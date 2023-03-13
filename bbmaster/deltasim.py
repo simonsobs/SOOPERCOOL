@@ -31,17 +31,47 @@ class DeltaBbl(object):
         self.seed0 = seed0
         self.n_iter = n_iter
         self._prepare_filtering()
+        self.alm_ord = hp.Alm()
+        self._sqrt2 = np.sqrt(2.)
+        self._oosqrt2 = 1/self._sqrt2
 
     def _prepare_filtering(self):
         # Match pixel resolution
         self.filt_d['mask'] = hp.ud_grade(self.filt_d['mask'], nside_out=self.nside)
 
-    def _dsim_default(self, seed, ell):
-        np.random.seed(seed)
+    def _gen_gaussian_alm(self, ell):
         cl = np.zeros(3*self.nside)
         cl[ell] = 1
+        # TODO: we can save time on the SHT massively, since in this case there is no
+        # sum over ell!
+        return hp.synfast(cl, self.nside)
+
+    def _gen_Z2_alm(self, ell):
+        idx = self.alm_ord.getidx(3*self.nside-1, ell,
+                                  np.arange(ell+1))
+        # Generate Z2 numbers (one per m)
+        # TODO: Is it clear that it's best to excite all m's
+        # rather than one (or some) at a time?
+        rans = self._oosqrt2*(2*np.random.binomial(1, 0.5,
+                                                   size=2*(ell+1))-1).reshape([2,
+                                                                               ell+1])
+        # Correct m=0 (it should be real and have twice as much variance
+        rans[0, 0] *= self._sqrt2
+        rans[1, 0] = 0
+        # Populate alms and transform to map
+        # TODO: we can save time on the SHT massively, since in this case there is no
+        # sum over ell!
+        alms = np.zeros(self.alm_ord.getsize(3*self.nside-1),
+                        dtype='complex128')
+        alms[idx] = rans[0]+1j*rans[1]
+        return hp.alm2map(alms, self.nside)
+
+    def _dsim_default(self, seed, ell):
+        np.random.seed(seed)
         if self.dsim_d['stats'] == 'Gaussian':
-            return hp.synfast(cl, self.nside)
+            return self._gen_gaussian_alm(ell)
+        elif self.dsim_d['stats'] == 'Z2':
+            return self._gen_Z2_alm(ell)
         else:
             raise ValueError("Only Gaussian sims implemented")
 
