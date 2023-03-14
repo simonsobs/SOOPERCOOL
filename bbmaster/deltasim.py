@@ -126,6 +126,13 @@ class DeltaBbl(object):
     def get_ells(self):
         return np.arange(self.lmin, self.lmax+1)
 
-    def gen_Bbl_all(self):
-        return np.array([self.gen_Bbl_at_ell(l)
-                         for l in self.get_ells()]).T
+    def gen_Bbl_all(self, verbose=False, every=10):
+        Bbls = []
+        for l in self.get_ells():
+            if verbose:
+                if l % every == 0:
+                    print(f" - ell = {l}")
+            Bbl = self.gen_Bbl_at_ell(l)
+            Bbls.append(Bbl)
+        Bbls = np.array(Bbls).T
+        return Bbls
