@@ -2,10 +2,14 @@ import numpy as np
 import healpy as hp
 import pymaster as nmt
 import copy
+import os
+import warnings
 
 
 class DeltaBbl(object):
-    def __init__(self, nside, dsim, filt, bins, lmin=2, lmax=None, nsim_per_ell=10, seed0=1000, n_iter=0):
+    def __init__(self, nside, dsim, filt, bins, prefix_save=None,
+                 lmin=2, lmax=None, nsim_per_ell=10, seed0=1000,
+                 n_iter=0):
         if not isinstance(dsim, dict):
             raise TypeError("For now delta simulators can only be "
                             "specified through a dictionary.")
@@ -34,6 +38,10 @@ class DeltaBbl(object):
         self.alm_ord = hp.Alm()
         self._sqrt2 = np.sqrt(2.)
         self._oosqrt2 = 1/self._sqrt2
+        self.prefix_save= prefix_save
+
+    def cleanup(self):
+        os.system(f'rm -rf {self.prefix_save}')
 
     def _prepare_filtering(self):
         # Match pixel resolution
@@ -83,16 +91,34 @@ class DeltaBbl(object):
         dsim_filt = self.filt(dsim_true)
         return dsim_filt
 
-    def gen_deltasim_bpw(self, seed, ell):
+    def _file_exists(self, isim, ell):
+        if self.prefix_save is None:
+            return False, None
+        else:
+            fname = os.path.join(self.prefix_save,
+                                 f'cb_ell{ell}_sim{isim}.npz')
+            isfile = os.path.isfile(fname)
+            if isfile:
+                warnings.warn("Reading from file. Run `cleanup` "
+                              "if you'd like to recompute bandpowers.",
+                              Warning)
+            return isfile, fname
+
+    def gen_deltasim_bpw(self, isim, ell):
+        isfile, fname = self._file_exists(isim, ell)
+        seed = ell*self.nsim_per_ell + isim
+        if isfile:
+            return np.load(fname)['cb']
         dsim = self.gen_deltasim(seed, ell)
         cb = self.bins.bin_cell(hp.anafast(dsim, iter=self.n_iter))
+        if fname is not None:
+            np.savez(fname, cb=cb)
         return cb
 
     def gen_Bbl_at_ell(self, ell):
         Bbl = np.zeros(self.bins.get_n_bands())
-        for i in range(self.nsim_per_ell):
-            seed = ell*self.nsim_per_ell + i
-            cb = self.gen_deltasim_bpw(seed, ell)
+        for isim in range(self.nsim_per_ell):
+            cb = self.gen_deltasim_bpw(isim, ell)
             Bbl += cb
         Bbl /= self.nsim_per_ell
         return Bbl
