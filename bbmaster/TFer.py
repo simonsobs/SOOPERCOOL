@@ -14,6 +14,8 @@ if __name__ == '__main__':
                         help='Name of sorting routine')
     parser.add_argument("--output-dir", type=str, help='Output directory')
     parser.add_argument("--sim-type", type=str, help='filtered or input')
+    parser.add_argument("--plot", action='store_true',
+                        help='Pass to generate a plot of the MCM.')
     o = parser.parse_args()
 
     man = PipelineManager(o.globals)
@@ -62,27 +64,35 @@ if __name__ == '__main__':
     ecl_filt = np.std(cls_filt, axis=0)
 
     # Naive transfer function
-    trans0 = np.array([[cl_filt[j, i]/cl_in[i, i] for i in range(4)]
-                       for j in range(4)])
+    # trans0 = np.array([[cl_filt[j, i]/cl_in[i, i] for i in range(4)]
+    #                    for j in range(4)])
     # Potentially more accurate transfer function
-    trans1 = np.einsum('ijl,jkl->ikl',
-                       np.einsum('jil,jkl->ikl', cl_in, cl_filt),
-                       np.transpose(np.linalg.inv(
-                           np.transpose(np.einsum('jil,jkl->ikl',
-                                                  cl_in, cl_in),
-                                        axes=[2, 0, 1])),
-                                    axes=[1, 2, 0]))
+    trans = np.einsum('ijl,jkl->ikl',
+                      np.einsum('jil,jkl->ikl', cl_in, cl_filt),
+                      np.transpose(np.linalg.inv(
+                          np.transpose(np.einsum('jil,jkl->ikl',
+                                                 cl_in, cl_in),
+                                       axes=[2, 0, 1])),
+                                   axes=[1, 2, 0]))
 
     # Save to file
     np.savez(os.path.join(o.output_dir, 'transfer.npz'),
-             TF=trans1)
-    combs = ['EE', 'EB', 'BE', 'BB']
-    for i1, comb1 in enumerate(combs):
-        for i2, comb2 in enumerate(combs):
+             TF=trans)
+
+    if o.plot:
+        # Now recover Cl_filt from Cl_in
+        cl_filt_r = np.einsum('ijl,kjl->ikl', trans, cl_in)
+        combs = ['EE', 'EB', 'BE', 'BB']
+        for i, comb in enumerate(combs):
             plt.figure()
-            plt.title(f'{comb2}->{comb1}')
-            plt.plot(leff, trans0[i1, i2], 'k-')
-            plt.plot(leff, trans1[i1, i2], 'r--')
-    plt.show()
-    print(trans0[0, 0])
-    print(trans1[0, 0])
+            plt.title(comb)
+            plt.plot(leff, cl_filt[i, i], 'k-')
+            plt.plot(leff, cl_filt_r[i, i], 'r:')
+        plt.show()
+
+        for i1, comb1 in enumerate(combs):
+            for i2, comb2 in enumerate(combs):
+                plt.figure()
+                plt.title(f'{comb2}->{comb1}')
+                plt.plot(leff, trans[i1, i2], 'k-')
+        plt.show()
