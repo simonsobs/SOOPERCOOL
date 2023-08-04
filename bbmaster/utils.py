@@ -32,7 +32,10 @@ class PipelineManager(object):
 
     def pl_sim_names(self, sim0, nsims, output_dir, which='input',
                      EandB=False):
-        names = self.pl_names[sim0:sim0+nsims]
+        if nsims == -1:
+            names = self.pl_names[sim0:]
+        else:
+            names = self.pl_names[sim0:sim0+nsims]
         fnames = []
         for n in names:
             if which == 'names':
