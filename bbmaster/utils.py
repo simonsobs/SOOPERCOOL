@@ -1,18 +1,58 @@
 import yaml
 import numpy as np
 import os
+from scipy.interpolate import interp1d
+
+
+def beam_gaussian(ll, fwhm_amin):
+    """
+    Returns the SHT of a Gaussian beam.
+    Args:
+        l (float or array): multipoles.
+        fwhm_amin (float): full-widht half-max in arcmins.
+    Returns:
+        float or array: beam sampled at `l`.
+    """
+    sigma_rad = np.radians(fwhm_amin / 2.355 / 60)
+    return np.exp(-0.5 * ll * (ll + 1) * sigma_rad**2)
+
+
+def beam_hpix(ll, nside):
+    """
+    Returns the SHT of the beam associated with a HEALPix
+    pixel size.
+    Args:
+        l (float or array): multipoles.
+        nside (int): HEALPix resolution parameter.
+    Returns:
+        float or array: beam sampled at `l`.
+    """
+    fwhm_hp_amin = 60 * 41.7 / nside
+    return beam_gaussian(ll, fwhm_hp_amin)
 
 
 class PipelineManager(object):
     def __init__(self, fname_config):
         with open(fname_config) as f:
             self.config = yaml.load(f, Loader=yaml.FullLoader)
-        self.pl_names = np.loadtxt(self.config['pl_sims'], dtype=str)
-        self.pl_input_dir = self.config['pl_sims_dir']
         self.nside = self.config['nside']
         self.fname_mask = self.config['mask']
         self.fname_binary_mask = self.config['binary_mask']
         self.bpw_edges = None
+        self.pl_names = np.loadtxt(self.config['pl_sims'], dtype=str)
+        self.pl_input_dir = self.config['pl_sims_dir']
+        self._get_cls_PL()
+
+    def _get_cls_PL(self):
+        d = np.load(self.config['cl_PL'])
+        lin = d['ls']
+        ls = np.arange(3*self.nside)
+        self.cls_PL = []
+        for kind in ['EE', 'EB', 'BE', 'BB']:
+            cli = interp1d(lin, d[f'cl{kind}'], bounds_error=False,
+                           fill_value=0)
+            self.cls_PL.append(cli(ls))
+        self.cls_PL = np.array(self.cls_PL)
 
     def get_bpw_edges(self):
         if self.bpw_edges is None:

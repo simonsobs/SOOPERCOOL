@@ -4,6 +4,7 @@ import sacc
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import pymaster as nmt
 
 
 if __name__ == '__main__':
@@ -14,17 +15,23 @@ if __name__ == '__main__':
                         help='Name of sorting routine')
     parser.add_argument("--output-dir", type=str, help='Output directory')
     parser.add_argument("--sim-type", type=str, help='filtered or input')
+    parser.add_argument("--use-theory", action='store_true',
+                        help='Pass to use theoretical power spectrum '
+                        'convolved with MCM to estimate the transfer function')
     parser.add_argument("--plot", action='store_true',
                         help='Pass to generate a plot of the MCM.')
     o = parser.parse_args()
 
     man = PipelineManager(o.globals)
+
+    # Get all simulation names and the pCl files
     sorter = getattr(man, o.sim_sorter)
     sim_names = sorter(0, -1, o.output_dir, which='names')
     pcl_in_names = sorter(0, -1, o.output_dir, which='input_Cl')
     pcl_filt_names = sorter(0, -1, o.output_dir, which='filtered_Cl')
 
     # Loop through each file and read all power spectra
+    nsims = len(sim_names)
     cls_in = []
     cls_filt = []
     for n, pin, pfilt in zip(sim_names, pcl_in_names, pcl_filt_names):
@@ -58,20 +65,38 @@ if __name__ == '__main__':
     leff = s.get_ell_cl('cl_ee', nE, nE)[0]
     cls_in = np.array(cls_in)
     cls_filt = np.array(cls_filt)
+
+    # Compute average over sims
     cl_in = np.mean(cls_in, axis=0)
     cl_filt = np.mean(cls_filt, axis=0)
     ecl_in = np.std(cls_in, axis=0)
     ecl_filt = np.std(cls_filt, axis=0)
 
-    # Naive transfer function
-    # trans0 = np.array([[cl_filt[j, i]/cl_in[i, i] for i in range(4)]
-    #                    for j in range(4)])
-    # Potentially more accurate transfer function
+    # Compute theoretical input pCl
+    bpw_edges = man.get_bpw_edges()
+    b = nmt.NmtBin.from_edges(bpw_edges[:-1], bpw_edges[1:])
+    mcm = np.load(os.path.join(o.output_dir, 'mcm.npz'))['mcm']
+    cl0 = np.zeros(3*man.nside)
+    cl_th = np.array([
+        b.bin_cell(np.einsum('ijkl,kl', mcm,
+                             np.array([man.cls_PL[0], cl0, cl0, cl0]))),
+        b.bin_cell(np.einsum('ijkl,kl', mcm,
+                             np.array([cl0, man.cls_PL[1], cl0, cl0]))),
+        b.bin_cell(np.einsum('ijkl,kl', mcm,
+                             np.array([cl0, cl0, man.cls_PL[2], cl0]))),
+        b.bin_cell(np.einsum('ijkl,kl', mcm,
+                             np.array([cl0, cl0, cl0, man.cls_PL[3]])))])
+
+    # Transfer function via least-squares fitting.
+    if o.use_theory:
+        pcl = cl_th
+    else:
+        pcl = cl_in
     trans = np.einsum('ijl,jkl->ikl',
-                      np.einsum('jil,jkl->ikl', cl_in, cl_filt),
+                      np.einsum('jil,jkl->ikl', pcl, cl_filt),
                       np.transpose(np.linalg.inv(
                           np.transpose(np.einsum('jil,jkl->ikl',
-                                                 cl_in, cl_in),
+                                                 pcl, pcl),
                                        axes=[2, 0, 1])),
                                    axes=[1, 2, 0]))
 
@@ -80,19 +105,38 @@ if __name__ == '__main__':
              TF=trans)
 
     if o.plot:
+        # Reliable ells
+        goodl = leff < 2*man.nside
+
         # Now recover Cl_filt from Cl_in
         cl_filt_r = np.einsum('ijl,kjl->ikl', trans, cl_in)
         combs = ['EE', 'EB', 'BE', 'BB']
         for i, comb in enumerate(combs):
             plt.figure()
             plt.title(comb)
-            plt.plot(leff, cl_filt[i, i], 'k-')
-            plt.plot(leff, cl_filt_r[i, i], 'r:')
+            plt.plot(leff[goodl], cl_filt[i, i][goodl], 'k-')
+            plt.plot(leff[goodl], cl_filt_r[i, i][goodl], 'r:')
         plt.show()
 
         for i1, comb1 in enumerate(combs):
             for i2, comb2 in enumerate(combs):
                 plt.figure()
                 plt.title(f'{comb2}->{comb1}')
-                plt.plot(leff, trans[i1, i2], 'k-')
+                plt.plot(leff[goodl], trans[i1, i2][goodl], 'k-')
+        plt.show()
+
+        for i1, c1 in enumerate(['EE', 'EB', 'BE', 'BB']):
+            plt.figure()
+            plt.title(f'{c1}->XY')
+            for i2, (c2, col) in enumerate(zip(['EE', 'EB', 'BE', 'BB'],
+                                               ['r', 'b', 'y', 'c'])):
+                p = cl_th[i1, i2]
+
+                plt.plot(leff[goodl], p[goodl], col+'-', label=f'XY={c2}')
+                plt.plot(leff[goodl], -p[goodl], col+':')
+                plt.errorbar(leff[goodl], np.fabs(cl_in[i1, i2][goodl]),
+                             yerr=ecl_in[i1, i2][goodl]/np.sqrt(nsims),
+                             fmt=col+'.')
+            plt.loglog()
+            plt.legend()
         plt.show()
