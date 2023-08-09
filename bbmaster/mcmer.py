@@ -20,9 +20,10 @@ def mcmer(o):
     # Create dummy NaMaster field
     f = nmt.NmtField(mask, None, spin=2)
     # Binning scheme is irrelevant for us, but NaMaster needs one.
-    b = nmt.NmtBin(man.nside, nlb=10)
+    b = man.get_nmt_bins()
 
-    # Alright, compute and reshape coupling matrix
+    # Alright, compute and reshape coupling matrix.
+    # Compute also the binned MCM (this is actually what we need).
     print("Computing MCM")
     w = nmt.NmtWorkspace()
     w.compute_coupling_matrix(f, f, b)

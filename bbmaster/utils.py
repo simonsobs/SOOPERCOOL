@@ -2,6 +2,7 @@ import yaml
 import numpy as np
 import os
 from scipy.interpolate import interp1d
+import pymaster as nmt
 
 
 def beam_gaussian(ll, fwhm_amin):
@@ -40,7 +41,9 @@ class PipelineManager(object):
         self.fname_binary_mask = self.config['binary_mask']
         self.bpw_edges = None
         self.pl_names = np.loadtxt(self.config['pl_sims'], dtype=str)
+        self.val_names = np.loadtxt(self.config['val_sims'], dtype=str)
         self.pl_input_dir = self.config['pl_sims_dir']
+        self.val_input_dir = self.config['val_sims_dir']
         self._get_cls_PL()
 
     def _get_cls_PL(self):
@@ -59,12 +62,40 @@ class PipelineManager(object):
             self.bpw_edges = np.load(self.config['bpw_edges'])['bpw_edges']
         return self.bpw_edges
 
+    def get_nmt_bins(self):
+        bpw_edges = self.get_bpw_edges()
+        b = nmt.NmtBin.from_edges(bpw_edges[:-1], bpw_edges[1:])
+        return b
+
     def cl_pair_iter(self, nmaps):
         icl = 0
         for i in range(nmaps):
             for j in range(i, nmaps):
                 yield icl, i, j
                 icl += 1
+
+    def val_sim_names(self, sim0, nsims, output_dir, which='input'):
+        if nsims == -1:
+            names = self.val_names[sim0:]
+        else:
+            names = self.val_names[sim0:sim0+nsims]
+        fnames = []
+        for n in names:
+            if which == 'names':
+                fnames.append(n)
+            elif which == 'input':
+                fn = os.path.join(self.val_input_dir, n+'.fits')
+                fnames.append(fn)
+            elif which == 'filtered':
+                fn = os.path.join(output_dir, n+'_filtered.fits')
+                fnames.append(fn)
+            elif which == 'input_Cl':
+                fnames.append(os.path.join(output_dir, n+'_cl_in.fits'))
+            elif which == 'filtered_Cl':
+                fnames.append(os.path.join(output_dir, n+'_cl_filtered.fits'))
+            else:
+                raise ValueError(f"Unknown kind {which}")
+        return fnames
 
     def pl_sim_names_EandB(self, sim0, nsims, output_dir, which):
         return self.pl_sim_names(sim0, nsims, output_dir,

@@ -4,7 +4,6 @@ import sacc
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-import pymaster as nmt
 
 
 if __name__ == '__main__':
@@ -63,29 +62,39 @@ if __name__ == '__main__':
         cls_filt.append(cls)
     s = sacc.Sacc.load_fits(pfilt)
     leff = s.get_ell_cl('cl_ee', nE, nE)[0]
+    # Shape is [Nsims, N_pure_pairs, N_pol_pairs, N_ells]
     cls_in = np.array(cls_in)
     cls_filt = np.array(cls_filt)
 
     # Compute average over sims
+    # Shape is [N_pure_pairs, N_pol_pairs, N_ells]
     cl_in = np.mean(cls_in, axis=0)
     cl_filt = np.mean(cls_filt, axis=0)
     ecl_in = np.std(cls_in, axis=0)
     ecl_filt = np.std(cls_filt, axis=0)
 
+    # Construct binning matrix
+    b = man.get_nmt_bins()
+    nl = 3*man.nside
+    nbpw = b.get_n_bands()
+    binner = np.array([b.bin_cell(np.array([cl]))[0]
+                       for cl in np.eye(nl)]).T
+
     # Compute theoretical input pCl
-    bpw_edges = man.get_bpw_edges()
-    b = nmt.NmtBin.from_edges(bpw_edges[:-1], bpw_edges[1:])
-    mcm = np.load(os.path.join(o.output_dir, 'mcm.npz'))['mcm']
     cl0 = np.zeros(3*man.nside)
+    # Full mask MCM
+    mcm = np.load(os.path.join(o.output_dir, 'mcm.npz'))['mcm']
+    # Binned mask MCM
+    bmcm = np.einsum('ij,kjlm->kilm', binner, mcm)
     cl_th = np.array([
-        b.bin_cell(np.einsum('ijkl,kl', mcm,
-                             np.array([man.cls_PL[0], cl0, cl0, cl0]))),
-        b.bin_cell(np.einsum('ijkl,kl', mcm,
-                             np.array([cl0, man.cls_PL[1], cl0, cl0]))),
-        b.bin_cell(np.einsum('ijkl,kl', mcm,
-                             np.array([cl0, cl0, man.cls_PL[2], cl0]))),
-        b.bin_cell(np.einsum('ijkl,kl', mcm,
-                             np.array([cl0, cl0, cl0, man.cls_PL[3]])))])
+        np.einsum('ijkl,kl->ij', bmcm,
+                  np.array([man.cls_PL[0], cl0, cl0, cl0])),
+        np.einsum('ijkl,kl->ij', bmcm,
+                  np.array([cl0, man.cls_PL[1], cl0, cl0])),
+        np.einsum('ijkl,kl->ij', bmcm,
+                  np.array([cl0, cl0, man.cls_PL[2], cl0])),
+        np.einsum('ijkl,kl->ij', bmcm,
+                  np.array([cl0, cl0, cl0, man.cls_PL[3]]))])
 
     # Transfer function via least-squares fitting.
     if o.use_theory:
@@ -100,16 +109,34 @@ if __name__ == '__main__':
                                        axes=[2, 0, 1])),
                                    axes=[1, 2, 0]))
 
+    # Binned mask MCM times transfer function
+    tbmcm = np.einsum('ijk,jklm->iklm', trans, bmcm)
+    # Fully binned coupling matrix (including filtering)
+    btbmcm = np.transpose(
+        np.array([np.sum(tbmcm[:, :, :, b.get_ell_list(i)],
+                         axis=-1)
+                  for i in range(b.get_n_bands())]),
+        axes=[1, 2, 3, 0])
+    # Invert and multiply by tbmcm to get final bandpower
+    # window functions.
+    ibtbmcm = np.linalg.inv(btbmcm.reshape([4*nbpw, 4*nbpw]))
+    winflat = np.dot(ibtbmcm, tbmcm.reshape([4*nbpw, 4*nl]))
+    wcal_inv = ibtbmcm.reshape([4, nbpw, 4, nbpw])
+    bpw_windows = winflat.reshape([4, nbpw, 4, nl])
+
     # Save to file
     np.savez(os.path.join(o.output_dir, 'transfer.npz'),
-             TF=trans)
+             mcm=mcm,  # We save the original mcm for completeness
+             transfer_function=trans,
+             bpw_windows=bpw_windows,
+             wcal_inv=wcal_inv)
 
     if o.plot:
         # Reliable ells
         goodl = leff < 2*man.nside
 
         # Now recover Cl_filt from Cl_in
-        cl_filt_r = np.einsum('ijl,kjl->ikl', trans, cl_in)
+        cl_filt_r = np.einsum('ijl,kjl->kil', trans, cl_in)
         combs = ['EE', 'EB', 'BE', 'BB']
         for i, comb in enumerate(combs):
             plt.figure()
@@ -117,6 +144,7 @@ if __name__ == '__main__':
             plt.plot(leff[goodl], cl_filt[i, i][goodl], 'k-')
             plt.plot(leff[goodl], cl_filt_r[i, i][goodl], 'r:')
         plt.show()
+        exit(1)
 
         for i1, comb1 in enumerate(combs):
             for i2, comb2 in enumerate(combs):
