@@ -101,13 +101,17 @@ if __name__ == '__main__':
         pcl = cl_th
     else:
         pcl = cl_in
-    trans = np.einsum('ijl,jkl->ikl',
-                      np.einsum('jil,jkl->ikl', pcl, cl_filt),
-                      np.transpose(np.linalg.inv(
-                          np.transpose(np.einsum('jil,jkl->ikl',
-                                                 pcl, pcl),
-                                       axes=[2, 0, 1])),
-                                   axes=[1, 2, 0]))
+    cct_inv = np.transpose(
+        np.linalg.inv(
+            np.transpose(np.einsum('jil,jkl->ikl', pcl, pcl),
+                         axes=[2, 0, 1])),
+        axes=[1, 2, 0])
+    trans = np.einsum('ijl,jkl->kil', cct_inv,
+                      np.einsum('jil,jkl->ikl', pcl, cl_filt))
+    # Standard deviation from MC simulations
+    etrans = np.std(np.array([np.einsum('ijl,jkl->kil', cct_inv,
+                                        np.einsum('jil,jkl->ikl', pcl, clf))
+                              for clf in cls_filt]), axis=0)
 
     # Binned mask MCM times transfer function
     tbmcm = np.einsum('ijk,jklm->iklm', trans, bmcm)
@@ -127,7 +131,9 @@ if __name__ == '__main__':
     # Save to file
     np.savez(os.path.join(o.output_dir, 'transfer.npz'),
              mcm=mcm,  # We save the original mcm for completeness
+             bmcm=bmcm,  # We save the original mcm for completeness
              transfer_function=trans,
+             transfer_function_error=etrans,
              bpw_windows=bpw_windows,
              wcal_inv=wcal_inv)
 
