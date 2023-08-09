@@ -97,6 +97,7 @@ class PipelineManager(object):
         self.pl_input_dir = self.config['pl_sims_dir']
         self.val_input_dir = self.config['val_sims_dir']
         self._get_cls_PL()
+        self._get_cls_val()
 
     def _get_cls_PL(self):
         d = np.load(self.config['cl_PL'])
@@ -108,6 +109,17 @@ class PipelineManager(object):
                            fill_value=0)
             self.cls_PL.append(cli(ls))
         self.cls_PL = np.array(self.cls_PL)
+
+    def _get_cls_val(self):
+        d = np.load(self.config['cl_val'])
+        lin = d['ls']
+        ls = np.arange(3*self.nside)
+        self.cls_val = []
+        for kind in ['EE', 'EB', 'BE', 'BB']:
+            cli = interp1d(lin, d[f'cl{kind}'], bounds_error=False,
+                           fill_value=0)
+            self.cls_val.append(cli(ls))
+        self.cls_val = np.array(self.cls_val)
 
     def get_bpw_edges(self):
         if self.bpw_edges is None:

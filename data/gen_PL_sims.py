@@ -19,7 +19,7 @@ cl0 = np.zeros(3*nside)
 np.savez('val/cl_val.npz', ls=ls,
          clEE=clEE, clEB=cl0, clBE=cl0, clBB=clBB)
 
-nsims = 100
+nsims = 200
 for i in range(nsims):
     print(i)
 

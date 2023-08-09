@@ -10,10 +10,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Transfer function')
     parser.add_argument("--globals", type=str,
                         help='Path to yaml with global parameters')
-    parser.add_argument("--sim-sorter", type=str,
-                        help='Name of sorting routine')
     parser.add_argument("--output-dir", type=str, help='Output directory')
-    parser.add_argument("--sim-type", type=str, help='filtered or input')
     parser.add_argument("--use-theory", action='store_true',
                         help='Pass to use theoretical power spectrum '
                         'convolved with MCM to estimate the transfer function')
@@ -24,7 +21,7 @@ if __name__ == '__main__':
     man = PipelineManager(o.globals)
 
     # Get all simulation names and the pCl files
-    sorter = getattr(man, o.sim_sorter)
+    sorter = man.pl_sim_names_EandB
     sim_names = sorter(0, -1, o.output_dir, which='names')
     pcl_in_names = sorter(0, -1, o.output_dir, which='input_Cl')
     pcl_filt_names = sorter(0, -1, o.output_dir, which='filtered_Cl')
