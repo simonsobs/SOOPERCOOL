@@ -11,4 +11,4 @@ do
     python3 -m bbmaster.pcler --globals=data/globals.yml --first-sim=${sim0} --num-sims=10 --sim-sorter=pl_sim_names_EandB --output-dir=mbatch_out/ --sim-type=filtered
 done
 # Estimate transfer function
-python3 -m bbmaster.TFer --globals=data/globals.yml --sim-sorter=pl_sim_names_EandB --output-dir=mbatch_out/ --plot
+python3 -m bbmaster.TFer --globals=data/globals.yml --sim-sorter=pl_sim_names_EandB --output-dir=mbatch_out/ --use-theory --plot
