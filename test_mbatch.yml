@@ -1,0 +1,149 @@
+root_dir: mbatch_test
+
+globals:
+  nside: 64
+  mask: data/mask_apodized.fits
+  binary_mask: data/mask_binary.fits.gz
+  pl_sims: data/plsims.txt
+  pl_sims_dir: data/PL
+  cl_PL: data/PL/cl_PL.npz
+  val_sims: data/valsims.txt
+  val_sims_dir: data/val
+  cl_val: data/val/cl_val.npz
+  bpw_edges: data/bpw_edges.npz
+  global: data/globals.yml
+
+gitcheck_pkgs:
+  - numpy
+  - healpy
+#  - pymaster
+
+stages:
+  # Compute mask's MCM
+  mcm:
+    exec: python3
+    script: pipeline/mcmer.py
+    globals:
+      - global
+
+  # Filter all power-law sims
+  filter_PL:
+    exec: python3
+    script: pipeline/filterer_mcut.py
+    globals:
+      - global
+    options:
+      first-sim: 0
+      num-sims: 200
+      m-cut: 30
+      sim-sorter: pl_sim_names
+
+  # Filter all validation sims
+  filter_val:
+    exec: python3
+    script: pipeline/filterer_mcut.py
+    globals:
+      - global
+    options:
+      first-sim: 0
+      num-sims: 200
+      m-cut: 30
+      sim-sorter: val_sim_names
+
+  # Compute pseudo-Cl of input power-law sims
+  pcl_PL_in:
+    exec: python3
+    script: pipeline/pcler.py
+    globals:
+      - global
+    options:
+      first-sim: 0
+      num-sims: 200
+      sim-sorter: pl_sim_names_EandB
+      sim-type: input
+
+  # Compute pseudo-Cl of filtered power-law sims
+  pcl_PL_filt:
+    exec: python3
+    script: pipeline/pcler.py
+    globals:
+      - global
+    depends:
+      - filter_PL
+    options:
+      first-sim: 0
+      num-sims: 200
+      sim-sorter: pl_sim_names_EandB
+      sim-type: filtered
+
+  # Compute pseudo-Cl of input validation sims
+  pcl_val_in:
+    exec: python3
+    script: pipeline/pcler.py
+    globals:
+      - global
+    options:
+      first-sim: 0
+      num-sims: 200
+      sim-sorter: val_sim_names
+      sim-type: input
+
+  # Compute pseudo-Cl of filtered validation sims
+  pcl_val_filt:
+    exec: python3
+    script: pipeline/pcler.py
+    globals:
+      - global
+    depends:
+      - filter_val
+    options:
+      first-sim: 0
+      num-sims: 200
+      sim-sorter: val_sim_names
+      sim-type: filtered
+
+  # Estimate transfer function and bandpower
+  # window functions from PL sim products
+  transfer:
+    exec: python3
+    script: pipeline/transfer.py
+    globals:
+      - global
+    depends:
+      - mcm
+      - pcl_PL_in
+      - pcl_PL_filt
+    options:
+      use-theory: True
+
+  # Compute Cl of filtered validation sims
+  # corrected for the transfer function
+  cl_val:
+    exec: python3
+    script: pipeline/pcler.py
+    globals:
+      - global
+    depends:
+      - filter_val
+      - transfer
+    options:
+      first-sim: 0
+      num-sims: 200
+      sim-sorter: val_sim_names
+      sim-type: decoupled
+      correct-transfer: True
+
+  # Compare Cl of validation sims with theory
+  # convolved with bpw window functions
+  transfer_val:
+    exec: python3
+    script: pipeline/transfer_validator.py
+    globals:
+      - global
+    depends:
+      - pcl_val_in
+      - pcl_val_filt
+      - transfer
+      - cl_val
+    options:
+      transfer-threshold: 0.05

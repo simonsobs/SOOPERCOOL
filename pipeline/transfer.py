@@ -1,9 +1,8 @@
 import argparse
-from .utils import PipelineManager
+from bbmaster.utils import PipelineManager
 import sacc
 import numpy as np
 import matplotlib.pyplot as plt
-import os
 
 
 if __name__ == '__main__':
@@ -80,7 +79,7 @@ if __name__ == '__main__':
     # Compute theoretical input pCl
     cl0 = np.zeros(3*man.nside)
     # Full mask MCM
-    mcm = np.load(os.path.join(o.output_dir, 'mcm.npz'))['mcm']
+    mcm = np.load(man.get_filename('mcm', o.output_dir))['mcm']
     # Binned mask MCM
     bmcm = np.einsum('ij,kjlm->kilm', binner, mcm)
     cl_th = np.array([
@@ -126,7 +125,8 @@ if __name__ == '__main__':
     bpw_windows = winflat.reshape([4, nbpw, 4, nl])
 
     # Save to file
-    np.savez(os.path.join(o.output_dir, 'transfer.npz'),
+    fname = man.get_filename('transfer_function', o.output_dir)
+    np.savez(fname,
              mcm=mcm,  # We save the original mcm for completeness
              bmcm=bmcm,  # We save the original mcm for completeness
              transfer_function=trans,

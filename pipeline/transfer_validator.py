@@ -1,5 +1,5 @@
 import argparse
-from .utils import PipelineManager
+from bbmaster.utils import PipelineManager
 import sacc
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,13 +20,9 @@ if __name__ == '__main__':
     parser.add_argument("--globals", type=str,
                         help='Path to yaml with global parameters')
     parser.add_argument("--output-dir", type=str, help='Output directory')
-    parser.add_argument("--mcm", type=str,
-                        help='Path to transfer function file')
     parser.add_argument("--transfer-threshold", type=float, default=0.05,
                         help='Minimum value of the transfer function '
                         'to validate')
-    parser.add_argument("--plot", action='store_true',
-                        help='Pass to generate a plot of the MCM.')
     o = parser.parse_args()
 
     man = PipelineManager(o.globals)
@@ -53,7 +49,8 @@ if __name__ == '__main__':
     ecl_dec = np.std(cls_dec, axis=0)
 
     # Read transfer function and compute theoretical predictions
-    transf = np.load(o.mcm)
+    fname_transfer = man.get_filename('transfer_function', o.output_dir)
+    transf = np.load(fname_transfer)
     cl_in_th = np.einsum('ijkl,kl', transf['bmcm'], man.cls_val)
     cl_filt_th = np.einsum('ijk,jk->ik', transf['transfer_function'], cl_in_th)
     cl_dec_th = np.einsum('ijkl,kl', transf['bpw_windows'], man.cls_val)

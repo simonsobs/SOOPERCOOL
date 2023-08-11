@@ -1,6 +1,6 @@
 import argparse
 import healpy as hp
-from .utils import PipelineManager
+from bbmaster.utils import PipelineManager
 import numpy as np
 
 

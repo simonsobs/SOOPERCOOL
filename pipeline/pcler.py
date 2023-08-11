@@ -1,7 +1,7 @@
 import argparse
 import healpy as hp
 import numpy as np
-from .utils import PipelineManager, get_pcls
+from bbmaster.utils import PipelineManager, get_pcls
 
 
 if __name__ == '__main__':
@@ -14,16 +14,18 @@ if __name__ == '__main__':
                         help='Name of sorting routine')
     parser.add_argument("--output-dir", type=str, help='Output directory')
     parser.add_argument("--sim-type", type=str, help='filtered or input')
-    parser.add_argument("--mcm", type=str,
-                        help='Path to bandpower window file')
+    parser.add_argument("--correct-transfer", action='store_true',
+                        help='Correct for transfer function?')
     o = parser.parse_args()
 
-    if o.mcm is not None:
-        winv = np.load(o.mcm)['wcal_inv']
+    man = PipelineManager(o.globals)
+
+    if o.correct_transfer:
+        fname = man.get_filename('transfer_function', o.output_dir)
+        winv = np.load(fname)['wcal_inv']
     else:
         winv = None
 
-    man = PipelineManager(o.globals)
     sorter = getattr(man, o.sim_sorter)
     b = man.get_nmt_bins()
 

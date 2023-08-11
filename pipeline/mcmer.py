@@ -3,7 +3,7 @@ import numpy as np
 import pymaster as nmt
 import healpy as hp
 import os
-from .utils import PipelineManager
+from bbmaster.utils import PipelineManager
 
 
 def mcmer(o):
@@ -31,8 +31,9 @@ def mcmer(o):
                        axes=[1, 0, 3, 2])
 
     # Save to file
-    print("Saving")
-    np.savez(os.path.join(o.output_dir, 'mcm.npz'), mcm=mcm)
+    fname_out = man.get_filename('mcm', o.output_dir)
+    print(f"Saving to {fname_out}")
+    np.savez(fname_out, mcm=mcm)
 
     if o.plot:
         import matplotlib.pyplot as plt
@@ -41,7 +42,9 @@ def mcmer(o):
         plt.figure()
         plt.imshow(mcm.reshape([nspec*nl, nspec*nl]))
         plt.colorbar()
-        plt.savefig(os.path.join(o.output_dir, "mcm.pdf"), bbox_inches='tight')
+        fname = os.path.join(man.get_filenam("mcm_plots", o.output_dir),
+                             'mcm.pdf')
+        plt.savefig(fname, bbox_inches='tight')
 
 
 if __name__ == '__main__':

@@ -99,6 +99,62 @@ class PipelineManager(object):
         self._get_cls_PL()
         self._get_cls_val()
 
+        self.stname_mcm = 'mcm'
+        self.stname_filtpl = 'filter_PL'
+        self.stname_pclpl_in = 'pcl_PL_in'
+        self.stname_pclpl_filt = 'pcl_PL_filt'
+        self.stname_filtval = 'filter_val'
+        self.stname_pclval_in = 'pcl_val_in'
+        self.stname_pclval_filt = 'pcl_val_filt'
+        self.stname_clval = 'cl_val'
+        self.stname_transfer = 'transfer'
+
+    def get_filename(self, product, out_base_dir, simname=None):
+        if product == 'mcm':  # NaMaster's MCM
+            fname = os.path.join(out_base_dir, '..',
+                                 self.stname_mcm, 'mcm.npz')
+        if product == 'mcm_plots':  # NaMaster's MCM plots dir
+            fname = os.path.join(out_base_dir, '..',
+                                 self.stname_mcm)
+        if product == 'pl_sim_input':  # Input PL sims
+            fname = os.path.join(self.pl_input_dir,
+                                 simname+'.fits')
+        if product == 'pl_sim_filtered':  # Filtered PL sims
+            fname = os.path.join(
+                out_base_dir, '..', self.stname_filtpl,
+                simname+'.fits')
+        if product == 'pcl_pl_sim_input':  # PCL of input PL sims
+            fname = os.path.join(
+                out_base_dir, '..', self.stname_pclpl_in,
+                simname+'_pcl_in.fits')
+        if product == 'pcl_pl_sim_filtered':  # PCL of filtered PL sims
+            fname = os.path.join(
+                out_base_dir, '..', self.stname_pclpl_filt,
+                simname+'_pcl_filt.fits')
+        if product == 'val_sim_input':  # Input validation sims
+            fname = os.path.join(self.val_input_dir,
+                                 simname+'.fits')
+        if product == 'val_sim_filtered':  # Filtered validation sims
+            fname = os.path.join(
+                out_base_dir, '..', self.stname_filtval,
+                simname+'.fits')
+        if product == 'pcl_val_sim_input':  # PCL of input validations sims
+            fname = os.path.join(
+                out_base_dir, '..', self.stname_pclval_in,
+                simname+'_pcl_in.fits')
+        if product == 'pcl_val_sim_filtered':  # PCL of filtered validation sims
+            fname = os.path.join(
+                out_base_dir, '..', self.stname_pclval_filt,
+                simname+'_pcl_filt.fits')
+        if product == 'cl_val_sim':  # CL of filtered validation sims
+            fname = os.path.join(
+                out_base_dir, '..', self.stname_clval,
+                simname+'_cl.fits')
+        if product == 'transfer_function':
+            fname = os.path.join(
+                out_base_dir, '..', self.stname_transfer, 'transfer.npz')
+        return fname
+
     def _get_cls_PL(self):
         d = np.load(self.config['cl_PL'])
         lin = d['ls']
@@ -146,21 +202,25 @@ class PipelineManager(object):
         fnames = []
         for n in names:
             if which == 'names':
-                fnames.append(n)
+                fn = n
             elif which == 'input':
-                fn = os.path.join(self.val_input_dir, n+'.fits')
-                fnames.append(fn)
+                fn = self.get_filename('val_sim_input',
+                                       output_dir, n)
             elif which in ['filtered', 'decoupled']:
-                fn = os.path.join(output_dir, n+'_filtered.fits')
-                fnames.append(fn)
+                fn = self.get_filename('val_sim_filtered',
+                                       output_dir, n)
             elif which == 'input_Cl':
-                fnames.append(os.path.join(output_dir, n+'_cl_in.fits'))
+                fn = self.get_filename("pcl_val_sim_input",
+                                       output_dir, n)
             elif which == 'filtered_Cl':
-                fnames.append(os.path.join(output_dir, n+'_cl_filtered.fits'))
+                fn = self.get_filename("pcl_val_sim_filtered",
+                                       output_dir, n)
             elif which == 'decoupled_Cl':
-                fnames.append(os.path.join(output_dir, n+'_cl_decoupled.fits'))
+                fn = self.get_filename("cl_val_sim",
+                                       output_dir, n)
             else:
                 raise ValueError(f"Unknown kind {which}")
+            fnames.append(fn)
         return fnames
 
     def pl_sim_names_EandB(self, sim0, nsims, output_dir, which):
@@ -184,25 +244,31 @@ class PipelineManager(object):
                     fnames.append(fE)
                     fnames.append(fB)
             elif which == 'input':
-                fE = os.path.join(self.pl_input_dir, n+'_E.fits')
-                fB = os.path.join(self.pl_input_dir, n+'_B.fits')
+                fE = self.get_filename('pl_sim_input',
+                                       output_dir, n+'_E')
+                fB = self.get_filename('pl_sim_input',
+                                       output_dir, n+'_B')
                 if EandB:
                     fnames.append([fE, fB])
                 else:
                     fnames.append(fE)
                     fnames.append(fB)
             elif which == 'filtered':
-                fE = os.path.join(output_dir, n+'_filtered_E.fits')
-                fB = os.path.join(output_dir, n+'_filtered_B.fits')
+                fE = self.get_filename('pl_sim_filtered',
+                                       output_dir, n+'_E')
+                fB = self.get_filename('pl_sim_filtered',
+                                       output_dir, n+'_B')
                 if EandB:
                     fnames.append([fE, fB])
                 else:
                     fnames.append(fE)
                     fnames.append(fB)
             elif which == 'input_Cl':
-                fnames.append(os.path.join(output_dir, n+'_cl_in.fits'))
+                fn = self.get_filename('pcl_pl_sim_input', output_dir, n)
+                fnames.append(fn)
             elif which == 'filtered_Cl':
-                fnames.append(os.path.join(output_dir, n+'_cl_filtered.fits'))
+                fn = self.get_filename('pcl_pl_sim_filtered', output_dir, n)
+                fnames.append(fn)
             else:
                 raise ValueError(f"Unknown kind {which}")
         return fnames
