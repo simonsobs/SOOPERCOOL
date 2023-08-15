@@ -59,9 +59,11 @@ if __name__ == '__main__':
     tf = transf['transfer_function'][0, 0]
     goodl = (tf > o.transfer_threshold) & (leff < 2*man.nside)
 
+    titles = ['EE', 'EB', 'BE', 'BB']
     # Transfer function
     fig, axes = plt.subplots(4, 4, figsize=(10, 10),
                              sharex=True)
+    fig.suptitle("Transfer function")
     for i in range(4):
         for j in range(4):
             ax = axes[i, j]
@@ -69,6 +71,8 @@ if __name__ == '__main__':
             ax.errorbar(leff[goodl], transf['transfer_function'][i, j][goodl],
                         yerr=transf['transfer_function_error'][i, j][goodl],
                         fmt='b.')
+            ax.text(0.6, 0.9, f'{titles[j]}->{titles[i]}',
+                    transform=ax.transAxes)
     plt.savefig(os.path.join(o.output_dir, 'transfer_val.pdf'),
                 bbox_inches='tight')
 
@@ -76,29 +80,40 @@ if __name__ == '__main__':
     bpw = transf['bpw_windows']
     fig, axes = plt.subplots(4, 4, figsize=(10, 10),
                              sharex=True)
+    fig.suptitle("Bandpower window functions")
     for i in range(4):
         for j in range(4):
             ax = axes[i, j]
             for k in range(len(leff)):
                 ax.plot(bpw[i, k, j, :], 'r-')
+            ax.text(0.6, 0.9, f'{titles[j]}->{titles[i]}',
+                    transform=ax.transAxes)
     plt.savefig(os.path.join(o.output_dir, 'bandpower_windows.pdf'),
                 bbox_inches='tight')
 
     # Input spectra
+    fig.suptitle("Masked PCLs")
     fig, axes = plt.subplots(2, 2, figsize=(8, 8),
                              sharex=True)
     for i, ax in enumerate(axes.flatten()):
         ax.errorbar(leff, cl_in[i], yerr=ecl_in[i], fmt='k.')
         ax.plot(leff, cl_in_th[i], 'r-')
+        if i in [0, 3]:  # Log-scale for EE and BB
+            ax.set_yscale('log')
+        ax.text(0.85, 0.9, titles[i], transform=ax.transAxes)
     plt.savefig(os.path.join(o.output_dir, 'pcl_input_val.pdf'),
                 bbox_inches='tight')
 
     # Filtered spectra
+    fig.suptitle("Filtered PCLs")
     fig, axes = plt.subplots(2, 2, figsize=(8, 8),
                              sharex=True)
     for i, ax in enumerate(axes.flatten()):
         ax.errorbar(leff, cl_filt[i], yerr=ecl_filt[i], fmt='k.')
         ax.plot(leff, cl_filt_th[i], 'r-')
+        if i in [0, 3]:  # Log-scale for EE and BB
+            ax.set_yscale('log')
+        ax.text(0.85, 0.9, titles[i], transform=ax.transAxes)
     plt.savefig(os.path.join(o.output_dir, 'pcl_filtered_val.pdf'),
                 bbox_inches='tight')
 
@@ -106,11 +121,15 @@ if __name__ == '__main__':
     lth = np.arange(3*man.nside)
     fig, axes = plt.subplots(2, 2, figsize=(8, 8),
                              sharex=True)
+    fig.suptitle("Decoupled C_ells")
     for i, ax in enumerate(axes.flatten()):
         ax.errorbar(leff[goodl], cl_dec[i][goodl],
                     yerr=ecl_dec[i][goodl], fmt='k.')
         ax.plot(leff[goodl], cl_dec_th[i][goodl], 'r-')
         ax.plot(lth, man.cls_val[i], 'b--')
+        if i in [0, 3]:  # Log-scale for EE and BB
+            ax.set_yscale('log')
+        ax.text(0.85, 0.9, titles[i], transform=ax.transAxes)
     plt.savefig(os.path.join(o.output_dir, 'cl_decoupled_val.pdf'),
                 bbox_inches='tight')
     plt.show()

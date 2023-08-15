@@ -1,0 +1,20 @@
+# Resolution parameter
+nside: 64
+# Apodised mask
+mask: data/mask_apodized.fits
+# Binary mask
+binary_mask: data/mask_binary.fits.gz
+# List with power law sim names
+pl_sims: data/plsims.txt
+# Directory storing the PL sims
+pl_sims_dir: data/PL
+# Input PL power spectrum
+cl_PL: data/PL/cl_PL.npz
+# List with validation sim names
+val_sims: data/CMBlsims.txt
+# Directory storing the validation sims
+val_sims_dir: data/CMBl
+# Input validation power spectrum
+cl_val: data/CMBl/cl_CMBl.npz
+# Bandpower edges
+bpw_edges: data/bpw_edges.npz

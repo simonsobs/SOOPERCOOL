@@ -1,16 +1,6 @@
 root_dir: mbatch_test
 
 globals:
-  nside: 64
-  mask: data/mask_apodized.fits
-  binary_mask: data/mask_binary.fits.gz
-  pl_sims: data/plsims.txt
-  pl_sims_dir: data/PL
-  cl_PL: data/PL/cl_PL.npz
-  val_sims: data/valsims.txt
-  val_sims_dir: data/val
-  cl_val: data/val/cl_val.npz
-  bpw_edges: data/bpw_edges.npz
   global: data/globals.yml
 
 gitcheck_pkgs:
