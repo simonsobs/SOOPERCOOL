@@ -23,6 +23,8 @@ if __name__ == '__main__':
     parser.add_argument("--transfer-threshold", type=float, default=0.05,
                         help='Minimum value of the transfer function '
                         'to validate')
+    parser.add_argument("--show", action='store_true',
+                        help='Show plots live?')
     o = parser.parse_args()
 
     man = PipelineManager(o.globals)
@@ -132,4 +134,5 @@ if __name__ == '__main__':
         ax.text(0.85, 0.9, titles[i], transform=ax.transAxes)
     plt.savefig(os.path.join(o.output_dir, 'cl_decoupled_val.pdf'),
                 bbox_inches='tight')
-    plt.show()
+    if o.show:
+        plt.show()
