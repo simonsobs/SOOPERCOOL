@@ -21,7 +21,7 @@ cl0 = np.zeros(3*nside)
 np.savez('val/cl_val.npz', ls=ls,
          clEE=clEE, clEB=cl0, clBE=cl0, clBB=clBB)
 
-d = np.loadtxt("../../BBPower/examples/data/camb_lens_nobb.dat", unpack=True)
+d = np.loadtxt("camb_lens_nobb.dat", unpack=True)
 clEE_CMBl = np.zeros(3*nside)
 clEE_CMBl[1:] = (2*np.pi*d[2]/(d[0]*(d[0]+1)))[:3*nside-1]
 clBB_CMBl = np.zeros(3*nside)
@@ -29,7 +29,7 @@ clBB_CMBl[1:] = (2*np.pi*d[3]/(d[0]*(d[0]+1)))[:3*nside-1]
 np.savez('CMBl/cl_CMBl.npz', ls=ls,
          clEE=clEE_CMBl, clEB=cl0, clBE=cl0, clBB=clBB_CMBl)
 
-dlr = np.loadtxt("../../BBPower/examples/data/camb_lens_r1.dat", unpack=True)
+dlr = np.loadtxt("camb_lens_r1.dat", unpack=True)
 rfid = 0.01
 clEE_CMBr = clEE_CMBl
 clBB_CMBr = np.zeros(3*nside)
