@@ -42,7 +42,7 @@ def mcmer(o):
         plt.figure()
         plt.imshow(mcm.reshape([nspec*nl, nspec*nl]))
         plt.colorbar()
-        fname = os.path.join(man.get_filenam("mcm_plots", o.output_dir),
+        fname = os.path.join(man.get_filename("mcm_plots", o.output_dir),
                              'mcm.pdf')
         plt.savefig(fname, bbox_inches='tight')
 
