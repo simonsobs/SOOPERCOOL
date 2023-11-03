@@ -1,0 +1,49 @@
+# Here is a sample .yaml file that can be used 
+# to store the metadata necessary to run the
+# SO BB pipeline.
+
+############################
+# Metadata related to maps #
+############################
+## Path to the maps
+map_directory: "/path/to/maps/" # I guess that we should be able to 
+                                # derive the name of the associated
+                                # map from the couple (exp, freq)
+map_type: "science"
+
+## Different experiment considered
+experiments: ["SAT1", "SAT2", "SAT3"]
+## For each experiment, the different maps considered
+frequencies:
+  SAT1: ["f093", "f145"]
+  SAT2: ["f093", "f145"]      #### /path/to/maps/science_SAT1_f093_split2.fits [IQU]
+  SAT3: ["f225", "f285"]      #### /path/to/maps/pwv_split_SAT2_f145_split3.fits
+num_splits:                   ### map_name.replace('.fits', '_ivar.fits')
+  SAT1: 2
+  SAT2: 2
+  SAT3: 2
+## Beam information
+beam_directory: "/path/to/beams/"
+
+####################
+# Masking metadata #
+####################
+mask_directory: '/path/to/masks/'
+## Name of galactic mask
+galactic_mask: 'galactic_mask.fits'
+## Name of point source mask
+point_source_mask: 'point_source_mask.fits'
+## Name of extra mask
+extra_mask: 'extra_mask.fits'
+
+####################################
+# Metadata related to the analysis #
+####################################
+lmax: 500
+nside_sims: 256
+num_sims: 1000
+
+
+Cls theory from camb + foregrounds --> fake sky --> power spectra (auto cross noise)
+covariances
+Try to include filtering 
