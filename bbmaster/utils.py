@@ -5,6 +5,7 @@ from scipy.interpolate import interp1d
 import pymaster as nmt
 import healpy as hp
 import sacc
+import camb
 
 
 def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
@@ -55,6 +56,80 @@ def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
             s.add_ell_cl('cl_be', names[i], names[j], leff, cls[icl][2])
         s.add_ell_cl('cl_bb', names[i], names[j], leff, cls[icl][3])
     s.save_fits(fname_out, overwrite=True)
+
+def theory_cls(cosmo_params, lmax):
+    """
+    """
+    params = camb.set_params(**cosmo_params)
+    results = camb.get_results(params)
+    powers = results.get_cmb_power_spectra(params, CMB_unit='muK', raw_cl=True)
+    ell = np.arange(lmax+1)
+    out_ps = {
+        "TT": powers["total"][:, 0],
+        "EE": powers["total"][:, 1],
+        "TE": powers["total"][:, 3],
+        "BB": powers["total"][:, 2]
+    }
+    for spec in ["EB", "TB"]:
+        out_ps[spec] = np.zeros_like(ell)
+    return ell, out_ps
+
+def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
+    """
+    """
+    size = 12 * nside**2
+
+    pixel_area_deg = hp.nside2pixarea(nside, degrees=True)
+    pixel_area_arcmin = 60**2 * pixel_area_deg
+
+    noise_rms_muK_T = noise_rms_muKarcmin / np.sqrt(pixel_area_arcmin)
+    
+    out_map = np.zeros((ncomp, size))
+    out_map[0, :] = np.random.randn(size) * noise_rms_muK_T
+
+    if ncomp == 3:
+        noise_rms_muK_P = np.sqrt(2) * noise_rms_muK_T
+        out_map[1, :] = np.random.randn(size) * noise_rms_muK_P
+        out_map[2, :] = np.random.randn(size) * noise_rms_muK_P
+        return out_map
+    return out_map
+
+def generate_noise_map(nl_T, nl_P, hitmap, n_splits):
+    """
+    """
+    if nl_T is None:
+        nl_T = nl_P / 2
+    if nl_P is None:
+        nl_P = nl_T * 2
+    
+    # healpix ordering ["TT", "EE", "BB", "TE"]
+    noise_mat = np.array([nl_T, nl_P, nl_P, np.zeros_like(nl_P)])
+    # Normalize the noise
+    noise_mat *= n_splits
+
+    noise_map = hp.synfast(noise_mat, hp.get_nside(hitmap), pol=True, new=True)
+
+    # Weight with hitmap
+    noise_map /= np.sqrt(hitmap / np.max(hitmap))
+
+    return noise_map
+
+    
+
+    
+def random_src_mask(mask, nsrcs, mask_radius_arcmin):
+    """
+    pspy.so_map
+    """
+    ps_mask = mask.copy()
+    src_ids = np.random.choice(np.where(mask == 1)[0], nsrcs)
+    for src_id in src_ids:
+        vec = hp.pix2vec(hp.get_nside(mask), src_id)
+        disc = hp.query_disc(hp.get_nside(mask), vec, np.deg2rad(mask_radius_arcmin / 60))
+        ps_mask[disc] = 0
+    return ps_mask
+
+
 
 
 def beam_gaussian(ll, fwhm_amin):
