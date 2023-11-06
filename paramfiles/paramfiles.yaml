@@ -57,6 +57,8 @@ map_sets:
 
 ## Beam information
 beam_directory: "beams"
+## Bandpass information
+bandpasses_directory: "/path/to/bandpasses/" #### /path/to/bandpasses/bandpass_SAT1_f093.txt
 
 ####################
 # Masking metadata #
@@ -80,7 +82,9 @@ masks:
 
 ## General parameters
 nside: 256
+lmin: 30
 lmax: 120
+deltal: 10
 
 ## Simulation related
 sim_pars:
@@ -99,14 +103,9 @@ sim_pars:
   mock_nsrcs: 80
   mock_srcs_hole_radius: 40
 
-
-
-
-
 ######################################
 # Metadata from existing global.yaml #
 ######################################
-
 # Apodised mask
 mask: data/mask_apodized.fits
 # Binary mask
