@@ -2,48 +2,126 @@
 # to store the metadata necessary to run the
 # SO BB pipeline.
 
-############################
-# Metadata related to maps #
-############################
+# Output directory
+output_dir: "outputs"
+
+##################################
+#    Metadata related to maps    #
+# ------------------------------ #
+#                                #
+# The structure of input splits  #
+# is the following:              #
+#                                #
+# tag:                           #
+#   file_root: ...               #
+#   n_splits: ...                #
+#   freq_tag: ...                #
+#   exp_tag: ...                 #
+##################################
+
 ## Path to the maps
-map_directory: "/path/to/maps/" # I guess that we should be able to 
+map_directory: "maps" # I guess that we should be able to 
                                 # derive the name of the associated
                                 # map from the couple (exp, freq)
-map_type: "science"
+map_sets:
+  SAT1_f093:
+    file_root: "cmb_sat1_f093"
+    n_splits: 4          # Number of splits
+    freq_tag: 93         # Freq. tag (useful for coadding ?)
+    exp_tag: "SAT1"      # Experiment tag (coadding?)
+  SAT1_f145:
+    file_root: "cmb_sat1_f145"
+    n_splits: 4
+    freq_tag: 145
+    exp_tag: "SAT1"
+  SAT2_f093:
+    file_root: "cmb_sat2_f093"
+    n_splits: 4
+    freq_tag: 93
+    exp_tag: "SAT2"
+  SAT2_f145:
+    file_root: "cmb_sat2_f145"
+    n_splits: 4
+    freq_tag: 145
+    exp_tag: "SAT2"
+  SAT3_f225:
+    file_root: "cmb_sat3_f225"
+    n_splits: 4
+    freq_tag: 225
+    exp_tag: "SAT3"
+  SAT3_f285:
+    file_root: "cmb_sat3_f285"
+    n_splits: 4
+    freq_tag: 280
+    exp_tag: "SAT3"
 
-## Different experiment considered
-experiments: ["SAT1", "SAT2", "SAT3"]
-## For each experiment, the different maps considered
-frequencies:
-  SAT1: ["f093", "f145"]
-  SAT2: ["f093", "f145"]      #### /path/to/maps/science_SAT1_f093_split2.fits [IQU]
-  SAT3: ["f225", "f285"]      #### /path/to/maps/pwv_split_SAT2_f145_split3.fits
-num_splits:                   ### map_name.replace('.fits', '_ivar.fits')
-  SAT1: 2
-  SAT2: 2
-  SAT3: 2
 ## Beam information
-beam_directory: "/path/to/beams/"
+beam_directory: "beams"
 
 ####################
 # Masking metadata #
 ####################
-mask_directory: '/path/to/masks/'
-## Name of galactic mask
-galactic_mask: 'galactic_mask.fits'
-## Name of point source mask
-point_source_mask: 'point_source_mask.fits'
-## Name of extra mask
-extra_mask: 'extra_mask.fits'
+masks:
+  mask_directory: "masks"
+  analysis_mask: "analysis_mask.fits"
+
+  binary_mask: "binary_mask.fits"
+  galactic_mask_root: "planck_galactic_mask"
+  point_source_mask: "point_source_mask.fits"
+
+  include_in_mask: ["galactic","point_source"]
+  gal_mask_mode: "gal070"
+  apod_radius: 2.5
+  apod_type: "C1"
 
 ####################################
 # Metadata related to the analysis #
 ####################################
-lmax: 500
-nside_sims: 256
-num_sims: 1000
+
+## General parameters
+nside: 256
+lmax: 120
+
+## Simulation related
+sim_pars:
+  hitmap_file: "../data/norm_nHits_SA_35FOV_ns512.fits"
+  nside_sims: 256
+  num_sims: 100
+  cosmology:
+    cosmomc_theta: 0.0104085
+    As: 2.1e-9
+    ombh2: 0.02237
+    omch2: 0.1200
+    ns: 0.9649
+    Alens: 1.0
+    tau: 0.0544
+    r: 0.01
+  mock_nsrcs: 80
+  mock_srcs_hole_radius: 40
 
 
-Cls theory from camb + foregrounds --> fake sky --> power spectra (auto cross noise)
-covariances
-Try to include filtering 
+
+
+
+######################################
+# Metadata from existing global.yaml #
+######################################
+
+# Apodised mask
+mask: data/mask_apodized.fits
+# Binary mask
+#binary_mask: data/mask_binary.fits.gz
+# List with power law sim names
+pl_sims: data/plsims.txt
+# Directory storing the PL sims
+pl_sims_dir: data/PL
+# Input PL power spectrum
+cl_PL: data/PL/cl_PL.npz
+# List with validation sim names
+val_sims: data/valsims.txt
+# Directory storing the validation sims
+val_sims_dir: data/val
+# Input validation power spectrum
+cl_val: data/val/cl_val.npz
+# Bandpower edges
+bpw_edges: data/bpw_edges.npz
