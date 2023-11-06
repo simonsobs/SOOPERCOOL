@@ -23,27 +23,31 @@ num_splits:                   ### map_name.replace('.fits', '_ivar.fits')
   SAT2: 2
   SAT3: 2
 ## Beam information
-beam_directory: "/path/to/beams/"
+beams_directory: "/path/to/beams/" #### /path/to/beams/beam_SAT1_f093.txt
+## Bandpass information
+bandpasses_directory: "/path/to/bandpasses/" #### /path/to/bandpasses/bandpass_SAT1_f093.txt
 
 ####################
 # Masking metadata #
 ####################
 mask_directory: '/path/to/masks/'
-## Name of galactic mask
-galactic_mask: 'galactic_mask.fits'
-## Name of point source mask
-point_source_mask: 'point_source_mask.fits'
-## Name of extra mask
-extra_mask: 'extra_mask.fits'
+
+mask_type:
+  SAT1: ['galactic', 'point_source', 'extra'] #### /path/to/masks/mask_SAT1_galactic_split1.fits
+  SAT2: ['galactic', 'point_source']          #### /path/to/masks/mask_SAT2_point_source_split2.fits
+  SAT3: ['galactic']
 
 ####################################
 # Metadata related to the analysis #
 ####################################
-lmax: 500
+lmin: 30
+lmax: 300
+deltal: 10
+nside: 256
 nside_sims: 256
 num_sims: 1000
 
 
-Cls theory from camb + foregrounds --> fake sky --> power spectra (auto cross noise)
-covariances
-Try to include filtering 
+#Cls theory from camb + foregrounds --> fake sky --> power spectra (auto cross noise)
+#covariances
+#Try to include filtering 
