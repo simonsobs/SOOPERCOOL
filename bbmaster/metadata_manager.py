@@ -184,3 +184,24 @@ class BBmeta(object):
             path_to_maps = self.map_directory
         
         return os.path.join(path_to_maps, f"{map_set_root}_split_{id_split}.fits")
+    
+    def read_map(self, map_set, id_split, id_sim=None, pol_only=False):
+        """
+        Read a map given a map set and split index.
+        Can also read a given simulation if `id_sim` is provided.
+
+        Parameters
+        ----------
+        map_set : str
+            Name of the map set.
+        id_split : int
+            Index of the split.
+        id_sim : int, optional
+            Index of the simulation.
+            If None, return the data map.
+        pol_only : bool, optional
+            Return only the polarization maps.
+        """
+        field = [1, 2] if pol_only else [0, 1, 2]
+        fname = self.get_map_filename(map_set, id_split, id_sim=id_sim)
+        return hp.read_map(fname, field=field)
