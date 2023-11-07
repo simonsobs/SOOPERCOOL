@@ -57,6 +57,7 @@ def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
         s.add_ell_cl('cl_bb', names[i], names[j], leff, cls[icl][3])
     s.save_fits(fname_out, overwrite=True)
 
+
 def theory_cls(cosmo_params, lmax):
     """
     """
@@ -73,6 +74,7 @@ def theory_cls(cosmo_params, lmax):
     for spec in ["EB", "TB"]:
         out_ps[spec] = np.zeros_like(ell)
     return ell, out_ps
+
 
 def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
     """
@@ -93,6 +95,7 @@ def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
         out_map[2, :] = np.random.randn(size) * noise_rms_muK_P
         return out_map
     return out_map
+
 
 def generate_noise_map(nl_T, nl_P, hitmap, n_splits):
     """
@@ -115,8 +118,6 @@ def generate_noise_map(nl_T, nl_P, hitmap, n_splits):
     return noise_map
 
     
-
-    
 def random_src_mask(mask, nsrcs, mask_radius_arcmin):
     """
     pspy.so_map
@@ -128,8 +129,6 @@ def random_src_mask(mask, nsrcs, mask_radius_arcmin):
         disc = hp.query_disc(hp.get_nside(mask), vec, np.deg2rad(mask_radius_arcmin / 60))
         ps_mask[disc] = 0
     return ps_mask
-
-
 
 
 def beam_gaussian(ll, fwhm_amin):

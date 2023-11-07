@@ -83,14 +83,15 @@ masks:
 ## General parameters
 nside: 256
 lmin: 30
-lmax: 120
+lmax: 400
 deltal: 10
 
 ## Simulation related
 sim_pars:
+  sims_directory: "sims"
   hitmap_file: "../data/norm_nHits_SA_35FOV_ns512.fits"
   nside_sims: 256
-  num_sims: 100
+  num_sims: 5
   cosmology:
     cosmomc_theta: 0.0104085
     As: 2.1e-9
