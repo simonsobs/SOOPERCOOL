@@ -157,7 +157,21 @@ class BBmeta(object):
     
     def get_map_filename(self, map_set, id_split, id_sim=None):
         """
-        
+        Get the path to file for a given `map_set` and split index.
+        Can also get the path to a given simulation if `id_sim` is provided.
+
+        Path to standard map : {map_directory}/{map_set_root}_split_{id_split}.fits
+        Path to sim map : e.g. {sims_directory}/0000/{map_set_root}_split_{id_split}.fits
+
+        Parameters
+        ----------
+        map_set : str
+            Name of the map set.
+        id_split : int
+            Index of the split.
+        id_sim : int, optional
+            Index of the simulation.
+            If None, return the path to the data map.
         """
         map_set_root = self.file_root_from_map_set(map_set)
         if id_sim is not None:
