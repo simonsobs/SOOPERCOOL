@@ -5,6 +5,8 @@ from scipy.interpolate import interp1d
 import pymaster as nmt
 import healpy as hp
 import sacc
+from itertools import combinations_with_replacement as cwr
+from itertools import combinations
 import camb
 
 class BBmeta(object):
@@ -41,13 +43,14 @@ class BBmeta(object):
         # Set all the `_directory` attributes
         self._set_directory_attributes()
 
-        # A list of the maps used in the analysis
-        self.map_sets_list = self._get_map_sets_list()
-
         # Initialize method to parse map_sets metadata
         map_sets_attributes = list(self.map_sets[next(iter(self.map_sets))].keys())
         for map_sets_attribute in map_sets_attributes:
             self._init_getter_from_map_set(map_sets_attribute)
+
+        # A list of the maps used in the analysis
+        self.map_sets_list = self._get_map_sets_list()
+        self.maps_list = self._get_map_list()
 
         # Initialize masks file_names
         for mask_type in ["binary", "galactic", "point_source", "analysis"]:
@@ -78,6 +81,18 @@ class BBmeta(object):
         Constructor for the map_sets_list attribute.
         """
         return list(self.map_sets.keys())
+    
+    
+    def _get_map_list(self):
+        """
+        List the different maps (including splits).
+        Constructor for the map_list attribute.
+        """
+        out_list = [
+            f"{map_set}__{id_split}" for map_set in self.map_sets_list
+                for id_split in range(self.n_splits_from_map_set(map_set))
+        ]
+        return out_list
 
 
     def _init_getter_from_map_set(self, map_set_attribute):
@@ -205,3 +220,33 @@ class BBmeta(object):
         field = [1, 2] if pol_only else [0, 1, 2]
         fname = self.get_map_filename(map_set, id_split, id_sim=id_sim)
         return hp.read_map(fname, field=field)
+    
+    def get_ps_names_list(self, type="all", coadd=False):
+        """
+        List all the possible cross split power spectra
+        Example: 
+            From two map_sets `ms1` and `ms2` with
+            two splits each, and `type="all"`, 
+            this function will return :
+            [('ms1__0', 'ms1__0'), ('ms1__0', 'ms1__1'),
+             ('ms1__0', 'ms2__0'), ('ms1__0', 'ms2__1'),
+             ('ms1__1', 'ms1__1'), ('ms1__1', 'ms2__0'),
+             ('ms1__1', 'ms2__1'), ('ms2__0', 'ms2__0'),
+             ('ms2__0', 'ms2__1'), ('ms2__1', 'ms2__1')]
+
+        Parameters
+        ----------
+        type : str, optional
+            Type of power spectra to return.
+            Can be "all", "auto" or "cross".
+        coadd: bool, optional
+            If True, return the cross-split power spectra names.
+            Else, return the (split-)coadded power spectra names.
+        """
+        map_iterable = self.map_sets_list if coadd else self.maps_list
+        if type == "all":
+            return list(cwr(map_iterable, 2))
+        elif type == "auto":
+            return [(map_name, map_name) for map_name in map_iterable]
+        elif type == "cross":
+            return list(combinations(map_iterable, 2))
