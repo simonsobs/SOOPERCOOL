@@ -99,12 +99,7 @@ def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
 
 def generate_noise_map(nl_T, nl_P, hitmap, n_splits):
     """
-    """
-    if nl_T is None:
-        nl_T = nl_P / 2
-    if nl_P is None:
-        nl_P = nl_T * 2
-    
+    """    
     # healpix ordering ["TT", "EE", "BB", "TE"]
     noise_mat = np.array([nl_T, nl_P, nl_P, np.zeros_like(nl_P)])
     # Normalize the noise
@@ -156,6 +151,18 @@ def beam_hpix(ll, nside):
     """
     fwhm_hp_amin = 60 * 41.7 / nside
     return beam_gaussian(ll, fwhm_hp_amin)
+
+def create_binning(lmin, lmax, delta_ell):
+    """
+    """
+    bin_low = np.arange(lmin, lmax, delta_ell)
+    bin_high = bin_low + delta_ell - 1
+
+    idx = bin_high <= lmax
+    bin_low, bin_high = bin_low[idx], bin_high[idx]
+    bin_center = (bin_low + bin_high) / 2
+
+    return bin_low, bin_high, bin_center
 
 
 class PipelineManager(object):

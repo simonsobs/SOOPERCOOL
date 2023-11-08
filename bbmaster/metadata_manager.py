@@ -43,6 +43,9 @@ class BBmeta(object):
         # Set all the `_directory` attributes
         self._set_directory_attributes()
 
+        # Path to binning
+        self.path_to_binning = f"{self.pre_process_directory}/{self.binning_file}"
+
         # Initialize method to parse map_sets metadata
         map_sets_attributes = list(self.map_sets[next(iter(self.map_sets))].keys())
         for map_sets_attribute in map_sets_attributes:
@@ -59,6 +62,12 @@ class BBmeta(object):
                 f"{mask_type}_mask_name", 
                 getattr(self, f"_get_{mask_type}_mask_name")()
             )
+
+        # Simulation
+        self.init_simulation_params()
+
+        # Fiducial cls
+        self.cosmo_cls_file = f"{self.pre_process_directory}/cosmo_cls.npz"
 
 
     def _set_directory_attributes(self):
@@ -169,7 +178,44 @@ class BBmeta(object):
         """
         return hp.write_map(getattr(self, f"{mask_type}_mask_name"), mask, overwrite=overwrite)
 
+
+    def read_hitmap(self):
+        """
+        """
+        hitmap = hp.read_map(self.hitmap_file)
+        return hp.ud_grade(hitmap, self.nside, power=-2)
+
+
+    def read_nmt_binning(self):
+        """
+        """
+        binning = np.load(self.path_to_binning)
+        return nmt.NmtBin.from_edges(binning["bin_low"], binning["bin_high"] + 1)
     
+
+    def init_simulation_params(self):
+        """
+        """
+        for name in ["num_sims", "cosmology",
+                     "mock_nsrcs", "mock_srcs_hole_radius",
+                     "hitmap_file"]:
+            setattr(self, name, self.sim_pars[name])
+
+
+    def save_fiducial_cl(self, l, cl_dict, cl_type):
+        """
+        """
+        fname = getattr(self, f"{cl_type}_file")
+        np.savez(fname, l=l, **cl_dict)
+
+
+    def load_fiducial_cl(self, cl_type):
+        """
+        """
+        fname = getattr(self, f"{cl_type}_file")
+        return np.load(fname)
+
+
     def get_map_filename(self, map_set, id_split, id_sim=None):
         """
         Get the path to file for a given `map_set` and split index.

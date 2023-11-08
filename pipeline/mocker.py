@@ -23,18 +23,12 @@ def mocker(args):
     meta = BBmeta(args.globals)
 
     map_dir = meta.map_directory
-    mask_dir = meta.masks["mask_directory"]
     beam_dir = meta.beam_directory
 
     os.makedirs(map_dir, exist_ok=True)
     os.makedirs(beam_dir, exist_ok=True)
 
-    cosmo = meta.sim_pars["cosmology"]
-
-    lth, psth = theory_cls(
-        cosmo,
-        lmax=meta.lmax
-    )
+    ps_th = meta.load_fiducial_cl(cl_type="cosmo_cls")
 
     # Load binary mask
     binary_mask = meta.read_mask("binary")
@@ -42,7 +36,7 @@ def mocker(args):
 
     # Load noise curves
     noise_model = noise_calc.SOSatV3point1(sensitivity_mode='baseline')
-    lth, nlth_T, nlth_P = noise_model.get_noise_curves(
+    lth, _, nlth_P = noise_model.get_noise_curves(
         fsky,
         meta.lmax,
         delta_ell=1,
@@ -50,13 +44,12 @@ def mocker(args):
     )
     # Only support polarization noise at the moment
     nlth_dict = {
-        "T": None,
+        "T": {freq_band: nlth_P[i]/2 for i, freq_band in enumerate(noise_model.get_bands())},
         "P": {freq_band: nlth_P[i] for i, freq_band in enumerate(noise_model.get_bands())}
     }
 
     # Load hitmap
-    hitmap = hp.read_map(meta.sim_pars["hitmap_file"])
-    hitmap = hp.ud_grade(hitmap, meta.nside, power=-2)
+    hitmap = meta.read_hitmap()
 
     # Load and save beams
     beam_arcmin = {
@@ -73,10 +66,10 @@ def mocker(args):
     
     hp_ordering = ["TT", "TE", "TB", "EE", "EB", "BB"]
 
-    Nsims = meta.sim_pars["num_sims"] if args.sims else 1
+    Nsims = meta.num_sims if args.sims else 1
 
     for id_sim in range(Nsims):
-        cmb_map = hp.synfast([psth[k] for k in hp_ordering], meta.nside)
+        cmb_map = hp.synfast([ps_th[k] for k in hp_ordering], meta.nside)
         for map_set in meta.map_sets_list:
             freq_tag = meta.freq_tag_from_map_set(map_set)
             cmb_map_beamed = hp.sphtfunc.smoothing(cmb_map, fwhm=np.deg2rad(beam_arcmin[freq_tag] / 60))
@@ -84,7 +77,7 @@ def mocker(args):
             n_splits = meta.n_splits_from_map_set(map_set)
             file_root = meta.file_root_from_map_set(map_set)
             for id_split in range(n_splits):
-                noise_map = generate_noise_map(nlth_dict["T"], nlth_dict["P"][freq_tag], hitmap, n_splits)
+                noise_map = generate_noise_map(nlth_dict["T"][freq_tag], nlth_dict["P"][freq_tag], hitmap, n_splits)
                 split_map = cmb_map_beamed + noise_map
 
                 split_map *= binary_mask
@@ -99,7 +92,7 @@ def mocker(args):
                     overwrite=True            
                 )
                 
-                if args.plot:
+                if args.plots:
                     for i, m in enumerate("TQU"):
                         vrange = 300 if m == "T" else 10
                         plt.figure(figsize=(16,9))
@@ -113,13 +106,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='simplistic simulator')
     parser.add_argument("--globals", type=str, help="Path to yaml with global parameters")
     parser.add_argument("--sims", action="store_true", help="Generate a set of sims if True.")
-    parser.add_argument("--plot", action="store_true", help="Plot the generated maps if True.")
+    parser.add_argument("--plots", action="store_true", help="Plot the generated maps if True.")
     
     args = parser.parse_args()
 
-    if args.sims and args.plot:
+    if args.sims and args.plots:
         warnings.warn("Both --sims and --plot are set to True. Too many plots will be generated. Set --plot to False")
-        args.plot = False
+        args.plots = False
 
     mocker(args)
 
