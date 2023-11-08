@@ -66,8 +66,16 @@ class BBmeta(object):
         # Simulation
         self.init_simulation_params()
 
+        # Tf estimation 
+        self.init_tf_estimation_params()
+        self.tf_est_sims_dir = f"{self.pre_process_directory}/tf_est_sims"
+        self.tf_val_sims_dir = f"{self.pre_process_directory}/tf_val_sims"
+        self.cosmo_sims_dir = f"{self.pre_process_directory}/cosmo_sims"
+
         # Fiducial cls
         self.cosmo_cls_file = f"{self.pre_process_directory}/cosmo_cls.npz"
+        self.tf_est_cls_file = f"{self.pre_process_directory}/tf_est_cls.npz"
+        self.tf_val_cls_file = f"{self.pre_process_directory}/tf_val_cls.npz"
 
 
     def _set_directory_attributes(self):
@@ -181,6 +189,8 @@ class BBmeta(object):
 
     def read_hitmap(self):
         """
+        Read the hitmap. For now, we assume that all tags
+        share the same hitmap.
         """
         hitmap = hp.read_map(self.hitmap_file)
         return hp.ud_grade(hitmap, self.nside, power=-2)
@@ -188,6 +198,7 @@ class BBmeta(object):
 
     def read_nmt_binning(self):
         """
+        Read the binning file and return the corresponding NmtBin object.
         """
         binning = np.load(self.path_to_binning)
         return nmt.NmtBin.from_edges(binning["bin_low"], binning["bin_high"] + 1)
@@ -195,6 +206,7 @@ class BBmeta(object):
 
     def init_simulation_params(self):
         """
+        Loop over the simulation parameters and set them as attributes.
         """
         for name in ["num_sims", "cosmology",
                      "mock_nsrcs", "mock_srcs_hole_radius",
@@ -202,17 +214,43 @@ class BBmeta(object):
             setattr(self, name, self.sim_pars[name])
 
 
+    def init_tf_estimation_params(self):
+        """
+        Loop over the transfer function parameters and set them as attributes.
+        """
+        for name in self.tf_settings:
+            setattr(self, name, self.tf_settings[name])
+
+
     def save_fiducial_cl(self, l, cl_dict, cl_type):
         """
+        Save a fiducial power spectra dictionnary to disk.
+
+        Parameters
+        ----------
+        l : array-like
+            Multipole values.
+        cl_dict : dict
+            Dictionnary with the power spectra.
+        cl_type : str
+            Type of power spectra.
+            Can be "cosmo", "tf_est" or "tf_val".
         """
-        fname = getattr(self, f"{cl_type}_file")
+        fname = getattr(self, f"{cl_type}_cls_file")
         np.savez(fname, l=l, **cl_dict)
 
 
     def load_fiducial_cl(self, cl_type):
         """
+        Load a fiducial power spectra dictionnary from disk.
+
+        Parameters
+        ----------
+        cl_type : str
+            Type of power spectra.
+            Can be "cosmo", "tf_est" or "tf_val".
         """
-        fname = getattr(self, f"{cl_type}_file")
+        fname = getattr(self, f"{cl_type}_cls_file")
         return np.load(fname)
 
 

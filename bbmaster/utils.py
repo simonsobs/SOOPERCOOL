@@ -165,6 +165,23 @@ def create_binning(lmin, lmax, delta_ell):
     return bin_low, bin_high, bin_center
 
 
+def power_law_cl(ell, amp, delta_ell, power_law_index):
+    """
+    """
+    pl_ps = {}
+    for spec in ["TT", "EE", "BB", "TE"]:
+        if isinstance(amp, dict):
+            A = amp[spec]
+        else:
+            A = amp
+        pl_ps[spec] = A / (ell + delta_ell) ** power_law_index
+
+    for spec in ["TB", "EB"]:
+        pl_ps[spec] = np.zeros_like(ell)
+
+    return pl_ps
+
+
 class PipelineManager(object):
     def __init__(self, fname_config):
         with open(fname_config) as f:
