@@ -31,7 +31,15 @@ def mcmer(o):
                        axes=[1, 0, 3, 2])
 
     # Save to file
-    fname_out = man.get_filename('mcm', o.output_dir)
+    #fname_out = man.get_filename('mcm', o.output_dir)
+    # Using PurePath to easy handle trailing slash
+    if os.path.isabs(o.mcm_dir):
+        # absolute path
+        mcm_dir = o.mcm_dir
+    else:
+        mcm_dir = os.path.join(o.output_dir, '..', o.mcm_dir)
+    os.makedirs(mcm_dir, exist_ok=True)
+    fname_out = os.path.join(mcm_dir, 'mcm.npz')
     print(f"Saving to {fname_out}")
     np.savez(fname_out, mcm=mcm)
 
@@ -54,5 +62,7 @@ if __name__ == '__main__':
     parser.add_argument("--output-dir", type=str, help='Output directory')
     parser.add_argument("--plot", action='store_true',
                         help='Pass to generate a plot of the MCM.')
+    parser.add_argument("--mcm-dir", type=str,
+                        help='Directory to store computed MCM.')
     o = parser.parse_args()
     mcmer(o)

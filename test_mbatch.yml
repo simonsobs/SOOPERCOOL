@@ -15,6 +15,10 @@ stages:
     script: pipeline/mcmer.py
     globals:
       - global
+    options:
+      # Directories to store MCM
+      # absolute path or path relative to mbatch output directory
+      mcm-dir: results/mcm
 
   # Filter all power-law sims
   filter_PL:
