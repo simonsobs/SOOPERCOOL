@@ -1,49 +1,26 @@
 import argparse
 import healpy as hp
 from bbmaster.utils import *
+from bbmaster import BBmeta
 import pymaster as nmt
 import numpy as np
 import os
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import urllib.request
-
 import yaml
 
 cmap = cm.YlOrRd
 cmap.set_under("w")
 
-if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='simplistic simulator')
-    parser.add_argument("--globals", type=str, help="Path to yaml with global parameters")
-
-    o = parser.parse_args()
-
-    #man = PipelineManager(o.globals)
-    with open(o.globals, "r") as f:
-        global_dict = yaml.safe_load(f)
-
-    mask_dir = global_dict["masks"]["mask_directory"]
+def mask_handler(args):
+    """
+    """
+    meta = BBmeta(args.globals)
+    mask_dir = meta.mask_directory
 
     os.makedirs(mask_dir, exist_ok=True)
-
-    # Save binary mask
-    print("Load and save binary mask ...")
-    binary_mask = hp.read_map("../data/mask_binary.fits.gz", hdu=1)
-    binary_mask = hp.ud_grade(binary_mask, global_dict["nside"])
-    binary_mask = np.where(binary_mask > 0.5, 1, 0)
-    hp.write_map(
-        f"{mask_dir}/{global_dict['masks']['binary_mask']}",
-        binary_mask,
-        overwrite=True,
-        dtype=np.int32
-    )
-
-    plt.figure(figsize=(16,9))
-    hp.mollview(binary_mask, cmap=cmap, cbar=False)
-    hp.graticule()
-    plt.savefig(f"{mask_dir}/{global_dict['masks']['binary_mask'].replace('.fits', '.png')}")
 
     # Download galactic mask
     print("Download and save planck galactic masks")
@@ -63,52 +40,64 @@ if __name__ == "__main__":
         r = hp.Rotator(coord=['G','C'])
         gal_mask_p15 = r.rotate_map_pixel(gal_mask_p15)
 
-        gal_mask_p15 = hp.ud_grade(gal_mask_p15, global_dict["nside"])
+        gal_mask_p15 = hp.ud_grade(gal_mask_p15, meta.nside)
         gal_mask_p15 = np.where(gal_mask_p15 > 0.5, 1, 0)
-        fname = f"{mask_dir}/{global_dict['masks']['galactic_mask_root']}_{gal_key.lower()}.fits"
+        fname = f"{mask_dir}/{meta.masks['galactic_mask_root']}_{gal_key.lower()}.fits"
         hp.write_map(
             fname, 
             gal_mask_p15, 
             overwrite=True,
             dtype=np.int32
         )
-
-        plt.figure(figsize=(16,9))
-        hp.mollview(gal_mask_p15, cmap=cmap, cbar=False)
-        hp.graticule()
-        plt.savefig(fname.replace("fits", "png"))
+        
+        if args.plots:
+            plt.figure(figsize=(16,9))
+            hp.mollview(gal_mask_p15, cmap=cmap, cbar=False)
+            hp.graticule()
+            plt.savefig(fname.replace("fits", "png"))
     
+    binary_mask = meta.read_mask("binary")
+
     # Generate a mock source mask
     print("Generate mock point source mask ...")
-    nsrcs = global_dict["sim_pars"]["mock_nsrcs"]
-    mask_radius_arcmin = global_dict["sim_pars"]["mock_srcs_hole_radius"]
+    nsrcs = meta.mock_nsrcs
+    mask_radius_arcmin = meta.mock_srcs_hole_radius
     ps_mask = random_src_mask(binary_mask, nsrcs, mask_radius_arcmin)
-    fname = f"{mask_dir}/{global_dict['masks']['point_source_mask']}"
-    hp.write_map(fname, ps_mask, overwrite=True, dtype=np.int32)
+    meta.save_mask("point_source", ps_mask, overwrite=True)
 
-    plt.figure(figsize=(16,9))
-    hp.mollview(ps_mask, cmap=cmap, cbar=False)
-    hp.graticule()
-    plt.savefig(fname.replace(".fits", ".png"))
+    if args.plots:
+        plt.figure(figsize=(16,9))
+        hp.mollview(ps_mask, cmap=cmap, cbar=False)
+        hp.graticule()
+        plt.savefig(meta.point_source_mask_name.replace(".fits", ".png"))
 
     # Add the masks
     print("Create the final mask ...")
     final_mask = binary_mask.copy()
-    if "galactic" in global_dict["masks"]["include_in_mask"]:
-        fname = f"{mask_dir}/{global_dict['masks']['galactic_mask_root']}_{global_dict['masks']['gal_mask_mode']}.fits"
-        mask = hp.read_map(fname)
+    if "galactic" in meta.masks["include_in_mask"]:
+        mask = meta.read_mask("galactic")
         final_mask *= mask
-    if "point_source" in global_dict["masks"]["include_in_mask"]:
-        fname = f"{mask_dir}/{global_dict['masks']['point_source_mask']}"
-        mask = hp.read_map(fname)
+    if "point_source" in meta.masks["include_in_mask"]:
+        mask = meta.read_mask("point_source")
         final_mask *= mask
     
-    final_mask = nmt.mask_apodization(final_mask, global_dict["masks"]["apod_radius"], apotype=global_dict["masks"]["apod_type"])
-    fname = f"{mask_dir}/{global_dict['masks']['analysis_mask']}"
-    hp.write_map(fname, final_mask, overwrite=True, dtype=np.float32)
+    final_mask = nmt.mask_apodization(final_mask, meta.masks["apod_radius"], apotype=meta.masks["apod_type"])
+    meta.save_mask("analysis", final_mask, overwrite=True)
 
-    plt.figure(figsize=(16,9))
-    hp.mollview(final_mask, cmap=cmap, cbar=False)
-    hp.graticule()
-    plt.savefig(fname.replace(".fits", ".png"))
+    if args.plots:
+        plt.figure(figsize=(16,9))
+        hp.mollview(final_mask, cmap=cmap, cbar=False)
+        hp.graticule()
+        plt.savefig(meta.analysis_mask_name.replace(".fits", ".png"))
+    
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='simplistic simulator')
+    parser.add_argument("--globals", type=str, help="Path to yaml with global parameters")
+    parser.add_argument("--plots", action="store_true")
+    args = parser.parse_args()
+
+    mask_handler(args)
+
     

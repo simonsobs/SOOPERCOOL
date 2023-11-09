@@ -5,6 +5,8 @@ from scipy.interpolate import interp1d
 import pymaster as nmt
 import healpy as hp
 import sacc
+from itertools import combinations_with_replacement as cwr
+from itertools import combinations
 import camb
 
 class BBmeta(object):
@@ -41,13 +43,17 @@ class BBmeta(object):
         # Set all the `_directory` attributes
         self._set_directory_attributes()
 
-        # A list of the maps used in the analysis
-        self.map_sets_list = self._get_map_sets_list()
+        # Path to binning
+        self.path_to_binning = f"{self.pre_process_directory}/{self.binning_file}"
 
         # Initialize method to parse map_sets metadata
         map_sets_attributes = list(self.map_sets[next(iter(self.map_sets))].keys())
         for map_sets_attribute in map_sets_attributes:
             self._init_getter_from_map_set(map_sets_attribute)
+
+        # A list of the maps used in the analysis
+        self.map_sets_list = self._get_map_sets_list()
+        self.maps_list = self._get_map_list()
 
         # Initialize masks file_names
         for mask_type in ["binary", "galactic", "point_source", "analysis"]:
@@ -56,6 +62,20 @@ class BBmeta(object):
                 f"{mask_type}_mask_name", 
                 getattr(self, f"_get_{mask_type}_mask_name")()
             )
+
+        # Simulation
+        self.init_simulation_params()
+
+        # Tf estimation 
+        self.init_tf_estimation_params()
+        self.tf_est_sims_dir = f"{self.pre_process_directory}/tf_est_sims"
+        self.tf_val_sims_dir = f"{self.pre_process_directory}/tf_val_sims"
+        self.cosmo_sims_dir = f"{self.pre_process_directory}/cosmo_sims"
+
+        # Fiducial cls
+        self.cosmo_cls_file = f"{self.pre_process_directory}/cosmo_cls.npz"
+        self.tf_est_cls_file = f"{self.pre_process_directory}/tf_est_cls.npz"
+        self.tf_val_cls_file = f"{self.pre_process_directory}/tf_val_cls.npz"
 
 
     def _set_directory_attributes(self):
@@ -78,6 +98,18 @@ class BBmeta(object):
         Constructor for the map_sets_list attribute.
         """
         return list(self.map_sets.keys())
+    
+    
+    def _get_map_list(self):
+        """
+        List the different maps (including splits).
+        Constructor for the map_list attribute.
+        """
+        out_list = [
+            f"{map_set}__{id_split}" for map_set in self.map_sets_list
+                for id_split in range(self.n_splits_from_map_set(map_set))
+        ]
+        return out_list
 
 
     def _init_getter_from_map_set(self, map_set_attribute):
@@ -154,7 +186,74 @@ class BBmeta(object):
         """
         return hp.write_map(getattr(self, f"{mask_type}_mask_name"), mask, overwrite=overwrite)
 
+
+    def read_hitmap(self):
+        """
+        Read the hitmap. For now, we assume that all tags
+        share the same hitmap.
+        """
+        hitmap = hp.read_map(self.hitmap_file)
+        return hp.ud_grade(hitmap, self.nside, power=-2)
+
+
+    def read_nmt_binning(self):
+        """
+        Read the binning file and return the corresponding NmtBin object.
+        """
+        binning = np.load(self.path_to_binning)
+        return nmt.NmtBin.from_edges(binning["bin_low"], binning["bin_high"] + 1)
     
+
+    def init_simulation_params(self):
+        """
+        Loop over the simulation parameters and set them as attributes.
+        """
+        for name in ["num_sims", "cosmology",
+                     "mock_nsrcs", "mock_srcs_hole_radius",
+                     "hitmap_file"]:
+            setattr(self, name, self.sim_pars[name])
+
+
+    def init_tf_estimation_params(self):
+        """
+        Loop over the transfer function parameters and set them as attributes.
+        """
+        for name in self.tf_settings:
+            setattr(self, name, self.tf_settings[name])
+
+
+    def save_fiducial_cl(self, l, cl_dict, cl_type):
+        """
+        Save a fiducial power spectra dictionnary to disk.
+
+        Parameters
+        ----------
+        l : array-like
+            Multipole values.
+        cl_dict : dict
+            Dictionnary with the power spectra.
+        cl_type : str
+            Type of power spectra.
+            Can be "cosmo", "tf_est" or "tf_val".
+        """
+        fname = getattr(self, f"{cl_type}_cls_file")
+        np.savez(fname, l=l, **cl_dict)
+
+
+    def load_fiducial_cl(self, cl_type):
+        """
+        Load a fiducial power spectra dictionnary from disk.
+
+        Parameters
+        ----------
+        cl_type : str
+            Type of power spectra.
+            Can be "cosmo", "tf_est" or "tf_val".
+        """
+        fname = getattr(self, f"{cl_type}_cls_file")
+        return np.load(fname)
+
+
     def get_map_filename(self, map_set, id_split, id_sim=None):
         """
         Get the path to file for a given `map_set` and split index.
@@ -184,3 +283,54 @@ class BBmeta(object):
             path_to_maps = self.map_directory
         
         return os.path.join(path_to_maps, f"{map_set_root}_split_{id_split}.fits")
+    
+    def read_map(self, map_set, id_split, id_sim=None, pol_only=False):
+        """
+        Read a map given a map set and split index.
+        Can also read a given simulation if `id_sim` is provided.
+
+        Parameters
+        ----------
+        map_set : str
+            Name of the map set.
+        id_split : int
+            Index of the split.
+        id_sim : int, optional
+            Index of the simulation.
+            If None, return the data map.
+        pol_only : bool, optional
+            Return only the polarization maps.
+        """
+        field = [1, 2] if pol_only else [0, 1, 2]
+        fname = self.get_map_filename(map_set, id_split, id_sim=id_sim)
+        return hp.read_map(fname, field=field)
+    
+    def get_ps_names_list(self, type="all", coadd=False):
+        """
+        List all the possible cross split power spectra
+        Example: 
+            From two map_sets `ms1` and `ms2` with
+            two splits each, and `type="all"`, 
+            this function will return :
+            [('ms1__0', 'ms1__0'), ('ms1__0', 'ms1__1'),
+             ('ms1__0', 'ms2__0'), ('ms1__0', 'ms2__1'),
+             ('ms1__1', 'ms1__1'), ('ms1__1', 'ms2__0'),
+             ('ms1__1', 'ms2__1'), ('ms2__0', 'ms2__0'),
+             ('ms2__0', 'ms2__1'), ('ms2__1', 'ms2__1')]
+
+        Parameters
+        ----------
+        type : str, optional
+            Type of power spectra to return.
+            Can be "all", "auto" or "cross".
+        coadd: bool, optional
+            If True, return the cross-split power spectra names.
+            Else, return the (split-)coadded power spectra names.
+        """
+        map_iterable = self.map_sets_list if coadd else self.maps_list
+        if type == "all":
+            return list(cwr(map_iterable, 2))
+        elif type == "auto":
+            return [(map_name, map_name) for map_name in map_iterable]
+        elif type == "cross":
+            return list(combinations(map_iterable, 2))

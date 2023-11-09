@@ -55,8 +55,15 @@ map_sets:
     freq_tag: 280
     exp_tag: "SAT3"
 
+## Path to pre-processing data
+pre_process_directory: "pre_processing"
+
+## Binning file
+binning_file: "binning.npz"
+
 ## Beam information
 beam_directory: "beams"
+
 ## Bandpass information
 bandpasses_directory: "/path/to/bandpasses/" #### /path/to/bandpasses/bandpass_SAT1_f093.txt
 
@@ -83,14 +90,13 @@ masks:
 ## General parameters
 nside: 256
 lmin: 30
-lmax: 400
+lmax: 600
 deltal: 10
 
 ## Simulation related
 sim_pars:
   sims_directory: "sims"
   hitmap_file: "../data/norm_nHits_SA_35FOV_ns512.fits"
-  nside_sims: 256
   num_sims: 5
   cosmology:
     cosmomc_theta: 0.0104085
@@ -107,6 +113,26 @@ sim_pars:
     schedule_file: "../data/toast_schedule.txt"
     par_file: "../data/toast_pars.toml"
   
+
+## Transfer function related parameters
+tf_settings:
+  filtering_type: "m_filterer" # "m_filterer" or "toast"
+  tf_est_num_sims: 100
+  
+  power_law_pars_tf_est:
+    amp: 1.0
+    delta_ell: 10
+    power_law_index: 2.
+  
+  power_law_pars_tf_val:
+    amp:
+      TT: 10.
+      EE: 1.
+      BB: 0.05
+      TE: 2.5
+    delta_ell: 10
+    power_law_index: 0.5
+
 
 ######################################
 # Metadata from existing global.yaml #
