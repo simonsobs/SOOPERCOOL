@@ -63,24 +63,17 @@ def pre_processer(args):
                     lmax=3*meta.nside-1,
                 )
 
-                map_T = hp.alm2map(alms_T, meta.nside, lmax=3*meta.nside-1)
-
                 if cl_type == "tf_est":
                     for case in ["pureE", "pureB"]:
                         
-                        pol_alms_list = [
-                            alms_E if case=="pureE" else np.zeros_like(alms_T),
-                            alms_B if case=="pureB" else np.zeros_like(alms_T)
-                        ]
-                        map_Q, map_U = hp.alm2map_spin(pol_alms_list, meta.nside, spin=2, lmax=3*meta.nside-1)
-                        
-                        sim = np.array([map_T, map_Q, map_U])
-                        
+                        if case == "pureE":
+                            sim = hp.alm2map([alms_T, alms_E, alms_B*0.], meta.nside, lmax=3*meta.nside-1)
+                        elif case == "pureB":
+                            sim = hp.alm2map([alms_T, alms_E*0., alms_B], meta.nside, lmax=3*meta.nside-1)
                         hp.write_map(f"{out_dir}/TQU_{case}_noiseless_nside{meta.nside}_lmax{meta.lmax}_{id_sim:04d}.fits", sim, overwrite=True)
 
                 else:
-                    map_Q, map_U = hp.alm2map_spin([alms_E, alms_B], meta.nside, spin=2, lmax=3*meta.nside-1)
-                    sim = np.array([map_T, map_Q, map_U])
+                    sim = hp.alm2map([alms_T, alms_E, alms_B], meta.nside, lmax=3*meta.nside-1)
                     hp.write_map(f"{out_dir}/TQU_noiseless_nside{meta.nside}_lmax{meta.lmax}_{id_sim:04d}.fits", sim, overwrite=True)
 
 
