@@ -3,71 +3,16 @@ import healpy as hp
 import numpy as np
 from bbmaster import BBmeta
 
-
-# TODO: put in metadata manager    
-def get_map(tag, isplit, isim=None):
-    ############################################################################
-    # TODO
-    # Only for data maps and (if isim!=None) covariance simulations.
-    ############################################################################
-
-# TODO: put in metadata manager  
-def get_nmt_bins():
-    ############################################################################
-    # TODO
-    ############################################################################
-    return
-
-def get_beam(tag):
-    ############################################################################
-    # TODO
-    # output shape: [nbpw]
-    ############################################################################
-    return
-    
-# TODO: put in metadata manager  
-def get_filename_transfer(fdir):
-    ############################################################################
-    # TODO
-    ############################################################################
-    return
-
-# TODO: put in metadata manager 
-def get_pcls(map1, map2):
+# TODO: document
+def get_pcls(meta, map1, map2):
     f1 = nmt.NmtField(meta.mask, [map1[1], map1[2]])
     f2 = nmt.NmtField(meta.mask, [map2[1], map2[2]])
     pcl = meta.binning.bin_cell(nmt.compute_coupled_cell(f1, f2))
         
     return pcl
 
-# TODO: put in metadata manager 
-def get_map_transval(signal='CMB', filt, isim):
-    # output QU maps (shape [2, npix]).
-    maps = np.zeros((2,meta.npix))
-    fname = meta.map_directory+\
-        f'/map_transval_{signal}_{filt}_{str(isim).zfill(4)}.fits'
-    try:
-        maps[ip] = hp.read_map(fname, field=(1,2))
-    except:
-        maps[ip] = hp.read_map(fname, field=(0,1))
-    return maps
-
-# TODO: put in metadata manager 
-def get_maps_transsim(filt, isim)
-    # output pure-E and pure-B QU maps (shape [2, 2, npix]), corresponding to 
-    # [pure_EB_in, QU, ipix].
-    maps = np.zeros((2,2,meta.npix))
-    for ip, p in zip([0,1],['E','B']):
-        fname = meta.map_directory+\
-            f'/map_transsim_{filt}_seed{str(isim).zfill(4)}_{p}only.fits'
-        try:
-            maps[ip] = hp.read_map(fname, field=(1,2))
-        except:
-            maps[ip] = hp.read_map(fname, field=(0,1))
-    return maps
-
-# TODO: put in metadata manager
-def get_pcls_transsim(mapset)
+# TODO: document
+def get_pcls_transsim(meta, mapset)
     # input pure-E and pure-B QU maps (shape [2, 2, npix]), corresponding to 
     # [pure_EB_in, QU, ipix], and output 4x4 matrix of cross-pol C_ells 
     # (shape [4,4,nbpws]), corresponding to [(EE,EB,BE,EE)_in, 
@@ -96,18 +41,19 @@ if __name__ == '__main__':
     # Global pars
     nside = meta.nside
     npix = hp.nside2npix(nside)
-    # Load mask, bandpower windows, map tags
+    # Load mask, bandpower windows, map sets
     mask = hp.ud_grade(hp.read_map(meta.fname_mask),
                        nside_out=meta.nside)
-    nmt_bins = meta.get_nmt_bins() #### get_nmt_bins()
+    binning = meta.read_nmt_binning()
+    nmt_bins = binning.get_n_bands()
     nbpw = len(nmt_bins)
-    tags = meta.tags
+    map_sets = meta.map_sets
     maps = {}
     pcls = {}
     
     if o.mode=='data':
         # Load inverse bandpower coupling matrix
-        # For now, assume that all map sets (tags) are described by a single 
+        # For now, assume that all map sets are described by a single 
         # transfer function.
         fname = meta.get_transfer_filename(o.output_dir)
         winv = np.load(fname)['wcal_inv']
@@ -118,39 +64,40 @@ if __name__ == '__main__':
         
         # Load maps, beams
         beams = {}
-        for t in tags:
-            n = range(t['num_splits'])
-            maps[t] = np.zeros(n1)
-            beams[t] = meta.get_beam(t)
+        for m in map_sets:
+            n = range(m['num_splits'])
+            maps[m] = np.zeros(n1)
+            beams[m] = meta.get_beam(t)
             for s in range(n):
-                maps[t][s] = meta.get_map(t, s)
+                #read_map(self, map_set, id_split, id_sim=None, pol_only=False)
+                maps[m][s] = meta.read_map(m, s)
 
         # Calculate power spectra
-        for t1 in tags:
-            n1 = range(t1['num_splits'])
+        for m1 in map_sets:
+            n1 = range(m1['num_splits'])
             for s1 in range(n1):
-                for t2 in tags:
+                for m2 in map_sets:
                     n2 = range(t2['num_splits'])
-                    pcls[t1][t2] = np.zeros((n1, n2, nbpws))
-                    if t2==t1:
+                    pcls[m1][m2] = np.zeros((n1, n2, nbpws))
+                    if m2==m1:
                         for s2 in range(s1): # Same tag: split pairs 
                                              # can be swapped
-                            coupled_pcl = meta.get_pcls(maps[t1][s1], 
-                                                        maps[t1][s2])
+                            coupled_pcl = meta.get_pcls(maps[m1][s1], 
+                                                        maps[m1][s2])
                             # Calculate mask+filtering-corrected estimator
                             decoupled_pcl = np.dot(
                                 winv, coupled_pcl.flatten()).reshape([4, nbpw])
                             # Deconvolve the beam
-                            beam_deconv = 1./beams[t1]**2
-                            pcls[t1][t1][s1,s2,:] = decoupled_pcl*beam_deconv
-                            pcls[t1][t1][s2,s1,:] = decoupled_pcl*beam_deconv
+                            beam_deconv = 1./beams[m1]**2
+                            pcls[m1][m1][s1,s2,:] = decoupled_pcl*beam_deconv
+                            pcls[m1][m1][s2,s1,:] = decoupled_pcl*beam_deconv
                     else:
-                        for s2 in range(s1): # Different tags: split pairs
+                        for s2 in range(s1): # Different map sets: split pairs
                                              # cannot be swapped
-                            coupled_pcl_a = meta.get_pcls(maps[t1][s1], 
-                                                          maps[t2][s2])
-                            coupled_pcl_b = meta.get_pcls(maps[t1][s2], 
-                                                          maps[t2][s1])
+                            coupled_pcl_a = meta.get_pcls(maps[m1][s1], 
+                                                          maps[m2][s2])
+                            coupled_pcl_b = meta.get_pcls(maps[m1][s2], 
+                                                          maps[m2][s1])
                             # Calculate the mask+filtering-corrected estimator
                             decoupled_pcl_a = np.dot(
                                 winv, coupled_pcl_a.flatten()).reshape([4, 
@@ -159,13 +106,13 @@ if __name__ == '__main__':
                                 winv, coupled_pcl_b.flatten()).reshape([4, 
                                                                         nbpw])
                             # Deconvolve the beam
-                            beam_deconv = 1./beams[t1]/beams[t2]
-                            pcls[t1][t2][s1,s2,:] = decoupled_pcl_a*beam_deconv
-                            pcls[t1][t2][s2,s1,:] = decoupled_pcl_b*beam_deconv
+                            beam_deconv = 1./beams[m1]/beams[m2]
+                            pcls[m1][m2][s1,s2,:] = decoupled_pcl_a*beam_deconv
+                            pcls[m1][m2][s2,s1,:] = decoupled_pcl_b*beam_deconv
                 
     elif o.mode=='covsim':
         # Load inverse bandpower coupling matrix
-        # For now, assume that all map sets (tags) are described by a single 
+        # For now, assume that all map sets are described by a single 
         # transfer function.
         fname = meta.get_filename_transfer(o.output_dir)
         winv = np.load(fname)['wcal_inv']
@@ -178,46 +125,48 @@ if __name__ == '__main__':
         # Load simulation maps, beams
         beams = {}
         nsims = meta.sim_pars['num_sims']
-        for t in tags:
+        for m in map_sets:
             nsplits = range(t['num_splits'])
-            maps[t] = np.zeros(nsplits,nsims)
-            beams[t] = meta.get_beam(t)
+            maps[m] = np.zeros(nsplits,nsims)
+            beams[m] = meta.get_beam(m)
             for isplit in range(n):
                 for isim in range(nsims):
-                    maps[t][isplit,isim] = meta.get_map(t, isplit=isplit, 
+                    maps[m][isplit,isim] = meta.get_map(m, isplit=isplit, 
                                                         isim = isim)
         
         # Calculate power spectra
-        for t1 in tags:
-            n1 = range(t1['num_splits'])
+        for m1 in map_sets:
+            n1 = range(m1['num_splits'])
             for s1 in range(n1):
-                for t2 in tags:
-                    nsp2 = range(t2['num_splits'])
-                    pcls[t1][t2] = np.zeros((nsims, n1, n2, nbpws))
+                for m2 in map_sets:
+                    nsp2 = range(m2['num_splits'])
+                    pcls[m1][m2] = np.zeros((nsims, n1, n2, nbpws))
                     for isim in range(nsims):
-                        if t2==t1:
+                        if m2==m1:
                             for s2 in range(s1): # Same tag: split pairs 
                                                  # can be swapped
                                 coupled_pcl[] = meta.get_pcls_data(
-                                    maps[t1][s1,isim], 
-                                    maps[t1][s2,isim]
+                                    maps[m1][s1,isim], 
+                                    maps[m1][s2,isim]
                                 )
-                                # Calculate the mask+filtering-corrected estimator
+                                # Calculate the mask+filtering-corrected 
+                                # estimator
                                 decoupled_pcl = np.dot(
                                     winv, coupled_pcl.flatten()
                                 ).reshape([4, nbpw])
                                 # Deconvolve the beam
-                                decoupled_pcl *= 1./beams[t1]**2
-                                pcls[t1][t1][isim,s1,s2,:] = decoupled_pcl
-                                pcls[t1][t1][isim,s2,s1,:] = decoupled_pcl
+                                decoupled_pcl *= 1./beams[m1]**2
+                                pcls[m1][m1][isim,s1,s2,:] = decoupled_pcl
+                                pcls[m1][m1][isim,s2,s1,:] = decoupled_pcl
                         else:
-                            for s2 in range(s1): # Different tags: split pairs
-                                                 # cannot be swapped
-                                coupled_pcl_a = meta.get_pcls(maps[t1][s1,isim],
-                                                              maps[t2][s2,isim])
-                                coupled_pcl_b = meta.get_pcls(maps[t1][s2,isim],                
-                                                              maps[t2][s1,isim])
-                                # Calculate the mask+filtering-corrected estimator
+                            for s2 in range(s1): # Different map sets: split 
+                                                 # pairs cannot be swapped
+                                coupled_pcl_a = meta.get_pcls(maps[m1][s1,isim],
+                                                              maps[m2][s2,isim])
+                                coupled_pcl_b = meta.get_pcls(maps[m1][s2,isim],                
+                                                              maps[m2][s1,isim])
+                                # Calculate the mask+filtering-corrected 
+                                # estimator
                                 decoupled_pcl_a = np.dot(
                                     winv, coupled_pcl_a.flatten()).reshape([4, 
                                                                           nbpw])
@@ -225,10 +174,10 @@ if __name__ == '__main__':
                                     winv, coupled_pcl_b.flatten()).reshape([4, 
                                                                           nbpw])
                                 # Deconvolve the beam
-                                decoupled_pcl_a *= 1./(beams[t1]*beams[t2])
-                                decoupled_pcl_b *= 1./(beams[t1]*beams[t2])
-                                pcls[t1][t2][isim,s1,s2,:] = decoupled_pcl_a
-                                pcls[t1][t2][isim,s2,s1,:] = decoupled_pcl_b
+                                decoupled_pcl_a *= 1./(beams[m1]*beams[t2])
+                                decoupled_pcl_b *= 1./(beams[m1]*beams[t2])
+                                pcls[m1][m2][isim,s1,s2,:] = decoupled_pcl_a
+                                pcls[m1][m2][isim,s2,s1,:] = decoupled_pcl_b
         
     elif o.mode=='transsim':
         # Load list of pure-E and pure-B power-law simulated maps, and compute
@@ -260,7 +209,7 @@ if __name__ == '__main__':
     else:
         raise ValueError("Unknown pipeline mode. Choose between "
                             "'data', 'covsim', 'transsim', 'transval'.")
-        
+    
     # Save beams, maps
     np.savez(o.outdir+f'maps_beams_{o.mode}.npz', maps=maps, beams=beams)
     
