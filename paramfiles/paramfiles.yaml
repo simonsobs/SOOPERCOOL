@@ -20,9 +20,10 @@ output_dir: "outputs"
 ##################################
 
 ## Path to the maps
-map_directory: "maps" # I guess that we should be able to 
-                                # derive the name of the associated
-                                # map from the couple (exp, freq)
+map_directory: "/mnt/extraspace/alaposta/bb_pipeline_dev/cosmo_sims/" 
+                      # I guess that we should be able to 
+                      # derive the name of the associated
+                      # map from the couple (exp, freq)
 map_sets:
   SAT1_f093:
     file_root: "cmb_sat1_f093"
@@ -95,7 +96,9 @@ deltal: 10
 
 ## Simulation related
 sim_pars:
-  sims_directory: "sims"
+  covsims_directory: "/mnt/extraspace/alaposta/bb_pipeline_dev/cosmo_sims/"
+  transsims_directory: "/mnt/extraspace/alaposta/bb_pipeline_dev/tf_est_sims/"
+  transval_directory: "/mnt/extraspace/alaposta/bb_pipeline_dev/tf_val_sims/"
   hitmap_file: "../data/norm_nHits_SA_35FOV_ns512.fits"
   num_sims: 5
   cosmology:

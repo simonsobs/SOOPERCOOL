@@ -156,6 +156,7 @@ class BBmeta(object):
         """
         return os.path.join(self.mask_directory, self.masks["analysis_mask"])
 
+    
 
     def read_mask(self, mask_type):
         """
@@ -184,7 +185,8 @@ class BBmeta(object):
         overwrite : bool, optional
             Overwrite the mask if it already exists.
         """
-        return hp.write_map(getattr(self, f"{mask_type}_mask_name"), mask, overwrite=overwrite)
+        return hp.write_map(getattr(self, f"{mask_type}_mask_name"), mask, 
+                            overwrite=overwrite)
 
 
     def read_hitmap(self):
@@ -202,6 +204,28 @@ class BBmeta(object):
         """
         binning = np.load(self.path_to_binning)
         return nmt.NmtBin.from_edges(binning["bin_low"], binning["bin_high"] + 1)
+    
+    def get_beam_filename_from_map_set(self, map_set):
+        """
+        Retrieve the beam filename from the map set.
+        """
+        if "SAT" in map_set['exp_tag']:
+            fname = f"beam_SAT_{map_set['freq_tag']}.txt"
+        else:
+            raise ValueError("Only SO-SAT beams accepted so far.")
+        return os.path.join(self.beam_directory, fname)
+    
+    def read_beam(self, beam_fname):
+        """
+        Read the beam file and return the corresponding array.
+        """
+        from scipy.interpolate import interp1d
+        larr_all = np.arange(3*self.nside)
+        l, b = np.loadtxt(beam_fname, unpack=True)
+        beam = interp1d(l, b, fill_value=0, bounds_error=False)(larr_all)
+        if l[0] != 0:
+            beam[:int(l[0])] = b[0]
+        return beam
     
 
     def init_simulation_params(self):
@@ -242,7 +266,7 @@ class BBmeta(object):
 
     def load_fiducial_cl(self, cl_type):
         """
-        Load a fiducial power spectra dictionnary from disk.
+        Load a fiducial power spectra dictionary from disk.
 
         Parameters
         ----------
@@ -284,10 +308,53 @@ class BBmeta(object):
         
         return os.path.join(path_to_maps, f"{map_set_root}_split_{id_split}.fits")
     
+
+    def get_map_filename_transfer(id_sim, signal=None, e_or_b=None):
+        """
+        Get the path to transfer function simulation or validation map for a 
+        given simulation index. Choosing either a signal or polarization type 
+        defines what type is loaded.
+
+        Path to simulation map: e.g. {sims_directory}/0000/{map_set_root}_pure{e_or_b}.fits
+        Path to validation map: e.g. {sims_directory}/0000/{map_set_root}_{signal}.fits
+
+        Parameters
+        ----------
+        id_sim : int
+            Index of the simulation.
+            If None, return the path to the data map.
+        signal : str, optional
+            Determines what signal the validation map corresponds to.
+            If None, assumes simulation mode.
+        e_or_b : str, optional
+            Accepts either `E`, `B`, or None. Determines what pure-polarization
+            type (E or B) the map corresponds to. 
+            If None, assumes validation mode.
+        """
+        
+        os.makedirs(path_to_maps, exist_ok=True)
+        if (not signal and not e_or_b) or (signal and e_or_b):
+            raise ValueError("You have to set to None either `signal` or "
+                             "`e_or_b`")
+        if signal is not None:
+            fname = os.path.join(
+                self.sim_pars['transsims_directory'],
+                f"{id_sim:04d}", 
+                f"pure{e_or_b}.fits"
+            )
+        else:
+            fname = os.path.join(
+                self.sim_pars['transval_directory'],
+                f"{id_sim:04d}", 
+                f"{signal}.fits"
+            )
+        return fname
+        
+    
     def read_map(self, map_set, id_split, id_sim=None, pol_only=False):
         """
         Read a map given a map set and split index.
-        Can also read a given simulation if `id_sim` is provided.
+        Can also read a given covariance simulation if `id_sim` is provided.
 
         Parameters
         ----------
@@ -302,8 +369,38 @@ class BBmeta(object):
             Return only the polarization maps.
         """
         field = [1, 2] if pol_only else [0, 1, 2]
-        fname = self.get_map_filename(map_set, id_split, id_sim=id_sim)
+        fname = self.get_map_filename(map_set, id_sim, pol_only=False)
         return hp.read_map(fname, field=field)
+    
+    
+    def read_map_transfer(self, id_sim, signal=None, e_or_b=None, 
+                          pol_only=False):
+        """
+        Read a map given a simulation index.
+        Can also read a pure-E or pure-B simulation if `e_or_b` is provided.
+
+        Parameters
+        ----------
+        id_sim : int
+            Index of the simulation.
+        signal : str, optional
+            Determines what signal the validation map corresponds to. For now, 
+            available choices are 'CMB' and 'dust'. 
+            If None, assumes simulation mode.
+        e_or_b : str
+            Accepts either `E`, `B`, or None. Determines what pure-polarization
+            type (E or B) the map corresponds to. 
+            If None, assumes validation mode.
+        pol_only : bool, optional
+            Return only the polarization maps.
+        """
+        field = [1, 2] if pol_only else [0, 1, 2]
+        if (not signal and not e_or_b) or (signal and e_or_b):
+            raise ValueError("You have to set to None either `signal` or "
+                             "`e_or_b`")
+        fname = self.get_map_filename_transfer(id_sim, signal, e_or_b)
+        return hp.read_map_transfer(fname, field=field)
+    
     
     def get_ps_names_list(self, type="all", coadd=False):
         """
