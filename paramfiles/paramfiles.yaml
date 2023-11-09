@@ -109,6 +109,10 @@ sim_pars:
     r: 0.01
   mock_nsrcs: 80
   mock_srcs_hole_radius: 40
+  toast:
+    schedule_file: "../data/toast_schedule.txt"
+    par_file: "../data/toast_pars.toml"
+  
 
 ## Transfer function related parameters
 tf_settings:
