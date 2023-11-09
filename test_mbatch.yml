@@ -16,7 +16,7 @@ stages:
     globals:
       - global
     options:
-      # Directories to store MCM
+      # Directory to store MCM
       # absolute path or path relative to mbatch output directory
       mcm-dir: results/mcm
 
@@ -27,10 +27,13 @@ stages:
     globals:
       - global
     options:
-      first-sim: 0
-      num-sims: 200
+      # Directory containing all input maps
+      sim-dir: data/PL
+      # Directory to store filtered maps
+      # absolute path or path relative to mbatch output directory
+      filtered-dir: results/filtered
+      binary-mask-file: data/mask_binary.fits
       m-cut: 30
-      sim-sorter: pl_sim_names
 
   # Filter all validation sims
   filter_val:
@@ -39,10 +42,13 @@ stages:
     globals:
       - global
     options:
-      first-sim: 0
-      num-sims: 200
+      # Directory containing all validation input maps
+      sim-dir: data/val
+      # Directory to store validation filtered maps
+      # absolute path or path relative to mbatch output directory
+      filtered-dir: results/filtered_val
+      binary-mask-file: data/mask_binary.fits
       m-cut: 30
-      sim-sorter: val_sim_names
 
   # Compute pseudo-Cl of input power-law sims
   pcl_PL_in:
