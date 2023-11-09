@@ -15,6 +15,7 @@ def filter_map(man, mpQ, mpU, msk, m_cut):
     # Filter them by setting to zero all alms with m <= m_cut
     # Note that the alms are ordered by m in HEALPix, so all
     # the alms with m <= m_cut are the first (m_cut+1)*((lmax+1)-m_cut/2)
+    # This is just a random toy model filter, it doesn't have any physical meaning.
     lmax = 3*man.nside-1
     nalm_filter = (m_cut+1)*(lmax+1)-((m_cut+1)*m_cut)//2
     almE[:nalm_filter] = 0

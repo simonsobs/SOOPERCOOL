@@ -58,7 +58,7 @@ def mcmer(o):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='MCM calculator')
+    parser = argparse.ArgumentParser(description='Mode-Coupling Matrix (MCM) calculator')
     parser.add_argument("--globals", type=str,
                         help='Path to yaml with global parameters')
     parser.add_argument("--output-dir", type=str, help='Output directory')

@@ -9,7 +9,7 @@ gitcheck_pkgs:
 #  - pymaster
 
 stages:
-  # Compute mask's MCM
+  # Compute mask's mode-coupling matrix (MCM)
   mcm:
     exec: python3
     script: pipeline/mcmer.py
