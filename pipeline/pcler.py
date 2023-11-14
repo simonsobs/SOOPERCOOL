@@ -3,20 +3,37 @@ import healpy as hp
 import numpy as np
 from bbmaster import BBmeta
 
-# TODO: document
 def get_pcls(meta, map1, map2):
+    """
+    Compute the coupled angular power spectrum from two maps map1 and map2.
+        
+    Parameters
+    ----------
+    meta : BBmeta object
+        BBmeta object of the metadata manager.
+    map1 : array-like, shape [3,npix]
+        TQU map to correlate.
+    map2 : array-like, shape [3,npix]
+        TQU map to correlate.
+    """
     f1 = nmt.NmtField(meta.mask, [map1[1], map1[2]])
     f2 = nmt.NmtField(meta.mask, [map2[1], map2[2]])
     pcl = meta.binning.bin_cell(nmt.compute_coupled_cell(f1, f2))
         
     return pcl
 
-# TODO: document
 def get_pcls_transsim(meta, mapset)
-    # input pure-E and pure-B QU maps (shape [2, 2, npix]), corresponding to 
-    # [pure_EB_in, QU, ipix], and output 4x4 matrix of cross-pol C_ells 
-    # (shape [4,4,nbpws]), corresponding to [(EE,EB,BE,EE)_in, 
-    # (EE,EB,BE,EE)_out, i_ell]
+    """
+    Compute the coupled angular power spectra from a 2x2 matrix of QU maps with
+    pure E and pure B modes.
+        
+    Parameters
+    ----------
+    meta : BBmeta object
+        BBmeta object of the metadata manager.
+    mapset : array-like, shape [2,2,npix]
+        Pure-E and pure-B QU maps, corresponding to [pure_EB_in, QU, ipix]
+    """
     pcls = np.zeros((4,4,meta.nbpws))
     icl = 0
     for ip1, p1 in zip([0,1],['E','B']):
