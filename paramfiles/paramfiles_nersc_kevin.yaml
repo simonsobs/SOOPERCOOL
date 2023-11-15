@@ -1,0 +1,166 @@
+# Here is a sample .yaml file that can be used 
+# to store the metadata necessary to run the
+# SO BB pipeline.
+
+# Output directory
+output_dir: "data"
+
+##################################
+#    Metadata related to maps    #
+# ------------------------------ #
+#                                #
+# The structure of input splits  #
+# is the following:              #
+#                                #
+# tag:                           #
+#   file_root: ...               #
+#   n_splits: ...                #
+#   freq_tag: ...                #
+#   exp_tag: ...                 #
+##################################
+
+## Path to the maps
+map_directory: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/maps_231114/" 
+                      # I guess that we should be able to 
+                      # derive the name of the associated
+                      # map from the couple (exp, freq)
+map_sets:
+  SAT1_f093:
+    file_root: "cmb_sat1_f093"
+    n_splits: 1          # Number of splits
+    freq_tag: 93         # Freq. tag (useful for coadding ?)
+    exp_tag: "SAT1"      # Experiment tag (coadding?)
+    beam_file: "beam_cmb_sat1_f093.dat"
+  SAT1_f145:
+    file_root: "cmb_sat1_f145"
+    n_splits: 1
+    freq_tag: 145
+    exp_tag: "SAT1"
+    beam_file: "beam_cmb_sat1_f145.dat"
+  # SAT2_f093:
+  #   file_root: "cmb_sat2_f093"
+  #   n_splits: 4
+  #   freq_tag: 93
+  #   exp_tag: "SAT2"
+  #   beam_file: "beam_cmb_sat2_f093.dat"
+  # SAT2_f145:
+  #   file_root: "cmb_sat2_f145"
+  #   n_splits: 4
+  #   freq_tag: 145
+  #   exp_tag: "SAT2"
+  #   beam_file: "beam_cmb_sat2_f145.dat"
+  # SAT3_f225:
+  #   file_root: "cmb_sat3_f225"
+  #   n_splits: 4
+  #   freq_tag: 225
+  #   exp_tag: "SAT3"
+  #   beam_file: "beam_cmb_sat3_f225.dat"
+  # SAT3_f285:
+  #   file_root: "cmb_sat3_f285"
+  #   n_splits: 4
+  #   freq_tag: 280
+  #   exp_tag: "SAT3"
+  #   beam_file: "beam_cmb_sat3_f285.dat"
+
+## Path to pre-processing data
+pre_process_directory: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/pre_processing/"
+
+## Binning file
+binning_file: "binning.npz"
+
+## Beam information
+beam_directory: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/beams/"
+
+## Bandpass information
+bandpasses_directory: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/pre_processing/" #### /path/to/bandpasses/bandpass_SAT1_f093.txt
+
+####################
+# Masking metadata #
+####################
+masks:
+  mask_directory: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/pre_processing/"
+  analysis_mask: "mask_apodized.fits"
+
+  binary_mask: "binary_mask.fits"
+  galactic_mask_root: "planck_galactic_mask"
+  point_source_mask: "point_source_mask.fits"
+
+  include_in_mask: ["galactic","point_source"]
+  gal_mask_mode: "gal070"
+  apod_radius: 2.5
+  apod_type: "C1"
+
+####################################
+# Metadata related to the analysis #
+####################################
+
+## General parameters
+nside: 64
+lmin: 30
+lmax: 120
+deltal: 10
+
+## Simulation related
+sim_pars:
+  covsims_directory: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/cosmo_sims/"
+  transsims_directory: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/tf_est_sims/"
+  transval_directory: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/tf_val_sims/"
+  hitmap_file: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/pre_processing/norm_nHits_SA_35FOV.fits"
+  num_sims: 5
+  cosmology:
+    cosmomc_theta: 0.0104085
+    As: 2.1e-9
+    ombh2: 0.02237
+    omch2: 0.1200
+    ns: 0.9649
+    Alens: 1.0
+    tau: 0.0544
+    r: 0.01
+  mock_nsrcs: 80
+  mock_srcs_hole_radius: 40
+  toast:
+    schedule_file: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/pre_processing/toast_schedule.txt"
+    par_file: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/pre_processing/toast_pars.toml"
+  
+
+## Transfer function related parameters
+tf_settings:
+  filtering_type: "m_filterer" # "m_filterer" or "toast"
+  tf_est_num_sims: 100
+  
+  power_law_pars_tf_est:
+    amp: 1.0
+    delta_ell: 10
+    power_law_index: 2.
+  
+  power_law_pars_tf_val:
+    amp:
+      TT: 10.
+      EE: 1.
+      BB: 0.05
+      TE: 2.5
+    delta_ell: 10
+    power_law_index: 0.5
+
+
+# ######################################
+# # Metadata from existing global.yaml #
+# ######################################
+# # Apodised mask
+# mask: data/mask_apodized.fits
+# # Binary mask
+# #binary_mask: data/mask_binary.fits.gz
+# # List with power law sim names
+# pl_sims: data/plsims.txt
+# # Directory storing the PL sims
+# pl_sims_dir: data/PL
+# # Input PL power spectrum
+# cl_PL: data/PL/cl_PL.npz
+# # List with validation sim names
+# val_sims: data/valsims.txt
+# # Directory storing the validation sims
+# val_sims_dir: data/val
+# # Input validation power spectrum
+# cl_val: data/val/cl_val.npz
+# # Bandpower edges
+# bpw_edges: data/bpw_edges.npz

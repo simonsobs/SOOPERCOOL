@@ -204,16 +204,23 @@ class BBmeta(object):
         """
         binning = np.load(self.path_to_binning)
         return nmt.NmtBin.from_edges(binning["bin_low"], binning["bin_high"] + 1)
+
     
-    def get_beam_filename_from_map_set(self, map_set):
+    def get_n_bandpowers(self):
         """
-        Retrieve the beam filename from the map set.
+        Read the binning file and return the number of ell-bins.
         """
-        if "SAT" in map_set['exp_tag']:
-            fname = f"beam_SAT_{map_set['freq_tag']}.txt"
-        else:
-            raise ValueError("Only SO-SAT beams accepted so far.")
-        return os.path.join(self.beam_directory, fname)
+        binner = self.read_nmt_binning()
+        return binner.get_n_bands()
+    
+    
+    def get_effective_ells(self):
+        """
+        Read the binning file and return the number of ell-bins.
+        """
+        binner = self.read_nmt_binning()
+        return binner.get_effective_ells()
+
     
     def read_beam(self, beam_fname):
         """
@@ -221,7 +228,8 @@ class BBmeta(object):
         """
         from scipy.interpolate import interp1d
         larr_all = np.arange(3*self.nside)
-        l, b = np.loadtxt(beam_fname, unpack=True)
+        l, b = np.loadtxt(os.path.join(self.beam_directory, beam_fname), 
+                          unpack=True)
         beam = interp1d(l, b, fill_value=0, bounds_error=False)(larr_all)
         if l[0] != 0:
             beam[:int(l[0])] = b[0]
@@ -274,10 +282,32 @@ class BBmeta(object):
             Type of power spectra.
             Can be "cosmo", "tf_est" or "tf_val".
         """
-        fname = getattr(self, f"{cl_type}_cls_file")
+        fname = getattr(self, f"{cl_type}_file")
         return np.load(fname)
-
-
+    
+    def get_fname_mask(self, map_type='analysis'):
+        """
+        Get the full filepath to a mask of predefined type.
+        
+        Parameters
+        ----------
+        map_type : str
+            Choose between 'analysis', 'binary', 'point_source'.
+            Defaults to 'analysis'.
+        """
+        base_dir = self.masks['mask_directory']
+        if map_type=='analysis':
+            fname = os.path.join(base_dir, self.masks['analysis_mask'])
+        elif map_type=='binary':
+            fname = os.path.join(base_dir, self.masks['binary_mask'])
+        elif map_type=='point_source':
+            fname = os.path.join(base_dir, self.masks['point_source_mask'])
+        else:
+            raise ValueError("The map_type chosen does not exits. "
+                             "Choose between 'analysis', 'binary', "
+                             "'point_source'.")
+        return fname
+    
     def get_map_filename(self, map_set, id_split, id_sim=None):
         """
         Get the path to file for a given `map_set` and split index.
@@ -369,7 +399,7 @@ class BBmeta(object):
             Return only the polarization maps.
         """
         field = [1, 2] if pol_only else [0, 1, 2]
-        fname = self.get_map_filename(map_set, id_sim, pol_only=False)
+        fname = self.get_map_filename(map_set, id_split, id_sim)
         return hp.read_map(fname, field=field)
     
     
