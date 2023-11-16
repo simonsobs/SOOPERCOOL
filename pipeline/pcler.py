@@ -112,6 +112,10 @@ def pcler(args):
         wcal_inv = {
             "spin2xspin2": wcal_inv
         }
+        
+        if args.plots:
+            ells_effective = nmt_binning.get_effective_ells()
+            cells_plots = {}
 
         for id_sim in range(Nsims):
             fields = {}
@@ -145,7 +149,47 @@ def pcler(args):
                 decoupled_pcls = decouple_pseudo_cls(pcls, wcal_inv)
                 
                 sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
-                np.savez(f"{cl_dir}/decoupled_pcls_nobeam_{map_name1}_{map_name2}{sim_label}.npz", **decoupled_pcls, lb=nmt_binning.get_effective_ells())
+                np.savez(f"{cl_dir}/decoupled_pcls_nobeam_{map_name1}_{map_name2}{sim_label}.npz", 
+                         **decoupled_pcls, lb=nmt_binning.get_effective_ells())
+                
+                if args.plots:
+                    cells_plots[(map_set1,map_set2)] = {'noisy':{}, 'noiseless':{}}
+                    has_noise = map_set1==map_set2 and id_split1==id_split2
+                    if has_noise:
+                        cells_plots[(map_set1,map_set2)]['noisy'][
+                            (id_split1,id_split2)] = decoupled_pcls
+                    else:
+                        cells_plots[(map_set1,map_set2)]['noiseless'][
+                            (id_split1,id_split2)] = decoupled_pcls
+     
+        if args.plots:
+            plot_dir = meta.plot_dir_from_output_dir(meta.map_directory_relative)
+            
+            for map_set1, map_set2 in cells_plots:
+                for field_pair in ['EE','EB','BB']:
+                    fig = plt.figure(figsize=(8,4))
+                    cells_types = cells_plots[(map_set1, map_set2)]
+                    for is_noisy in cells_types:
+                        cells_splits = cells_types[is_noisy]
+                        for id_split1, id_split2 in cells_splits:
+                            cells = cells_splits[(id_split1, id_split2)][
+                                field_pair
+                            ]
+                            label = f"{map_set1}__{id_split1}_x_"
+                                    f"{map_set2}__{id_split2}___{field_pair}"
+                            color = 'grey'
+                            if is_noisy=='noiseless':
+                                color = 'tab:red'
+                            plt.plot(ells_effective, cells, lw=0.7, c=color,
+                                     label=label)
+                    plt.xscale('log')
+                    plt.yscale('log')
+                    plt.legend(bbox_to_anchor=(2,1))
+                    plt.savefig(
+                        os.path.join(
+                            plot_dir, f"{map_set1}_{map_set2}_{field_pair}.png"
+                        )
+                    )
 
     if args.tf_est:
         for id_sim in range(meta.tf_est_num_sims):
@@ -188,6 +232,8 @@ def pcler(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pseudo-Cl calculator")
     parser.add_argument("--globals", type=str, help="Path to the yaml file")
+    parser.add_argument("--plots", action="store_true", 
+                        help="Plot the generated power spectra if True.")
 
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--data", action="store_true")
@@ -195,6 +241,13 @@ if __name__ == "__main__":
     mode.add_argument("--tf_est", action="store_true")
     mode.add_argument("--tf_val", action="store_true")
 
+    args = parser.parse_args()
+    
+    if args.sims and args.plots:
+        warnings.warn("Both --sims and --plot are set to True. "
+                      "Too many plots will be generated. Set --plot to False")
+        args.plots = False
+        
     args = parser.parse_args()
 
     pcler(args)
