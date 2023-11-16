@@ -98,20 +98,25 @@ def pcler(args):
     if args.data or args.sims:
         
         # Load beams for each map set
-        beams = {}
-        for map_set in meta.map_sets_list:
-            l, bl = meta.read_beam(map_set)
-            beams[map_set] = bl
+        #beams = {}
+        #for map_set in meta.map_sets_list:
+        #    l, bl = meta.read_beam(map_set)
+        #    beams[map_set] = bl
 
         # Set the number of sims to loop over
         Nsims = meta.num_sims if args.sims else 1
 
         # Load the inverse coupling matrix
-        couplings = np.load(f"{meta.coupling_directory}/transfer_function.npz")
-        wcal_inv = couplings['wcal_inv'].reshape([4*n_bins, 4*n_bins])
-        wcal_inv = {
-            "spin2xspin2": wcal_inv
-        }
+        inv_couplings = {}
+        for map_set1, map_set2 in meta.get_ps_names_list(type="all", coadd=True):
+            couplings = np.load(f"{meta.coupling_directory}/couplings_{map_set1}_{map_set2}.npz")
+            coupling_dict = {
+                "spin2xspin2": couplings['wcal_inv'].reshape([4*n_bins, 4*n_bins])
+            }
+            inv_couplings[map_set1, map_set2] = coupling_dict
+            if map_set1 != map_set2:
+                # the only map set dependance is on the beam
+                inv_couplings[map_set2, map_set1] = coupling_dict
 
         for id_sim in range(Nsims):
             fields = {}
@@ -125,8 +130,8 @@ def pcler(args):
                 map = hp.read_map(map_file, field=[0,1,2])
 
                 # Include beam in namaster fields to deconvolve it
-                field_spin0 = nmt.NmtField(mask, [map[0]], beam=beams[map_set])
-                field_spin2 = nmt.NmtField(mask, [map[1], map[2]], beam=beams[map_set])
+                field_spin0 = nmt.NmtField(mask, [map[0]])
+                field_spin2 = nmt.NmtField(mask, [map[1], map[2]])
 
                 fields[map_set, id_split] = {
                     #"spin0": field_spin0, 
@@ -142,7 +147,7 @@ def pcler(args):
                     nmt_binning
                 )
 
-                decoupled_pcls = decouple_pseudo_cls(pcls, wcal_inv)
+                decoupled_pcls = decouple_pseudo_cls(pcls, inv_couplings[map_set1, map_set2])
                 
                 sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
                 np.savez(f"{cl_dir}/decoupled_pcls_nobeam_{map_name1}_{map_name2}{sim_label}.npz", **decoupled_pcls, lb=nmt_binning.get_effective_ells())
