@@ -16,9 +16,11 @@ def pre_processer(args):
     np.savez(meta.path_to_binning, bin_low=bin_low, bin_high=bin_high, bin_center=bin_center)
 
     # Second step is to create the survey mask from a hitmap
+    meta.timer.start("Computing binary mask", args.verbose)
     hitmap = meta.read_hitmap()
     binary_mask = (hitmap > 0.).astype(float)
     meta.save_mask("binary", binary_mask, overwrite=True)
+    meta.timer.stop("Computing binary mask", args.verbose)
 
     if args.plots:
         cmap = cm.YlOrRd
@@ -82,6 +84,7 @@ if __name__ == "__main__":
     parser.add_argument("--globals", type=str, help="Path to the yaml with global parameters")
     parser.add_argument("--sims", action="store_true", help="Pass to generate the simulations used to compute the transfer function")
     parser.add_argument("--plots", action="store_true", help="Pass to generate plots")
+    parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args()
     

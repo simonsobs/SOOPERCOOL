@@ -3,6 +3,7 @@ import numpy as np
 import os
 import pymaster as nmt
 import healpy as hp
+import time
 from itertools import combinations_with_replacement as cwr
 
 class BBmeta(object):
@@ -76,6 +77,8 @@ class BBmeta(object):
         self.tf_est_cls_file = f"{self.pre_process_directory}/tf_est_cls.npz"
         self.tf_val_cls_file = f"{self.pre_process_directory}/tf_val_cls.npz"
 
+        # Initialize a timer
+        self.timer = self.Timer()
 
     def _set_directory_attributes(self):
         """
@@ -515,3 +518,23 @@ class BBmeta(object):
 
                 ps_name_list.append((map1, map2))
         return ps_name_list
+    
+    class Timer:
+        """
+        """
+        def __init__(self):
+            self.timers = {}
+        
+        def start(self, timer_label, verbose=True):
+            if verbose:
+                self.timers[timer_label] = time.time()
+            else:
+                pass
+        
+        def stop(self, timer_label, verbose=True):
+            if verbose:
+                dt = time.time() - self.timers[timer_label]
+                print(f"[{timer_label}] Took {dt:.02f} s to process.")
+                self.timers.pop(timer_label)
+            else:
+                pass

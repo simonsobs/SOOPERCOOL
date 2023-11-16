@@ -107,11 +107,16 @@ def pcler(args):
         Nsims = meta.num_sims if args.sims else 1
 
         # Load the inverse coupling matrix
-        couplings = np.load(f"{meta.coupling_directory}/transfer_function.npz")
-        wcal_inv = couplings['wcal_inv'].reshape([4*n_bins, 4*n_bins])
-        wcal_inv = {
-            "spin2xspin2": wcal_inv
-        }
+        inv_couplings = {}
+        for map_set1, map_set2 in meta.get_ps_names_list(type="all", coadd=True):
+            couplings = np.load(f"{meta.coupling_directory}/couplings_{map_set1}_{map_set2}.npz")
+            coupling_dict = {
+                "spin2xspin2": couplings['wcal_inv'].reshape([4*n_bins, 4*n_bins])
+            }
+            inv_couplings[map_set1, map_set2] = coupling_dict
+            if map_set1 != map_set2:
+                # the only map set dependance is on the beam
+                inv_couplings[map_set2, map_set1] = coupling_dict
         
         if args.plots:
             ells_effective = nmt_binning.get_effective_ells()
