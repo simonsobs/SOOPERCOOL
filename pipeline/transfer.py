@@ -3,126 +3,104 @@ from bbmaster.utils import PipelineManager
 import sacc
 import numpy as np
 import matplotlib.pyplot as plt
+from bbmaster import BBmeta
 
+def transfer(args):
+    """
+    """
+    meta = BBmeta(args.globals)
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Transfer function')
-    parser.add_argument("--globals", type=str,
-                        help='Path to yaml with global parameters')
-    parser.add_argument("--output-dir", type=str, help='Output directory')
-    parser.add_argument("--use-theory", action='store_true',
-                        help='Pass to use theoretical power spectrum '
-                        'convolved with MCM to estimate the transfer function')
-    parser.add_argument("--plot", action='store_true',
-                        help='Pass to generate a plot of the MCM.')
-    o = parser.parse_args()
+    pcls_mat_dict = {
+        "filtered": [],
+        "unfiltered": []
+    }
 
-    man = PipelineManager(o.globals)
+    cl_dir = meta.cell_transfer_directory
+    coupling_dir = meta.coupling_directory
 
-    # Get all simulation names and the pCl files
-    sorter = man.pl_sim_names_EandB
-    sim_names = sorter(0, -1, o.output_dir, which='names')
-    pcl_in_names = sorter(0, -1, o.output_dir, which='input_Cl')
-    pcl_filt_names = sorter(0, -1, o.output_dir, which='filtered_Cl')
+    # Load the pseudo-cl matrices for each simulation
+    # Should be (n_comb_pure, n_comb_mode, n_bins)
+    for id_sim in range(meta.tf_est_num_sims):
+        pcls_mat = np.load(f"{cl_dir}/pcls_mat_tf_est_{id_sim:04d}.npz")
+        pcls_mat_dict["filtered"] += [pcls_mat["pcls_mat_filtered"]]
+        pcls_mat_dict["unfiltered"] += [pcls_mat["pcls_mat_unfiltered"]]
 
-    # Loop through each file and read all power spectra
-    nsims = len(sim_names)
-    cls_in = []
-    cls_filt = []
-    for n, pin, pfilt in zip(sim_names, pcl_in_names, pcl_filt_names):
-        nE, nB = n
-        print(nE, nB, pin, pfilt)
-        order = [(nE, nE, 'cl_ee'),
-                 (nE, nE, 'cl_eb'),
-                 (nE, nE, 'cl_eb'),
-                 (nE, nE, 'cl_bb'),
-                 (nE, nB, 'cl_ee'),
-                 (nE, nB, 'cl_eb'),
-                 (nE, nB, 'cl_be'),
-                 (nE, nB, 'cl_bb'),
-                 (nE, nB, 'cl_ee'),
-                 (nE, nB, 'cl_be'),
-                 (nE, nB, 'cl_eb'),
-                 (nE, nB, 'cl_bb'),
-                 (nB, nB, 'cl_ee'),
-                 (nB, nB, 'cl_eb'),
-                 (nB, nB, 'cl_eb'),
-                 (nB, nB, 'cl_bb')]
-        s = sacc.Sacc.load_fits(pin)
-        cls = np.array([s.get_ell_cl(kind, t1, t2)[1]
-                        for t1, t2, kind in order]).reshape([4, 4, -1])
-        cls_in.append(cls)
-        s = sacc.Sacc.load_fits(pfilt)
-        cls = np.array([s.get_ell_cl(kind, t1, t2)[1]
-                        for t1, t2, kind in order]).reshape([4, 4, -1])
-        cls_filt.append(cls)
-    s = sacc.Sacc.load_fits(pfilt)
-    leff = s.get_ell_cl('cl_ee', nE, nE)[0]
-    # Shape is [Nsims, N_pure_pairs, N_pol_pairs, N_ells]
-    cls_in = np.array(cls_in)
-    cls_filt = np.array(cls_filt)
+    # Average the pseudo-cl matrices
+    pcls_mat_filtered_mean = np.mean(pcls_mat_dict["filtered"], axis=0)
+    pcls_mat_unfiltered_mean = np.mean(pcls_mat_dict["unfiltered"], axis=0)
 
-    # Compute average over sims
-    # Shape is [N_pure_pairs, N_pol_pairs, N_ells]
-    cl_in = np.mean(cls_in, axis=0)
-    cl_filt = np.mean(cls_filt, axis=0)
-    ecl_in = np.std(cls_in, axis=0)
-    ecl_filt = np.std(cls_filt, axis=0)
+    # Load the binning and create
+    # the `binner`. Maybe this should move
+    # to the mcm step.
+    nmt_binning = meta.read_nmt_binning()
+    nl = meta.lmax
+    n_bins = nmt_binning.get_n_bands()
+    binner = np.array([nmt_binning.bin_cell(np.array([cl]))[0] for cl in np.eye(nl)]).T
 
-    # Construct binning matrix
-    b = man.get_nmt_bins()
-    nl = 3*man.nside
-    nbpw = b.get_n_bands()
-    binner = np.array([b.bin_cell(np.array([cl]))[0]
-                       for cl in np.eye(nl)]).T
-
-    # Compute theoretical input pCl
-    cl0 = np.zeros(3*man.nside)
-    # Full mask MCM
-    mcm = np.load(man.get_filename('mcm', o.output_dir))['mcm']
-    # Binned mask MCM
+    # Load the MCM and compute the binned
+    # MCM. Same comment as above : should
+    # move this to the mcm step.
+    mcm = np.load(f"{coupling_dir}/mcm.npz")["spin2xspin2"]
     bmcm = np.einsum('ij,kjlm->kilm', binner, mcm)
-    cl_th = np.array([
-        np.einsum('ijkl,kl->ij', bmcm,
-                  np.array([man.cls_PL[0], cl0, cl0, cl0])),
-        np.einsum('ijkl,kl->ij', bmcm,
-                  np.array([cl0, man.cls_PL[1], cl0, cl0])),
-        np.einsum('ijkl,kl->ij', bmcm,
-                  np.array([cl0, cl0, man.cls_PL[2], cl0])),
-        np.einsum('ijkl,kl->ij', bmcm,
-                  np.array([cl0, cl0, cl0, man.cls_PL[3]]))])
 
-    # Transfer function via least-squares fitting.
-    if o.use_theory:
-        pcl = cl_th
-    else:
-        pcl = cl_in
+    # Is there a better way to formulate this ?
     cct_inv = np.transpose(
         np.linalg.inv(
-            np.transpose(np.einsum('jil,jkl->ikl', pcl, pcl),
-                         axes=[2, 0, 1])),
-        axes=[1, 2, 0])
+            np.transpose(
+                np.einsum('jil,jkl->ikl', pcls_mat_unfiltered_mean, pcls_mat_unfiltered_mean), axes=[2,0,1]
+            )
+        ), axes=[1,2,0]
+    )
+
+    # Same comment as above
     trans = np.einsum('ijl,jkl->kil', cct_inv,
-                      np.einsum('jil,jkl->ikl', pcl, cl_filt))
-    # Standard deviation from MC simulations
+                      np.einsum('jil,jkl->ikl', pcls_mat_unfiltered_mean, pcls_mat_filtered_mean))
+    
+    # Same comment as above
     etrans = np.std(np.array([np.einsum('ijl,jkl->kil', cct_inv,
-                                        np.einsum('jil,jkl->ikl', pcl, clf))
-                              for clf in cls_filt]), axis=0)
+                                        np.einsum('jil,jkl->ikl', pcls_mat_unfiltered_mean, clf))
+                              for clf in pcls_mat_dict["filtered"]]), axis=0)
 
     # Binned mask MCM times transfer function
     tbmcm = np.einsum('ijk,jklm->iklm', trans, bmcm)
+
     # Fully binned coupling matrix (including filtering)
     btbmcm = np.transpose(
-        np.array([np.sum(tbmcm[:, :, :, b.get_ell_list(i)],
+        np.array([np.sum(tbmcm[:, :, :, nmt_binning.get_ell_list(i)],
                          axis=-1)
-                  for i in range(b.get_n_bands())]),
+                  for i in range(nmt_binning.get_n_bands())]),
         axes=[1, 2, 3, 0])
+    
     # Invert and multiply by tbmcm to get final bandpower
     # window functions.
-    ibtbmcm = np.linalg.inv(btbmcm.reshape([4*nbpw, 4*nbpw]))
-    winflat = np.dot(ibtbmcm, tbmcm.reshape([4*nbpw, 4*nl]))
-    wcal_inv = ibtbmcm.reshape([4, nbpw, 4, nbpw])
-    bpw_windows = winflat.reshape([4, nbpw, 4, nl])
+    ibtbmcm = np.linalg.inv(btbmcm.reshape([4*n_bins, 4*n_bins]))
+    winflat = np.dot(ibtbmcm, tbmcm.reshape([4*n_bins, 4*nl]))
+    wcal_inv = ibtbmcm.reshape([4, n_bins, 4, n_bins])
+    bpw_windows = winflat.reshape([4, n_bins, 4, nl])
+
+    np.savez(f"{coupling_dir}/transfer_function.npz",
+             mcm=mcm,  # We save the original mcm for completeness
+             bmcm=bmcm,  # We save the original mcm for completeness
+             transfer_function=trans,
+             transfer_function_error=etrans,
+             bpw_windows=bpw_windows,
+             wcal_inv=wcal_inv)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Transfer function stage")
+    parser.add_argument("--globals", type=str, help="Path to the yaml file")
+    
+    args = parser.parse_args()
+
+    transfer(args)
+
+a="""
+
+
+
+    
+    
+    
 
     # Save to file
     fname = man.get_filename('transfer_function', o.output_dir)
@@ -171,3 +149,4 @@ if __name__ == '__main__':
             plt.loglog()
             plt.legend()
         plt.show()
+"""
