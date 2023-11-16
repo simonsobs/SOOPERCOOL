@@ -17,25 +17,3 @@ cd BBMASTER
 pip install numpy # Needed to install pymaster via pip
 pip install -e .
 ```
-
-## Run the pipeline using `mbatch`
-
-First prepare the data
-```bash
-cd data
-python gen_PL_sims.py
-```
-
-First clone and install mbatch
-
-```bash
-git clone git@github.com:simonsobs/mbatch.git
-cd mbatch
-pip install -e .
-```
-
-and run the whole pipeline with
-
-```bash
-mbatch output test_mbatch.yml
-```
