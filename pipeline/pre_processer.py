@@ -10,15 +10,12 @@ def pre_processer(args):
     """
     """
     meta = BBmeta(args.globals)
-    os.makedirs(meta.pre_process_directory, exist_ok=True)
-
 
     # First step : create bandpower edges / binning_file
     bin_low, bin_high, bin_center = utils.create_binning(meta.lmin, meta.lmax, meta.deltal)
     np.savez(meta.path_to_binning, bin_low=bin_low, bin_high=bin_high, bin_center=bin_center)
 
     # Second step is to create the survey mask from a hitmap
-    os.makedirs(meta.mask_directory, exist_ok=True)
     hitmap = meta.read_hitmap()
     binary_mask = (hitmap > 0.).astype(float)
     meta.save_mask("binary", binary_mask, overwrite=True)
@@ -31,10 +28,11 @@ def pre_processer(args):
         hp.graticule()
         plt.savefig(meta.binary_mask_name.replace('.fits', '.png'))
 
+    lmax_sim = 3*meta.nside-1
     # Create the CMB fiducial cl
     lth, psth = utils.theory_cls(
         meta.cosmology,
-        lmax= meta.lmax + 1000 # to ensure that the cl will be accurate up to lmax
+        lmax=lmax_sim # to ensure that the cl will be accurate up to lmax
     )
     meta.save_fiducial_cl(lth, psth, cl_type="cosmo")
 
@@ -60,29 +58,31 @@ def pre_processer(args):
                 cls = meta.load_fiducial_cl(cl_type=cl_type)
                 alms_T, alms_E, alms_B = hp.synalm(
                     [cls[k] for k in hp_ordering],
-                    lmax=3*meta.nside-1,
+                    lmax=lmax_sim,
                 )
 
                 if cl_type == "tf_est":
                     for case in ["pureE", "pureB"]:
                         
                         if case == "pureE":
-                            sim = hp.alm2map([alms_T, alms_E, alms_B*0.], meta.nside, lmax=3*meta.nside-1)
+                            sim = hp.alm2map([alms_T, alms_E, alms_B*0.], meta.nside, lmax=lmax_sim)
                         elif case == "pureB":
-                            sim = hp.alm2map([alms_T, alms_E*0., alms_B], meta.nside, lmax=3*meta.nside-1)
-                        hp.write_map(f"{out_dir}/TQU_{case}_noiseless_nside{meta.nside}_lmax{meta.lmax}_{id_sim:04d}.fits", sim, overwrite=True)
+                            sim = hp.alm2map([alms_T, alms_E*0., alms_B], meta.nside, lmax=lmax_sim)
+                        map_file = meta.get_map_filename_transfer2(id_sim, cl_type, pure_type=case)
+                        hp.write_map(map_file, sim, overwrite=True, dtype=np.float32)
 
                 else:
-                    sim = hp.alm2map([alms_T, alms_E, alms_B], meta.nside, lmax=3*meta.nside-1)
-                    hp.write_map(f"{out_dir}/TQU_noiseless_nside{meta.nside}_lmax{meta.lmax}_{id_sim:04d}.fits", sim, overwrite=True)
+                    sim = hp.alm2map([alms_T, alms_E, alms_B], meta.nside, lmax=lmax_sim)
+                    map_file = meta.get_map_filename_transfer2(id_sim, cl_type)
+                    hp.write_map(map_file, sim, overwrite=True, dtype=np.float32)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pre-processing steps for the pipeline")
     parser.add_argument("--globals", type=str, help="Path to the yaml with global parameters")
-    #parser.add_argument("--output_dir", type=str, help="Path to save the data")
     parser.add_argument("--sims", action="store_true", help="Pass to generate the simulations used to compute the transfer function")
     parser.add_argument("--plots", action="store_true", help="Pass to generate plots")
 
     args = parser.parse_args()
+    
     pre_processer(args)
