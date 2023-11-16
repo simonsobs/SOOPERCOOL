@@ -83,7 +83,12 @@ class BBmeta(object):
         in the paramfiles
         """
         for label, path in self.data_dirs.items():
-            setattr(self, label, path)
+            if label == "root": 
+                self.data_dir = self.data_dirs["root"]
+            else:
+                full_path = f"{self.data_dirs['root']}/{path}"
+                setattr(self, label, full_path)
+                os.makedirs(full_path, exist_ok=True)
 
         for label, path in self.output_dirs.items():
             if label == "root": 
