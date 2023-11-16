@@ -2,8 +2,22 @@
 # to store the metadata necessary to run the
 # SO BB pipeline.
 
-# Output directory
-output_dir: "outputs"
+# Define the directories
+## Let's start with directories of data products
+data_dirs:
+  map_directory: "maps"
+  beam_directory: "beams"
+  bandpasses_directory: "/path/to/bandpasses/"
+## Then directories in which we will store outputs
+output_dirs: 
+  root: "outputs"
+  mask_directory: "masks"
+  pre_process_directory: "pre_processing"
+  sims_directory: "sims"
+  cell_transfer_directory: "cells_transfer"
+  cell_data_directory: "cells_data"
+  cell_sims_directory: "cells_sims"
+  coupling_directory: "couplings"
 
 ##################################
 #    Metadata related to maps    #
@@ -18,18 +32,12 @@ output_dir: "outputs"
 #   freq_tag: ...                #
 #   exp_tag: ...                 #
 ##################################
-
-## Path to the maps
-map_directory: "/mnt/extraspace/alaposta/bb_pipeline_dev/cosmo_sims/" 
-                      # I guess that we should be able to 
-                      # derive the name of the associated
-                      # map from the couple (exp, freq)
 map_sets:
   SAT1_f093:
     file_root: "cmb_sat1_f093"
     n_splits: 4          # Number of splits
-    freq_tag: 93         # Freq. tag (useful for coadding ?)
-    exp_tag: "SAT1"      # Experiment tag (coadding?)
+    freq_tag: 93         # Freq. tag (e.g. useful to coadd freqs)
+    exp_tag: "SAT1"      # Experiment tag (useful to get noise-bias free cross-split spectra)
   SAT1_f145:
     file_root: "cmb_sat1_f145"
     n_splits: 4
@@ -56,43 +64,32 @@ map_sets:
     freq_tag: 280
     exp_tag: "SAT3"
 
-## Path to pre-processing data
-pre_process_directory: "pre_processing"
-
-## Binning file
-binning_file: "binning.npz"
-
-## Beam information
-beam_directory: "beams"
-
-## Bandpass information
-bandpasses_directory: "/path/to/bandpasses/" #### /path/to/bandpasses/bandpass_SAT1_f093.txt
-
 ####################
 # Masking metadata #
 ####################
 masks:
-  mask_directory: "masks"
   analysis_mask: "analysis_mask.fits"
 
   binary_mask: "binary_mask.fits"
   galactic_mask_root: "planck_galactic_mask"
   point_source_mask: "point_source_mask.fits"
 
-  include_in_mask: ["galactic","point_source"]
+  include_in_mask: ["galactic"]
   gal_mask_mode: "gal070"
-  apod_radius: 2.5
+  apod_radius: 4.0
   apod_type: "C1"
+
 
 ####################################
 # Metadata related to the analysis #
 ####################################
-
 ## General parameters
-nside: 256
-lmin: 30
-lmax: 600
-deltal: 10
+general_pars:
+  nside: 256
+  lmin: 30
+  lmax: 600
+  deltal: 10
+  binning_file: "binning.npz"
 
 ## Simulation related
 sim_pars:
@@ -112,16 +109,18 @@ sim_pars:
     r: 0.01
   mock_nsrcs: 80
   mock_srcs_hole_radius: 40
-  toast:
-    schedule_file: "../data/toast_schedule.txt"
-    par_file: "../data/toast_pars.toml"
   
 
-## Transfer function related parameters
+## Filtering transfer function related parameters
 tf_settings:
   filtering_type: "m_filterer" # "m_filterer" or "toast"
-  tf_est_num_sims: 100
-  
+  m_cut: 30 # necessary only if `filtering_type` is set to "m_filterer"
+  toast: # necessary only if `filtering_type` is set to "toast"
+    schedule_file: "../data/toast_schedule.txt"
+    par_file: "../data/toast_pars.toml"
+
+  tf_est_num_sims: 5
+
   power_law_pars_tf_est:
     amp: 1.0
     delta_ell: 10
@@ -135,26 +134,3 @@ tf_settings:
       TE: 2.5
     delta_ell: 10
     power_law_index: 0.5
-
-
-######################################
-# Metadata from existing global.yaml #
-######################################
-# Apodised mask
-mask: data/mask_apodized.fits
-# Binary mask
-#binary_mask: data/mask_binary.fits.gz
-# List with power law sim names
-pl_sims: data/plsims.txt
-# Directory storing the PL sims
-pl_sims_dir: data/PL
-# Input PL power spectrum
-cl_PL: data/PL/cl_PL.npz
-# List with validation sim names
-val_sims: data/valsims.txt
-# Directory storing the validation sims
-val_sims_dir: data/val
-# Input validation power spectrum
-cl_val: data/val/cl_val.npz
-# Bandpower edges
-bpw_edges: data/bpw_edges.npz

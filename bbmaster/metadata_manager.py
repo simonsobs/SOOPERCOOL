@@ -1,13 +1,9 @@
 import yaml
 import numpy as np
 import os
-from scipy.interpolate import interp1d
 import pymaster as nmt
 import healpy as hp
-import sacc
 from itertools import combinations_with_replacement as cwr
-from itertools import combinations
-import camb
 
 class BBmeta(object):
     """
@@ -36,12 +32,15 @@ class BBmeta(object):
         for key in self.config:
             setattr(self, key, self.config[key])
         
+        # Set all the `_directory` attributes
+        self._set_directory_attributes()
+
+        # Set the general attributes (nside, lmax, etc...)
+        self._set_general_attributes()
+
         # Basic sanity checks
         if self.lmax > 3*self.nside-1:
             raise ValueError(f"lmax should be lower or equal to 3*nside-1 = {3*self.nside-1}")
-        
-        # Set all the `_directory` attributes
-        self._set_directory_attributes()
 
         # Path to binning
         self.path_to_binning = f"{self.pre_process_directory}/{self.binning_file}"
@@ -64,10 +63,10 @@ class BBmeta(object):
             )
 
         # Simulation
-        self.init_simulation_params()
+        self._init_simulation_params()
 
         # Tf estimation 
-        self.init_tf_estimation_params()
+        self._init_tf_estimation_params()
         self.tf_est_sims_dir = f"{self.pre_process_directory}/tf_est_sims"
         self.tf_val_sims_dir = f"{self.pre_process_directory}/tf_val_sims"
         self.cosmo_sims_dir = f"{self.pre_process_directory}/cosmo_sims"
@@ -83,13 +82,22 @@ class BBmeta(object):
         Set the directory attributes that are listed
         in the paramfiles
         """
-        for value in self.config.values():
-            # Skip if value is not a dict (e.g. lmax, nside, ...)
-            if not isinstance(value, dict): continue
-            # Loop over 2nd layer dict to find directory definitions
-            for subkey, subvalue in value.items():
-                if subkey.endswith("_directory"):
-                    setattr(self, subkey, subvalue)
+        for label, path in self.data_dirs.items():
+            setattr(self, label, path)
+
+        for label, path in self.output_dirs.items():
+            if label == "root": 
+                self.output_dir = self.output_dirs["root"]
+            else:
+                full_path = f"{self.output_dirs['root']}/{path}"
+                setattr(self, label, full_path)
+                os.makedirs(full_path, exist_ok=True)
+    
+    def _set_general_attributes(self):
+        """
+        """
+        for key, value in self.general_pars.items():
+            setattr(self, key, value)
 
 
     def _get_map_sets_list(self):
@@ -221,22 +229,16 @@ class BBmeta(object):
         binner = self.read_nmt_binning()
         return binner.get_effective_ells()
 
-    
-    def read_beam(self, beam_fname):
+    def read_beam(self, map_set):
         """
-        Read the beam file and return the corresponding array.
         """
-        from scipy.interpolate import interp1d
-        larr_all = np.arange(3*self.nside)
-        l, b = np.loadtxt(os.path.join(self.beam_directory, beam_fname), 
-                          unpack=True)
-        beam = interp1d(l, b, fill_value=0, bounds_error=False)(larr_all)
-        if l[0] != 0:
-            beam[:int(l[0])] = b[0]
-        return beam
+        file_root = self.file_root_from_map_set(map_set)
+        beam_file = f"{self.beam_directory}/beam_{file_root}.dat"
+        l, bl = np.loadtxt(beam_file, unpack=True)
+        return l, bl
     
 
-    def init_simulation_params(self):
+    def _init_simulation_params(self):
         """
         Loop over the simulation parameters and set them as attributes.
         """
@@ -246,7 +248,7 @@ class BBmeta(object):
             setattr(self, name, self.sim_pars[name])
 
 
-    def init_tf_estimation_params(self):
+    def _init_tf_estimation_params(self):
         """
         Loop over the transfer function parameters and set them as attributes.
         """
@@ -282,9 +284,25 @@ class BBmeta(object):
             Type of power spectra.
             Can be "cosmo", "tf_est" or "tf_val".
         """
-        fname = getattr(self, f"{cl_type}_file")
+        fname = getattr(self, f"{cl_type}_cls_file")
         return np.load(fname)
     
+
+    def plot_dir_from_output_dir(self, out_dir):
+        """
+        """
+        root = self.output_dir
+
+        if root in out_dir:
+            path_to_plots = out_dir.replace(f"{root}/", f"{root}/plots/")
+        else:
+            path_to_plots = f"{root}/plots/{out_dir}"
+
+        os.makedirs(path_to_plots, exist_ok=True)
+
+        return path_to_plots
+
+
     def get_fname_mask(self, map_type='analysis'):
         """
         Get the full filepath to a mask of predefined type.
@@ -308,6 +326,7 @@ class BBmeta(object):
                              "'point_source'.")
         return fname
     
+
     def get_map_filename(self, map_set, id_split, id_sim=None):
         """
         Get the path to file for a given `map_set` and split index.
@@ -337,7 +356,18 @@ class BBmeta(object):
             path_to_maps = self.map_directory
         
         return os.path.join(path_to_maps, f"{map_set_root}_split_{id_split}.fits")
-    
+
+
+    def get_map_filename_transfer2(self, id_sim, cl_type, pure_type=None):
+        """
+        """
+        path_to_maps = getattr(self, f"{cl_type}_sims_dir")
+
+        pure_label = f"_{pure_type}" if pure_type else ""
+        file_name = f"TQU{pure_label}_noiseless_nside{self.nside}_lmax{self.lmax}_{id_sim:04d}.fits"
+
+        return f"{path_to_maps}/{file_name}"
+
 
     def get_map_filename_transfer(id_sim, signal=None, e_or_b=None):
         """
@@ -455,9 +485,26 @@ class BBmeta(object):
             Else, return the (split-)coadded power spectra names.
         """
         map_iterable = self.map_sets_list if coadd else self.maps_list
-        if type == "all":
-            return list(cwr(map_iterable, 2))
-        elif type == "auto":
-            return [(map_name, map_name) for map_name in map_iterable]
-        elif type == "cross":
-            return list(combinations(map_iterable, 2))
+
+        ps_name_list = []
+        for i, map1 in enumerate(map_iterable):
+            for j, map2 in enumerate(map_iterable):
+
+                if coadd:
+                    if i > j: continue
+                    if (type == "cross") and (i == j): continue
+                    if (type == "auto") and (i != j): continue
+
+                else:
+                    map_set_1, split_1 = map1.split("__")
+                    map_set_2, split_2 = map2.split("__")
+
+                    if (map_set_1 == map_set_2) and (split_1 > split_2): continue
+
+                    exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
+                    exp_tag_2 = self.exp_tag_from_map_set(map_set_2)
+                    if (type == "cross") and (exp_tag_1 == exp_tag_2) and (split_1 == split_2): continue
+                    if (type == "auto") and (exp_tag_1 != exp_tag_2) and (split_1 != split_2): continue
+
+                ps_name_list.append((map1, map2))
+        return ps_name_list

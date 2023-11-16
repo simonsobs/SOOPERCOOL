@@ -66,10 +66,10 @@ def theory_cls(cosmo_params, lmax):
     powers = results.get_cmb_power_spectra(params, CMB_unit='muK', raw_cl=True)
     ell = np.arange(lmax+1)
     out_ps = {
-        "TT": powers["total"][:, 0],
-        "EE": powers["total"][:, 1],
-        "TE": powers["total"][:, 3],
-        "BB": powers["total"][:, 2]
+        "TT": powers["total"][:, 0][:lmax+1],
+        "EE": powers["total"][:, 1][:lmax+1],
+        "TE": powers["total"][:, 3][:lmax+1],
+        "BB": powers["total"][:, 2][:lmax+1]
     }
     for spec in ["EB", "TB"]:
         out_ps[spec] = np.zeros_like(ell)
@@ -108,7 +108,7 @@ def generate_noise_map(nl_T, nl_P, hitmap, n_splits):
     noise_map = hp.synfast(noise_mat, hp.get_nside(hitmap), pol=True, new=True)
 
     # Weight with hitmap
-    noise_map /= np.sqrt(hitmap / np.max(hitmap))
+    noise_map[:, hitmap != 0] /= np.sqrt(hitmap[hitmap != 0] / np.max(hitmap))
 
     return noise_map
 
@@ -180,6 +180,28 @@ def power_law_cl(ell, amp, delta_ell, power_law_index):
         pl_ps[spec] = np.zeros_like(ell)
 
     return pl_ps
+
+
+def m_filter_map(map, mask, m_cut):
+    """
+    """
+
+    map_masked = map * mask
+    nside = hp.get_nside(map)
+    lmax = 3 * nside - 1
+
+    alms_list = []
+    alms = hp.map2alm(map_masked, lmax=lmax)
+
+    n_modes_to_filter = (m_cut + 1) * (lmax + 1) - ((m_cut + 1) * m_cut) // 2
+    alms[:, :n_modes_to_filter] = 0.
+
+    return hp.alm2map(alms, nside=nside, lmax=lmax)
+
+def toast_filter_map(map, mask):
+    """
+    """
+    raise NotImplementedError("TOAST filtering not implemented yet.")
 
 
 class PipelineManager(object):
