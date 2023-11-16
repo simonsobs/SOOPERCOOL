@@ -5,6 +5,7 @@
 # Define the directories
 ## Let's start with directories of data products
 data_dirs:
+  root: "data"
   map_directory: "maps"
   beam_directory: "beams"
   bandpasses_directory: "/path/to/bandpasses/"
@@ -93,9 +94,6 @@ general_pars:
 
 ## Simulation related
 sim_pars:
-  covsims_directory: "/mnt/extraspace/alaposta/bb_pipeline_dev/cosmo_sims/"
-  transsims_directory: "/mnt/extraspace/alaposta/bb_pipeline_dev/tf_est_sims/"
-  transval_directory: "/mnt/extraspace/alaposta/bb_pipeline_dev/tf_val_sims/"
   hitmap_file: "../data/norm_nHits_SA_35FOV_ns512.fits"
   num_sims: 5
   cosmology:
