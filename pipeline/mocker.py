@@ -28,19 +28,26 @@ def mocker(args):
     os.makedirs(map_dir, exist_ok=True)
     os.makedirs(beam_dir, exist_ok=True)
 
-    ps_th = meta.load_fiducial_cl(cl_type="cosmo_cls")
+    ps_th = meta.load_fiducial_cl(cl_type="cosmo")
 
     # Load binary mask
     binary_mask = meta.read_mask("binary")
     fsky = np.mean(binary_mask)
 
+    lmax_sim = 3 * meta.nside - 1
+
     # Load noise curves
     noise_model = noise_calc.SOSatV3point1(sensitivity_mode='baseline')
     lth, _, nlth_P = noise_model.get_noise_curves(
         fsky,
-        meta.lmax,
+        lmax_sim+1,
         delta_ell=1,
         deconv_beam=False
+    )
+    lth = np.concatenate(([0, 1], lth))
+    nlth_P = np.array(
+        [np.concatenate(([0, 0], nl)) for nl in nlth_P]
+        
     )
     # Only support polarization noise at the moment
     nlth_dict = {
@@ -89,16 +96,19 @@ def mocker(args):
                 hp.write_map(
                     map_file_name,
                     split_map,
-                    overwrite=True            
+                    overwrite=True,
+                    dtype=np.float32            
                 )
                 
                 if args.plots:
-                    for i, m in enumerate("TQU"):
-                        vrange = 300 if m == "T" else 10
-                        plt.figure(figsize=(16,9))
-                        hp.mollview(split_map[i], title=map_set, cmap=cm.coolwarm, min=-vrange, max=vrange)
-                        hp.graticule()
-                        plt.savefig(map_file_name.replace("fits", f"_{m}.png"))
+                    if Nsims == 1:
+                        plot_dir = meta.plot_dir_from_output_dir(meta.map_directory)
+                        for i, m in enumerate("TQU"):
+                            vrange = 300 if m == "T" else 10
+                            plt.figure(figsize=(16,9))
+                            hp.mollview(split_map[i], title=map_set, cmap=cm.coolwarm, min=-vrange, max=vrange)
+                            hp.graticule()
+                            plt.savefig(f"{plot_dir}/map_{map_set}__{id_split}_{m}.png", bbox_inches="tight")
 
 
 if __name__ == "__main__":
