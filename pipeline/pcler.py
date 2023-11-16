@@ -121,6 +121,7 @@ def pcler(args):
 
                 # Load maps
                 map_file = meta.get_map_filename(map_set, id_split, id_sim=id_sim if Nsims > 1 else None)
+                map_file = map_file.replace(".fits", "_filtered.fits")
                 map = hp.read_map(map_file, field=[0,1,2])
 
                 # Include beam in namaster fields to deconvolve it
