@@ -2,6 +2,7 @@ import yaml
 import numpy as np
 import os
 from scipy.interpolate import interp1d
+from so_models_v3 import SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 import pymaster as nmt
 import healpy as hp
 import sacc
@@ -58,18 +59,18 @@ def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
     s.save_fits(fname_out, overwrite=True)
 
 
-def theory_cls(cosmo_params, lmax):
+def theory_cls(cosmo_params, lmax, lmin=0):
     """
     """
     params = camb.set_params(**cosmo_params)
     results = camb.get_results(params)
     powers = results.get_cmb_power_spectra(params, CMB_unit='muK', raw_cl=True)
-    ell = np.arange(lmax+1)
+    ell = np.arange(lmin, lmax+1)
     out_ps = {
-        "TT": powers["total"][:, 0][:lmax+1],
-        "EE": powers["total"][:, 1][:lmax+1],
-        "TE": powers["total"][:, 3][:lmax+1],
-        "BB": powers["total"][:, 2][:lmax+1]
+        "TT": powers["total"][:, 0][lmin:lmax+1],
+        "EE": powers["total"][:, 1][lmin:lmax+1],
+        "TE": powers["total"][:, 3][lmin:lmax+1],
+        "BB": powers["total"][:, 2][lmin:lmax+1]
     }
     for spec in ["EB", "TB"]:
         out_ps[spec] = np.zeros_like(ell)
@@ -95,6 +96,32 @@ def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
         out_map[2, :] = np.random.randn(size) * noise_rms_muK_P
         return out_map
     return out_map
+
+
+def get_noise_curves(fsky, lmax, lmin=0, sensitivity_mode='baseline', 
+                          oof_mode='optimistic', deconvolve_beam=True):
+    """
+    """
+    # Load noise curves
+    noise_model = noise_calc.SOSatV3point1(sensitivity_mode=sensitivity_mode)
+    lth, _, nlth_P = noise_model.get_noise_curves(
+        fsky,
+        lmax+1,
+        delta_ell=1,
+        deconv_beam=False
+    )
+    lth = np.concatenate(([0, 1], lth))
+    nlth_P = np.array(
+        [np.concatenate(([0, 0], nl))[lmin:] for nl in nlth_P]
+        
+    )
+    # Only support polarization noise at the moment
+    nlth_dict = {
+        "T": {freq_band: nlth_P[i]/2 for i, freq_band in enumerate(noise_model.get_bands())},
+        "P": {freq_band: nlth_P[i] for i, freq_band in enumerate(noise_model.get_bands())}
+    }
+    
+    return lth, nlth_dict
 
 
 def generate_noise_map(nl_T, nl_P, hitmap, n_splits):

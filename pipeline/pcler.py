@@ -3,6 +3,7 @@ import healpy as hp
 import numpy as np
 import os
 from bbmaster import BBmeta
+from bbmaster.utils import *
 import pymaster as nmt
 from itertools import product
 import matplotlib.pyplot as plt
@@ -88,6 +89,8 @@ def pcler(args):
     mask = meta.read_mask("analysis")
     nmt_binning = meta.read_nmt_binning()
     n_bins = nmt_binning.get_n_bands()
+    binary_mask = meta.read_mask("binary")
+    fsky = np.mean(binary_mask)
 
     if args.tf_est or args.tf_val:
         cl_dir = meta.cell_transfer_directory
@@ -176,24 +179,48 @@ def pcler(args):
             
             for map_set1, map_set2 in cells_plots:
                 for field_pair in ['EE','EB','BB']:
-                    fig = plt.figure(figsize=(8,4))
+                    fig = plt.figure(figsize=(6,4))
                     cells_types = cells_plots[(map_set1, map_set2)]
+                    
+                    # Load theory CMB spectra
+                    el_th, cl_th_dict = theory_cls(meta.cosmology, 
+                                                   meta.lmax, lmin=meta.lmin)
+                    cl_th = cl_th_dict[field_pair]
+                    
                     for is_noisy in cells_types:
                         cells_splits = cells_types[is_noisy]
+                        color = 'tab:red'
+                        
+                        if is_noisy=='noisy' and cells_splits:
+                            # Load theory noise autospectra
+                            _, nl_th_dict = get_noise_curves(
+                                fsky, meta.lmax, lmin=meta.lmin, 
+                                sensitivity_mode='baseline', 
+                                oof_mode='optimistic',
+                                deconvolve_beam=False
+                            )
+                            freq_tag = meta.freq_tag_from_map_set(map_set)
+                            n_splits = meta.n_splits_from_map_set(map_set)
+                            nl_th = nl_th_dict["P"][freq_tag]*float(n_splits)
+                            cl_th = cl_th + nl_th
+                            color = 'grey'
+                            
+                        # Plot theory power spectra
+                        plt.plot(el_th, 
+                                 el_th*(el_th+1)/2./np.pi*cl_th,
+                                 lw=1, ls='--', c=color, 
+                                 label=f"theory expectation ({is_noisy})")
+                        
                         for splits_label in cells_splits:
                             id_split1 = splits_label.split('_')[0]
                             id_split2 = splits_label.split('_')[1]
-                            cells = cells_splits[splits_label][
-                                field_pair
-                            ]
+                            cells = cells_splits[splits_label][field_pair]
                             label = f"{map_set1}__{id_split1}_x_{map_set2}__{id_split2}___{field_pair}"
-                            color = 'grey'
-                            if is_noisy=='noiseless':
-                                color = 'tab:red'
+                            
+                            # Plot splits power spectra
                             plt.plot(el, 
                                      el*(el+1)/2./np.pi*cells, 
-                                     lw=0.7, 
-                                     c=color,
+                                     lw=0.7, c=color,
                                      label=label)
                     plt.xscale('log')
                     plt.yscale('log')
