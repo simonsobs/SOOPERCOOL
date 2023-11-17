@@ -5,6 +5,7 @@ import os
 from bbmaster import BBmeta
 import pymaster as nmt
 from itertools import product
+import matplotlib.pyplot as plt
 
 
 def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
@@ -119,8 +120,12 @@ def pcler(args):
                 inv_couplings[map_set2, map_set1] = coupling_dict
         
         if args.plots:
-            ells_effective = nmt_binning.get_effective_ells()
+            el = nmt_binning.get_effective_ells()
             cells_plots = {}
+            for map_set1 in meta.map_sets_list:
+                for map_set2 in meta.map_sets_list:
+                    cells_plots[(map_set1, map_set2)] = {'noisy': {}, 
+                                                        'noiseless': {}}
 
         for id_sim in range(Nsims):
             fields = {}
@@ -151,21 +156,20 @@ def pcler(args):
                     nmt_binning
                 )
 
-                decoupled_pcls = decouple_pseudo_cls(pcls, wcal_inv)
+                decoupled_pcls = decouple_pseudo_cls(
+                    pcls, inv_couplings[map_set1, map_set2]
+                )
                 
                 sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
                 np.savez(f"{cl_dir}/decoupled_pcls_nobeam_{map_name1}_{map_name2}{sim_label}.npz", 
                          **decoupled_pcls, lb=nmt_binning.get_effective_ells())
                 
                 if args.plots:
-                    cells_plots[(map_set1,map_set2)] = {'noisy':{}, 'noiseless':{}}
-                    has_noise = map_set1==map_set2 and id_split1==id_split2
+                    has_noise = (map_set1==map_set2) and (id_split1==id_split2)
                     if has_noise:
-                        cells_plots[(map_set1,map_set2)]['noisy'][
-                            (id_split1,id_split2)] = decoupled_pcls
+                        cells_plots[(map_set1,map_set2)]['noisy'][f"{id_split1}_{id_split2}"] = decoupled_pcls
                     else:
-                        cells_plots[(map_set1,map_set2)]['noiseless'][
-                            (id_split1,id_split2)] = decoupled_pcls
+                        cells_plots[(map_set1,map_set2)]['noiseless'][f"{id_split1}_{id_split2}"] = decoupled_pcls
      
         if args.plots:
             plot_dir = meta.plot_dir_from_output_dir(meta.map_directory_relative)
@@ -176,24 +180,32 @@ def pcler(args):
                     cells_types = cells_plots[(map_set1, map_set2)]
                     for is_noisy in cells_types:
                         cells_splits = cells_types[is_noisy]
-                        for id_split1, id_split2 in cells_splits:
-                            cells = cells_splits[(id_split1, id_split2)][
+                        for splits_label in cells_splits:
+                            id_split1 = splits_label.split('_')[0]
+                            id_split2 = splits_label.split('_')[1]
+                            cells = cells_splits[splits_label][
                                 field_pair
                             ]
-                            label = f"{map_set1}__{id_split1}_x_"
-                                    f"{map_set2}__{id_split2}___{field_pair}"
+                            label = f"{map_set1}__{id_split1}_x_{map_set2}__{id_split2}___{field_pair}"
                             color = 'grey'
                             if is_noisy=='noiseless':
                                 color = 'tab:red'
-                            plt.plot(ells_effective, cells, lw=0.7, c=color,
+                            plt.plot(el, 
+                                     el*(el+1)/2./np.pi*cells, 
+                                     lw=0.7, 
+                                     c=color,
                                      label=label)
                     plt.xscale('log')
                     plt.yscale('log')
-                    plt.legend(bbox_to_anchor=(2,1))
+                    plt.ylabel(r'$D_\ell$')
+                    plt.xlabel(r'$\ell$')
+                    plt.title(f"{map_set1} x {map_set2} {field_pair}")
+                    plt.legend(bbox_to_anchor=(1,1))
                     plt.savefig(
                         os.path.join(
-                            plot_dir, f"{map_set1}_{map_set2}_{field_pair}.png"
-                        )
+                            plot_dir, 
+                            f"cells_{map_set1}_{map_set2}_{field_pair}.png"
+                        ), bbox_inches='tight'
                     )
 
     if args.tf_est:
@@ -249,7 +261,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if args.sims and args.plots:
-        warnings.warn("Both --sims and --plot are set to True. "
+        warnings.warn("Both --sims and --plots are set to True. "
                       "Too many plots will be generated. Set --plot to False")
         args.plots = False
         

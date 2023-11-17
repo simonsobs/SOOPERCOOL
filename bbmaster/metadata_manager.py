@@ -186,7 +186,10 @@ class BBmeta(object):
             Type of mask to load.
             Can be "binary", "galactic", "point_source" or "analysis".
         """
-        return hp.read_map(getattr(self, f"{mask_type}_mask_name"))
+        return hp.ud_grade(
+            hp.read_map(getattr(self, f"{mask_type}_mask_name")),
+            nside_out=self.nside
+        )
 
 
     def save_mask(self, mask_type, mask, overwrite=False):
