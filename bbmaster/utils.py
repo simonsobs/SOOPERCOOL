@@ -99,7 +99,7 @@ def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
 
 
 def get_noise_curves(fsky, lmax, lmin=0, sensitivity_mode='baseline', 
-                          oof_mode='optimistic', deconvolve_beam=True):
+                          oof_mode='optimistic', is_beam_deconvolved=True):
     """
     """
     # Load noise curves
@@ -108,7 +108,7 @@ def get_noise_curves(fsky, lmax, lmin=0, sensitivity_mode='baseline',
         fsky,
         lmax+1,
         delta_ell=1,
-        deconv_beam=False
+        deconv_beam=is_beam_deconvolved
     )
     lth = np.concatenate(([0, 1], lth))
     nlth_P = np.array(

@@ -33,32 +33,17 @@ def mocker(args):
     # Load binary mask
     binary_mask = meta.read_mask("binary")
     fsky = np.mean(binary_mask)
-
     lmax_sim = 3 * meta.nside - 1
 
     # Load noise curves
     noise_model = noise_calc.SOSatV3point1(sensitivity_mode='baseline')
-    lth, _, nlth_P = noise_model.get_noise_curves(
-        fsky,
-        lmax_sim+1,
-        delta_ell=1,
-        deconv_beam=False
-    )
-    lth = np.concatenate(([0, 1], lth))
-    nlth_P = np.array(
-        [np.concatenate(([0, 0], nl)) for nl in nlth_P]
-        
-    )
-    # Only support polarization noise at the moment
-    nlth_dict = {
-        "T": {freq_band: nlth_P[i]/2 for i, freq_band in enumerate(noise_model.get_bands())},
-        "P": {freq_band: nlth_P[i] for i, freq_band in enumerate(noise_model.get_bands())}
-    }
+    lth, nlth_dict = get_noise_curves(fsky, lmax_sim, is_beam_deconvolved=False)
 
     # Load hitmap
     hitmap = meta.read_hitmap()
 
     # Load and save beams
+   
     beam_arcmin = {
         freq_band: beam_arcmin for freq_band, beam_arcmin in zip(noise_model.get_bands(), noise_model.get_beams())
     }

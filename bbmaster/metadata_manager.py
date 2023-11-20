@@ -91,7 +91,7 @@ class BBmeta(object):
             else:
                 full_path = f"{self.data_dirs['root']}/{path}"
                 setattr(self, label, full_path)
-                setattr(self, f"{label}_relative", path)
+                setattr(self, f"{label}_rel", path)
                 os.makedirs(full_path, exist_ok=True)
 
         for label, path in self.output_dirs.items():
@@ -100,7 +100,7 @@ class BBmeta(object):
             else:
                 full_path = f"{self.output_dirs['root']}/{path}"
                 setattr(self, label, full_path)
-                setattr(self, f"{label}_relative", path)
+                setattr(self, f"{label}_rel", path)
                 os.makedirs(full_path, exist_ok=True)
     
     def _set_general_attributes(self):

@@ -94,11 +94,8 @@ general_pars:
 
 ## Simulation related
 sim_pars:
-  # covsims_directory: "/mnt/extraspace/alaposta/bb_pipeline_dev/cosmo_sims/"
-  # transsims_directory: "/mnt/extraspace/alaposta/bb_pipeline_dev/tf_est_sims/"
-  # transval_directory: "/mnt/extraspace/alaposta/bb_pipeline_dev/tf_val_sims/"
   hitmap_file: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/data/norm_nHits_SA_35FOV_ns512.fits"
-  num_sims: 100
+  num_sims: 10
   cosmology:
     cosmomc_theta: 0.0104085
     As: 2.1e-9
@@ -120,7 +117,7 @@ tf_settings:
     schedule_file: "in_data/toast_schedule.txt"
     par_file: "in_data/toast_pars.toml"
 
-  tf_est_num_sims: 5
+  tf_est_num_sims: 100
 
   power_law_pars_tf_est:
     amp: 1.0
