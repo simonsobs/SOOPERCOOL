@@ -125,10 +125,22 @@ def pcler(args):
         if args.plots:
             el = nmt_binning.get_effective_ells()
             cells_plots = {}
-            for map_set1 in meta.map_sets_list:
-                for map_set2 in meta.map_sets_list:
-                    cells_plots[(map_set1, map_set2)] = {'noisy': {}, 
-                                                        'noiseless': {}}
+            
+            for map_name1, map_name2 in meta.get_ps_names_list(type="all", coadd=False):
+                map_set1, id_split1 = map_name1.split("__")
+                map_set2, id_split2 = map_name2.split("__")
+                split_label = f"split{id_split1}_x_split{id_split2}"
+                for pol1, pol2 in ['EE', 'EB', 'BB']:
+                    plot_label = f"{map_set1}__{map_set2}__{pol1}{pol2}"
+                    has_noise_bias = (id_split1==id_split2) and (map_set1 == map_set2)
+                    if not plot_label in cells_plots:
+                        cells_plots[plot_label] = {}
+                    if not split_label in cells_plots[plot_label]:
+                        cells_plots[plot_label][split_label] = {}
+                    if has_noise_bias:
+                        cells_plots[plot_label][split_label]['noisy'] = np.zeros((Nsims, n_bins))
+                    else:
+                        cells_plots[plot_label][split_label]['noiseless'] = np.zeros((Nsims, n_bins))
 
         for id_sim in range(Nsims):
             fields = {}
@@ -137,7 +149,9 @@ def pcler(args):
                 map_set, id_split = map_name.split("__")
 
                 # Load maps
-                map_file = meta.get_map_filename(map_set, id_split, id_sim=id_sim if Nsims > 1 else None)
+                map_file = meta.get_map_filename(
+                    map_set, id_split, id_sim=id_sim if Nsims > 1 else None
+                )
                 map_file = map_file.replace(".fits", "_filtered.fits")
                 map = hp.read_map(map_file, field=[0,1,2])
 
@@ -168,65 +182,73 @@ def pcler(args):
                          **decoupled_pcls, lb=nmt_binning.get_effective_ells())
                 
                 if args.plots:
-                    has_noise = (map_set1==map_set2) and (id_split1==id_split2)
-                    if has_noise:
-                        cells_plots[(map_set1,map_set2)]['noisy'][f"{id_split1}_{id_split2}"] = decoupled_pcls
-                    else:
-                        cells_plots[(map_set1,map_set2)]['noiseless'][f"{id_split1}_{id_split2}"] = decoupled_pcls
+                    split_label = f"split{id_split1}_x_split{id_split2}"
+                    for field_pair in ['EE', 'EB', 'BB']:
+                        plot_label = f"{map_set1}__{map_set2}__{field_pair}"
+                        has_noise_bias = (id_split1==id_split2) and (map_set1 == map_set2)
+                        
+                        if has_noise_bias:
+                            cells_plots[plot_label][split_label]['noisy'][id_sim] = decoupled_pcls[field_pair]
+                        else:
+                            cells_plots[plot_label][split_label]['noiseless'][id_sim] = decoupled_pcls[field_pair]
      
         if args.plots:
-            plot_dir = meta.plot_dir_from_output_dir(meta.map_directory_relative)
+            plot_dir_rel = meta.sims_directory_rel if Nsims > 1 else meta.map_directory_rel 
+            plot_dir = meta.plot_dir_from_output_dir(plot_dir_rel)
             
-            for map_set1, map_set2 in cells_plots:
-                for field_pair in ['EE','EB','BB']:
-                    fig = plt.figure(figsize=(6,4))
-                    cells_types = cells_plots[(map_set1, map_set2)]
+            for plot_label in cells_plots:
+                fig = plt.figure(figsize=(6,4))
+                plt.title(plot_label)
+                
+                # Load theory CMB spectra
+                map_set1, map_set2, field_pair = plot_label.split("__")
+                el_th, cl_th_dict = theory_cls(meta.cosmology, 
+                                               meta.lmax, lmin=meta.lmin)
+                cl_th = cl_th_dict[field_pair]
+                do_theory_plot = True
+                for split_label in cells_plots[plot_label]:
+                    cells_splits = cells_plots[plot_label][split_label]
                     
-                    # Load theory CMB spectra
-                    el_th, cl_th_dict = theory_cls(meta.cosmology, 
-                                                   meta.lmax, lmin=meta.lmin)
-                    cl_th = cl_th_dict[field_pair]
-                    
-                    for is_noisy in cells_types:
-                        cells_splits = cells_types[is_noisy]
-                        color = 'tab:red'
-                        
-                        if is_noisy=='noisy' and cells_splits:
-                            # Load theory noise autospectra
-                            _, nl_th_dict = get_noise_curves(
+                    if do_theory_plot:
+                        # Plot noiseless theory power spectra
+                        plt.plot(el_th, 
+                                 el_th*(el_th+1)/2./np.pi*(cl_th),
+                                 lw=1, ls='--', c='darkred', 
+                                 label=f"theory (noiseless)")
+                        if 'noisy' in cells_splits:
+                            # Plot noisy theory with beam-deconvolved noise
+                            _, nl_th_beam_dict = get_noise_curves(
                                 fsky, meta.lmax, lmin=meta.lmin, 
                                 sensitivity_mode='baseline', 
                                 oof_mode='optimistic',
-                                deconvolve_beam=False
+                                is_beam_deconvolved=True
                             )
-                            freq_tag = meta.freq_tag_from_map_set(map_set)
-                            n_splits = meta.n_splits_from_map_set(map_set)
-                            nl_th = nl_th_dict["P"][freq_tag]*float(n_splits)
-                            cl_th = cl_th + nl_th
-                            color = 'grey'
-                            
-                        # Plot theory power spectra
-                        plt.plot(el_th, 
-                                 el_th*(el_th+1)/2./np.pi*cl_th,
-                                 lw=1, ls='--', c=color, 
-                                 label=f"theory expectation ({is_noisy})")
+                            freq_tag = meta.freq_tag_from_map_set(map_set1)
+                            n_splits = meta.n_splits_from_map_set(map_set1)
+                            nl_th_beam = nl_th_beam_dict["P"][freq_tag]*float(n_splits)
+                            plt.plot(el_th, 
+                                     el_th*(el_th+1)/2./np.pi*(cl_th+nl_th_beam),
+                                     lw=1, ls='-.', c='k', 
+                                     label=f"theory (noisy)")
+                        do_theory_plot = False
                         
-                        for splits_label in cells_splits:
-                            id_split1 = splits_label.split('_')[0]
-                            id_split2 = splits_label.split('_')[1]
-                            cells = cells_splits[splits_label][field_pair]
-                            label = f"{map_set1}__{id_split1}_x_{map_set2}__{id_split2}___{field_pair}"
-                            
-                            # Plot splits power spectra
-                            plt.plot(el, 
-                                     el*(el+1)/2./np.pi*cells, 
-                                     lw=0.7, c=color,
-                                     label=label)
+                    # Plot splits power spectra
+                    for has_noise_bias, cells_sims in cells_splits.items():
+                        cells_sum = 0
+                        for id_sim in range(Nsims):
+                            cells = cells_sims[id_sim]
+                            cells_sum += cells
+                            color = 'k' if (has_noise_bias=="noisy") else 'tab:red'
+                            if Nsims > 1:
+                                plt.plot(el, el*(el+1)/2./np.pi*cells, 
+                                         lw=0.3, c=color, alpha=0.5)
+                        plt.plot(el, el*(el+1)/2./np.pi*cells_sum/Nsims, 
+                                 lw=1, c=color, label=split_label)
+                        
                     plt.xscale('log')
                     plt.yscale('log')
-                    plt.ylabel(r'$D_\ell$')
-                    plt.xlabel(r'$\ell$')
-                    plt.title(f"{map_set1} x {map_set2} {field_pair}")
+                    plt.ylabel(r'$\ell(\ell+1)\,C_\ell/2\pi$', fontsize=14)
+                    plt.xlabel(r'$\ell$', fontsize=14)
                     plt.legend(bbox_to_anchor=(1,1))
                     plt.savefig(
                         os.path.join(
@@ -255,7 +277,9 @@ def pcler(args):
             pcls_mat_filtered = get_pcls_mat_transfer(fields["filtered"], nmt_binning)
             pcls_mat_unfiltered = get_pcls_mat_transfer(fields["unfiltered"], nmt_binning)
 
-            np.savez(f"{cl_dir}/pcls_mat_tf_est_{id_sim:04d}.npz", pcls_mat_filtered=pcls_mat_filtered, pcls_mat_unfiltered=pcls_mat_unfiltered)
+            np.savez(f"{cl_dir}/pcls_mat_tf_est_{id_sim:04d}.npz", 
+                     pcls_mat_filtered=pcls_mat_filtered, 
+                     pcls_mat_unfiltered=pcls_mat_unfiltered)
 
     if args.tf_val:
         for id_sim in range(meta.tf_est_num_sims):
@@ -287,9 +311,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     
-    if args.sims and args.plots:
-        warnings.warn("Both --sims and --plots are set to True. "
-                      "Too many plots will be generated. Set --plot to False")
+    if (args.tf_est and args.plots) or (args.tf_val and args.plots):
+        warnings.warn("Both --tf_[...] and --plots are set to True. "
+                      "This is not implemented yet. Set --plot to False")
         args.plots = False
         
     args = parser.parse_args()
