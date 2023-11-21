@@ -164,7 +164,8 @@ def pcler(args):
                     "spin2": field_spin2
                 }
             
-            for map_name1, map_name2 in meta.get_ps_names_list():
+            for map_name1, map_name2 in meta.get_ps_names_list(type="all", 
+                                                               coadd=False):
                 map_set1, id_split1 = map_name1.split("__")
                 map_set2, id_split2 = map_name2.split("__")
                 pcls = get_coupled_pseudo_cls(
@@ -315,7 +316,5 @@ if __name__ == "__main__":
         warnings.warn("Both --tf_[...] and --plots are set to True. "
                       "This is not implemented yet. Set --plot to False")
         args.plots = False
-        
-    args = parser.parse_args()
 
     pcler(args)
