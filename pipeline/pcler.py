@@ -7,6 +7,7 @@ from bbmaster.utils import *
 import pymaster as nmt
 from itertools import product
 import matplotlib.pyplot as plt
+import warnings
 
 
 def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
@@ -35,7 +36,10 @@ def decouple_pseudo_cls(coupled_pseudo_cells, coupling_inv):
     for spin_comb, coupled_pcl in coupled_pseudo_cells.items():
         n_bins = coupled_pcl.shape[-1]
         decoupled_pcl = coupling_inv[spin_comb] @ coupled_pcl.flatten()
-        decoupled_pcl = decoupled_pcl.reshape((4, n_bins))
+        if spin_comb == "spin0xspin0": size = 1
+        elif spin_comb == "spin0xspin2" or spin_comb == "spin2xspin0": size = 2
+        elif spin_comb == "spin2xspin2": size = 4 
+        decoupled_pcl = decoupled_pcl.reshape((size, n_bins))
 
         decoupled_pcls[spin_comb] = decoupled_pcl
     
@@ -80,6 +84,28 @@ def get_pcls_mat_transfer(fields, nmt_binning):
 
     return pcls_mat
 
+def get_pcls_mat_transfer_upgrade(fields, nmt_binning):
+    """
+    attempt to get TF for T and Pol.
+    """
+    n_bins = nmt_binning.get_n_bands()
+    pcls_mat_00 = np.zeros((1, 1, n_bins))
+    pcls_mat_02 = np.zeros((2, 2, n_bins))
+    pcls_mat_22 = np.zeros((4, 4, n_bins))
+
+    index = 0
+    cases = ["pureE", "pureB"]
+    for index, (pure_type1, pure_type2) in enumerate(product(cases, cases)):
+        pcls = get_coupled_pseudo_cls(fields[pure_type1], fields[pure_type2], nmt_binning)
+        pcls_mat_22[index] = pcls["spin2xspin2"]
+
+        pcls_mat_02[cases.index(pure_type2)] = pcls["spin0xspin2"]
+    
+    pcls_mat_00[0] = pcls["spin0xspin0"]
+
+    return {"spin0xspin0": pcls_mat_00,
+            "spin0xspin2": pcls_mat_02,
+            "spin2xspin2": pcls_mat_22}
 
 def pcler(args):
     """
@@ -100,12 +126,6 @@ def pcler(args):
         cl_dir = meta.cell_sims_directory
 
     if args.data or args.sims:
-        
-        # Load beams for each map set
-        beams = {}
-        for map_set in meta.map_sets_list:
-            l, bl = meta.read_beam(map_set)
-            beams[map_set] = bl
 
         # Set the number of sims to loop over
         Nsims = meta.num_sims if args.sims else 1
@@ -115,7 +135,10 @@ def pcler(args):
         for map_set1, map_set2 in meta.get_ps_names_list(type="all", coadd=True):
             couplings = np.load(f"{meta.coupling_directory}/couplings_{map_set1}_{map_set2}.npz")
             coupling_dict = {
-                "spin2xspin2": couplings['wcal_inv'].reshape([4*n_bins, 4*n_bins])
+                "spin0xspin0": couplings["inv_coupling_spin0xspin0"].reshape([n_bins, n_bins]),
+                "spin0xspin2": couplings["inv_coupling_spin0xspin2"].reshape([2*n_bins, 2*n_bins]),
+                "spin2xspin0": couplings["inv_coupling_spin0xspin2"].reshape([2*n_bins, 2*n_bins]),
+                "spin2xspin2": couplings["inv_coupling_spin2xspin2"].reshape([4*n_bins, 4*n_bins])
             }
             inv_couplings[map_set1, map_set2] = coupling_dict
             if map_set1 != map_set2:
@@ -156,11 +179,11 @@ def pcler(args):
                 map = hp.read_map(map_file, field=[0,1,2])
 
                 # Include beam in namaster fields to deconvolve it
-                field_spin0 = nmt.NmtField(mask, [map[0]], beam=beams[map_set])
-                field_spin2 = nmt.NmtField(mask, [map[1], map[2]], beam=beams[map_set])
+                field_spin0 = nmt.NmtField(mask, [map[0]])
+                field_spin2 = nmt.NmtField(mask, [map[1], map[2]])
 
                 fields[map_set, id_split] = {
-                    #"spin0": field_spin0, 
+                    "spin0": field_spin0, 
                     "spin2": field_spin2
                 }
             
@@ -218,7 +241,7 @@ def pcler(args):
                                  label=f"theory (noiseless)")
                         if 'noisy' in cells_splits:
                             # Plot noisy theory with beam-deconvolved noise
-                            _, nl_th_beam_dict = get_noise_curves(
+                            _, nl_th_beam_dict = get_noise_cls(
                                 fsky, meta.lmax, lmin=meta.lmin, 
                                 sensitivity_mode='baseline', 
                                 oof_mode='optimistic',
@@ -258,6 +281,7 @@ def pcler(args):
                         ), bbox_inches='tight'
                     )
 
+
     if args.tf_est:
         for id_sim in range(meta.tf_est_num_sims):
             
@@ -266,37 +290,67 @@ def pcler(args):
                 map_file = meta.get_map_filename_transfer2(id_sim, "tf_est", pure_type=pure_type)
                 map_file_filtered = map_file.replace(".fits", "_filtered.fits")
 
-                map = hp.read_map(map_file, field=[1,2])
-                map_filtered = hp.read_map(map_file_filtered, field=[1,2])
+                map = hp.read_map(map_file, field=[0,1,2])
+                map_filtered = hp.read_map(map_file_filtered, field=[0,1,2])
 
-                field = {"spin2": nmt.NmtField(mask, map)}
-                field_filtered = {"spin2": nmt.NmtField(mask, map_filtered)}
+                # TO-DO: filter temperature only once !
+                field = {
+                    "spin0": nmt.NmtField(mask, map[:1]),
+                    "spin2": nmt.NmtField(mask, map[1:])
+                }
+                field_filtered = {
+                    "spin0": nmt.NmtField(mask, map_filtered[:1]),
+                    "spin2": nmt.NmtField(mask, map_filtered[1:])
+                }
 
                 fields["unfiltered"][pure_type] = field
                 fields["filtered"][pure_type] = field_filtered
 
-            pcls_mat_filtered = get_pcls_mat_transfer(fields["filtered"], nmt_binning)
-            pcls_mat_unfiltered = get_pcls_mat_transfer(fields["unfiltered"], nmt_binning)
+            pcls_mat_filtered = get_pcls_mat_transfer_upgrade(fields["filtered"], nmt_binning)
+            pcls_mat_unfiltered = get_pcls_mat_transfer_upgrade(fields["unfiltered"], nmt_binning)
 
-            np.savez(f"{cl_dir}/pcls_mat_tf_est_{id_sim:04d}.npz", 
-                     pcls_mat_filtered=pcls_mat_filtered, 
-                     pcls_mat_unfiltered=pcls_mat_unfiltered)
+            np.savez(f"{cl_dir}/pcls_mat_tf_est_filtered_{id_sim:04d}.npz",
+                     **pcls_mat_filtered)
+            np.savez(f"{cl_dir}/pcls_mat_tf_est_unfiltered_{id_sim:04d}.npz",
+                     **pcls_mat_unfiltered)
+            
 
     if args.tf_val:
+        
+        inv_couplings = {}
+        for filter_flag in ["filtered", "unfiltered"]:
+            couplings = np.load(f"{meta.coupling_directory}/couplings_{filter_flag}.npz")
+            inv_couplings[filter_flag] = {
+                "spin0xspin0": couplings["inv_coupling_spin0xspin0"].reshape([n_bins, n_bins]),
+                "spin0xspin2": couplings["inv_coupling_spin0xspin2"].reshape([2*n_bins, 2*n_bins]),
+                "spin2xspin0": couplings["inv_coupling_spin0xspin2"].reshape([2*n_bins, 2*n_bins]),
+                "spin2xspin2": couplings["inv_coupling_spin2xspin2"].reshape([4*n_bins, 4*n_bins])
+            }
+
         for id_sim in range(meta.tf_est_num_sims):
             
             for cl_type in ["tf_val", "cosmo"]:
-                map_file = meta.get_map_filename_transfer2(id_sim, cl_type=cl_type)
-                map_file.replace(".fits", "_filtered.fits")
 
-                map = hp.read_map(map_file, field=[1,2])
+                for filter_flag in ["filtered", "unfiltered"]:
+                    map_file = meta.get_map_filename_transfer2(id_sim, cl_type=cl_type)
+                    print(map_file)
+                    if filter_flag == "filtered":
+                        map_file = map_file.replace(".fits", "_filtered.fits")
+                        print(f"AFTER CHANGING : {map_file}")
 
-                field = {'spin2': nmt.NmtField(mask, map)}
+                    map = hp.read_map(map_file, field=[0,1,2])
 
-                pcls = get_coupled_pseudo_cls(field, field, nmt_binning)["spin2xspin2"]
+                    field = {
+                        "spin0": nmt.NmtField(mask, map[:1]),
+                        "spin2": nmt.NmtField(mask, map[1:])
+                    }
 
-                np.savez(f"{cl_dir}/pcls_{cl_type}_{id_sim:04d}_filtered.npz",
-                         EE=pcls[0], EB=pcls[1], BE=pcls[2], BB=pcls[3])
+                    pcls = get_coupled_pseudo_cls(field, field, nmt_binning)
+
+                    decoupled_pcls = decouple_pseudo_cls(pcls, inv_couplings[filter_flag])
+                    
+                    np.savez(f"{cl_dir}/pcls_{cl_type}_{id_sim:04d}_{filter_flag}.npz",
+                            **decoupled_pcls)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pseudo-Cl calculator")

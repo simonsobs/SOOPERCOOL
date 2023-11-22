@@ -36,12 +36,15 @@ def mocker(args):
     lmax_sim = 3 * meta.nside - 1
 
     # Load noise curves
+    meta.timer.start("Computing noise cls")
     noise_model = noise_calc.SOSatV3point1(sensitivity_mode='baseline')
-    lth, nlth_dict = get_noise_curves(fsky, lmax_sim, is_beam_deconvolved=False)
+    lth, nlth_dict = get_noise_cls(fsky, lmax_sim+1, is_beam_deconvolved=False)
+    meta.timer.stop("Computing noise cls")
 
     # Load hitmap
     hitmap = meta.read_hitmap()
 
+    meta.timer.start("Generating beams")
     # Load and save beams
    
     beam_arcmin = {
@@ -55,7 +58,8 @@ def mocker(args):
         # Save beams
         file_root = meta.file_root_from_map_set(map_set)
         np.savetxt(f"{beam_dir}/beam_{file_root}.dat", np.transpose([lth, beams[map_set]]))
-    
+    meta.timer.stop("Generating beams")
+
     hp_ordering = ["TT", "TE", "TB", "EE", "EB", "BB"]
 
     Nsims = meta.num_sims if args.sims else 1
@@ -63,6 +67,8 @@ def mocker(args):
     for id_sim in range(Nsims):
         cmb_map = hp.synfast([ps_th[k] for k in hp_ordering], meta.nside)
         for map_set in meta.map_sets_list:
+
+            meta.timer.start(f"Generate map set {map_set} split maps")
             freq_tag = meta.freq_tag_from_map_set(map_set)
             cmb_map_beamed = hp.sphtfunc.smoothing(cmb_map, fwhm=np.deg2rad(beam_arcmin[freq_tag] / 60))
 
@@ -95,6 +101,7 @@ def mocker(args):
                             hp.graticule()
                             plt.savefig(f"{plot_dir}/map_{map_set}__{id_split}_{m}.png", bbox_inches="tight")
 
+            meta.timer.stop(f"Generate map set {map_set} split maps")
 
 if __name__ == "__main__":
 
@@ -102,7 +109,7 @@ if __name__ == "__main__":
     parser.add_argument("--globals", type=str, help="Path to yaml with global parameters")
     parser.add_argument("--sims", action="store_true", help="Generate a set of sims if True.")
     parser.add_argument("--plots", action="store_true", help="Plot the generated maps if True.")
-    
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
     if args.sims and args.plots:

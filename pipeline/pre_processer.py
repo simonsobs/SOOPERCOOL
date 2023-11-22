@@ -16,7 +16,7 @@ def pre_processer(args):
     np.savez(meta.path_to_binning, bin_low=bin_low, bin_high=bin_high, bin_center=bin_center)
 
     # Second step is to create the survey mask from a hitmap
-    meta.timer.start("Computing binary mask", args.verbose)
+    meta.timer.start("Computing binary mask")
     hitmap = meta.read_hitmap()
     binary_mask = (hitmap > 0.).astype(float)
     meta.save_mask("binary", binary_mask, overwrite=True)
@@ -32,6 +32,7 @@ def pre_processer(args):
 
     lmax_sim = 3*meta.nside-1
     # Create the CMB fiducial cl
+    meta.timer.start("Computing fiducial cls")
     lth, psth = utils.theory_cls(
         meta.cosmology,
         lmax=lmax_sim # to ensure that the cl will be accurate up to lmax
@@ -46,14 +47,17 @@ def pre_processer(args):
     ## Then the power law used to validate the transfer function
     cl_power_law_tf_validation = utils.power_law_cl(lth, **meta.power_law_pars_tf_val)
     meta.save_fiducial_cl(lth, cl_power_law_tf_validation, cl_type="tf_val")
+    meta.timer.stop("Computing fiducial cls", args.verbose)
 
     if args.sims:
         # Now we iterate over the number of simulations to generate maps for each of them
         hp_ordering = ["TT", "TE", "TB", "EE", "EB", "BB"]
+        meta.timer.start("Generating simulations for transfer")
         for id_sim in range(meta.tf_est_num_sims):
-
+            
+            meta.timer.start(f"Generate `cosmo` and `power_law` simulation n° {id_sim:04d}")
             for cl_type in ["cosmo", "tf_est", "tf_val"]:
-
+                
                 out_dir = getattr(meta, f"{cl_type}_sims_dir")
                 os.makedirs(out_dir, exist_ok=True)
 
@@ -77,6 +81,9 @@ def pre_processer(args):
                     sim = hp.alm2map([alms_T, alms_E, alms_B], meta.nside, lmax=lmax_sim)
                     map_file = meta.get_map_filename_transfer2(id_sim, cl_type)
                     hp.write_map(map_file, sim, overwrite=True, dtype=np.float32)
+
+            meta.timer.stop(f"Generate `cosmo` and `power_law` simulation n° {id_sim:04d}", args.verbose)
+        meta.timer.stop("Generating simulations for transfer", args.verbose)
 
 
 if __name__ == "__main__":

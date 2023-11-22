@@ -98,7 +98,7 @@ def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
     return out_map
 
 
-def get_noise_curves(fsky, lmax, lmin=0, sensitivity_mode='baseline', 
+def get_noise_cls(fsky, lmax, lmin=0, sensitivity_mode='baseline', 
                           oof_mode='optimistic', is_beam_deconvolved=True):
     """
     """
@@ -110,7 +110,7 @@ def get_noise_curves(fsky, lmax, lmin=0, sensitivity_mode='baseline',
         delta_ell=1,
         deconv_beam=is_beam_deconvolved
     )
-    lth = np.concatenate(([0, 1], lth))
+    lth = np.concatenate(([0, 1], lth))[lmin:]
     nlth_P = np.array(
         [np.concatenate(([0, 0], nl))[lmin:] for nl in nlth_P]
         
@@ -187,6 +187,10 @@ def create_binning(lmin, lmax, delta_ell):
 
     idx = bin_high <= lmax
     bin_low, bin_high = bin_low[idx], bin_high[idx]
+
+    if not lmax in bin_high:
+        bin_low = np.concatenate([bin_low, [bin_high[-1]+1]])
+        bin_high = np.concatenate([bin_high, [lmax]])
     bin_center = (bin_low + bin_high) / 2
 
     return bin_low, bin_high, bin_center
@@ -229,6 +233,30 @@ def toast_filter_map(map, mask):
     """
     """
     raise NotImplementedError("TOAST filtering not implemented yet.")
+
+
+def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,
+                                       all_splits_ps_names,
+                                       cross_splits_ps_names,
+                                       auto_splits_ps_names):
+    """
+    """
+    split_pairs_list = {
+        "auto": [],
+        "cross": []
+    }
+    for split_ms1, split_ms2 in all_splits_ps_names:
+        if not (split_ms1.startswith(map_set1) and split_ms2.startswith(map_set2)):
+            continue
+
+        if (split_ms1, split_ms2) in cross_splits_ps_names:
+            split_pairs_list["cross"].append((split_ms1, split_ms2))
+        
+        elif (split_ms1, split_ms2) in auto_splits_ps_names:
+            split_pairs_list["auto"].append((split_ms1, split_ms2))
+
+    return split_pairs_list
+
 
 
 class PipelineManager(object):

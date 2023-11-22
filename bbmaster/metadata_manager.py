@@ -78,7 +78,7 @@ class BBmeta(object):
         self.tf_val_cls_file = f"{self.pre_process_directory}/tf_val_cls.npz"
 
         # Initialize a timer
-        self.timer = self.Timer()
+        self.timer = Timer()
 
     def _set_directory_attributes(self):
         """
@@ -381,48 +381,6 @@ class BBmeta(object):
 
         return f"{path_to_maps}/{file_name}"
 
-
-    def get_map_filename_transfer(id_sim, signal=None, e_or_b=None):
-        """
-        Get the path to transfer function simulation or validation map for a 
-        given simulation index. Choosing either a signal or polarization type 
-        defines what type is loaded.
-
-        Path to simulation map: e.g. {sims_directory}/0000/{map_set_root}_pure{e_or_b}.fits
-        Path to validation map: e.g. {sims_directory}/0000/{map_set_root}_{signal}.fits
-
-        Parameters
-        ----------
-        id_sim : int
-            Index of the simulation.
-            If None, return the path to the data map.
-        signal : str, optional
-            Determines what signal the validation map corresponds to.
-            If None, assumes simulation mode.
-        e_or_b : str, optional
-            Accepts either `E`, `B`, or None. Determines what pure-polarization
-            type (E or B) the map corresponds to. 
-            If None, assumes validation mode.
-        """
-        
-        os.makedirs(path_to_maps, exist_ok=True)
-        if (not signal and not e_or_b) or (signal and e_or_b):
-            raise ValueError("You have to set to None either `signal` or "
-                             "`e_or_b`")
-        if signal is not None:
-            fname = os.path.join(
-                self.sim_pars['transsims_directory'],
-                f"{id_sim:04d}", 
-                f"pure{e_or_b}.fits"
-            )
-        else:
-            fname = os.path.join(
-                self.sim_pars['transval_directory'],
-                f"{id_sim:04d}", 
-                f"{signal}.fits"
-            )
-        return fname
-        
     
     def read_map(self, map_set, id_split, id_sim=None, pol_only=False):
         """
@@ -519,12 +477,13 @@ class BBmeta(object):
 
                     exp_tag_1 = map_set_1 #self.exp_tag_from_map_set(map_set_1)
                     exp_tag_2 = map_set_2 #self.exp_tag_from_map_set(map_set_2)
+
                     if (type == "cross") and (exp_tag_1 == exp_tag_2) and (split_1 == split_2): continue
                     if (type == "auto") and ((exp_tag_1 != exp_tag_2) or (split_1 != split_2)): continue
 
                 ps_name_list.append((map1, map2))
         return ps_name_list
-    
+
     
     def get_n_split_pairs_from_map_sets(self, map_set1, map_set2, type="cross"):
         n_splits1 = self.n_splits_from_map_set(map_set1)
@@ -542,23 +501,56 @@ class BBmeta(object):
                              "'auto', and 'all'.")
         return n_pairs
 
-    
-    class Timer:
+
+class Timer:
+    """
+    Basic timer class to time different
+    parts of pipeline stages.
+    """
+    def __init__(self):
         """
+        Initialize the timers with an empty dict
         """
-        def __init__(self):
-            self.timers = {}
+        self.timers = {}
         
-        def start(self, timer_label, verbose=True):
-            if verbose:
-                self.timers[timer_label] = time.time()
-            else:
-                pass
+
+    def start(self, timer_label):
+        """
+        Start the timer with a given label. It allows
+        to time multiple nested loops using different labels.
+
+        Parameters
+        ----------
+        timer_label : str
+            Label of the timer.
+        """
+        if timer_label in self.timers:
+            raise ValueError(f"Timer {timer_label} already exists.")
+        self.timers[timer_label] = time.time()
+
+
+    def stop(self, timer_label, text_to_output=None, verbose=True):
+        """
+        Stop the timer with a given label.
+        Allows to output a custom text different
+        from the label.
+
+        Parameters
+        ----------
+        timer_label : str
+            Label of the timer.
+        text_to_output : str, optional
+            Text to output instead of the timer label.
+            Defaults to None.
+        verbose : bool, optional
+            Print the output text.
+            Defaults to True.
+        """
+        if not timer_label in self.timers:
+            raise ValueError(f"Timer {timer_label} does not exist.")
         
-        def stop(self, timer_label, verbose=True):
-            if verbose:
-                dt = time.time() - self.timers[timer_label]
-                print(f"[{timer_label}] Took {dt:.02f} s to process.")
-                self.timers.pop(timer_label)
-            else:
-                pass
+        dt = time.time() - self.timers[timer_label]
+        self.timers.pop(timer_label)
+        if verbose:
+            prefix = f"[{text_to_output}]" if text_to_output else f"[{timer_label}]"
+            print(f"{prefix} Took {dt:.02f} s to process.")
