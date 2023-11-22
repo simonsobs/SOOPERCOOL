@@ -336,7 +336,6 @@ def pcler(args):
                     print(map_file)
                     if filter_flag == "filtered":
                         map_file = map_file.replace(".fits", "_filtered.fits")
-                        print(f"AFTER CHANGING : {map_file}")
 
                     map = hp.read_map(map_file, field=[0,1,2])
 
