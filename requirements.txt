@@ -4,3 +4,4 @@ healpy
 pymaster
 sacc
 h5py
+camb
