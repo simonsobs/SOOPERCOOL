@@ -17,6 +17,8 @@ def coadder(args):
     n_bins = nmt_binning.get_n_bands()
     field_pairs = ["EE", "EB", "BB"] # TODO: ADD T*, *T and BE
     n_field_pairs = len(field_pairs)
+    binary_mask = meta.read_mask("binary")
+    fsky = np.mean(binary_mask)
     
     if args.data:
         cl_dir = meta.cell_data_directory
@@ -84,7 +86,23 @@ def coadder(args):
                 plt.plot(el_th, 
                          el_th*(el_th+1)/2./np.pi*(cl_th),
                          lw=1, ls='--', c='darkred', 
-                         label=f"theory")
+                         label=f"theory (noiseless)")
+                
+                if type=="auto" or type=="all":
+                    # Plot noisy theory with beam-deconvolved noise
+                    _, nl_th_beam_dict = get_noise_cls(
+                        fsky, meta.lmax, lmin=meta.lmin, 
+                        sensitivity_mode='baseline', 
+                        oof_mode='optimistic',
+                        is_beam_deconvolved=True
+                    )
+                    freq_tag = meta.freq_tag_from_map_set(map_set1)
+                    n_splits = meta.n_splits_from_map_set(map_set1)
+                    nl_th_beam = nl_th_beam_dict["P"][freq_tag]*float(n_splits)
+                    plt.plot(el_th, 
+                             el_th*(el_th+1)/2./np.pi*(cl_th+nl_th_beam),
+                             lw=1, ls='-.', c='k', 
+                             label=f"theory (noisy)")
                 
                 # Plot split-pair-averaged power spectra
                 cells_sum = 0
@@ -95,7 +113,7 @@ def coadder(args):
                         plt.plot(el, el*(el+1)/2./np.pi*cells, 
                                  lw=0.3, c='tab:red', alpha=0.5)
                 plt.plot(el, el*(el+1)/2./np.pi*cells_sum/Nsims, 
-                         lw=1, c='tab:red', label=cells_label)
+                         lw=1, c='blue', label=cells_label)
 
                 plt.xscale('log')
                 plt.yscale('log')
