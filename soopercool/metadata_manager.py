@@ -40,13 +40,15 @@ class BBmeta(object):
 
         # Basic sanity checks
         if self.lmax > 3*self.nside-1:
-            raise ValueError(f"lmax should be lower or equal to 3*nside-1 = {3*self.nside-1}")
+            raise ValueError("lmax should be lower or equal "
+                             f"to 3*nside-1 = {3*self.nside-1}")
 
         # Path to binning
-        self.path_to_binning = f"{self.pre_process_directory}/{self.binning_file}"
+        self.path_to_binning = f"{self.pre_process_directory}/{self.binning_file}"  # noqa
 
         # Initialize method to parse map_sets metadata
-        map_sets_attributes = list(self.map_sets[next(iter(self.map_sets))].keys())
+        map_sets_attributes = list(self.map_sets[
+            next(iter(self.map_sets))].keys())
         for map_sets_attribute in map_sets_attributes:
             self._init_getter_from_map_set(map_sets_attribute)
 
@@ -58,14 +60,14 @@ class BBmeta(object):
         for mask_type in ["binary", "galactic", "point_source", "analysis"]:
             setattr(
                 self,
-                f"{mask_type}_mask_name", 
+                f"{mask_type}_mask_name",
                 getattr(self, f"_get_{mask_type}_mask_name")()
             )
 
         # Simulation
         self._init_simulation_params()
 
-        # Tf estimation 
+        # Tf estimation
         self._init_tf_estimation_params()
         self.tf_est_sims_dir = f"{self.pre_process_directory}/tf_est_sims"
         self.tf_val_sims_dir = f"{self.pre_process_directory}/tf_val_sims"
@@ -85,7 +87,7 @@ class BBmeta(object):
         in the paramfiles
         """
         for label, path in self.data_dirs.items():
-            if label == "root": 
+            if label == "root":
                 self.data_dir = self.data_dirs["root"]
             else:
                 full_path = f"{self.data_dirs['root']}/{path}"
@@ -94,7 +96,7 @@ class BBmeta(object):
                 os.makedirs(full_path, exist_ok=True)
 
         for label, path in self.output_dirs.items():
-            if label == "root": 
+            if label == "root":
                 self.output_dir = self.output_dirs["root"]
             else:
                 full_path = f"{self.output_dirs['root']}/{path}"
@@ -122,7 +124,7 @@ class BBmeta(object):
         """
         out_list = [
             f"{map_set}__{id_split}" for map_set in self.map_sets_list
-                for id_split in range(self.n_splits_from_map_set(map_set))
+                for id_split in range(self.n_splits_from_map_set(map_set))  # noqa
         ]
         return out_list
 
@@ -145,7 +147,7 @@ class BBmeta(object):
         """
         Get the name of the galactic mask.
         """
-        fname = f"{self.masks['galactic_mask_root']}_{self.masks['gal_mask_mode']}.fits"
+        fname = f"{self.masks['galactic_mask_root']}_{self.masks['gal_mask_mode']}.fits"  # noqa
         return os.path.join(self.mask_directory, fname)
 
     def _get_binary_mask_name(self):
@@ -158,7 +160,8 @@ class BBmeta(object):
         """
         Get the name of the point source mask.
         """
-        return os.path.join(self.mask_directory, self.masks["point_source_mask"])
+        return os.path.join(self.mask_directory,
+                            self.masks["point_source_mask"])
 
     def _get_analysis_mask_name(self):
         """
@@ -195,7 +198,7 @@ class BBmeta(object):
         overwrite : bool, optional
             Overwrite the mask if it already exists.
         """
-        return hp.write_map(getattr(self, f"{mask_type}_mask_name"), mask, 
+        return hp.write_map(getattr(self, f"{mask_type}_mask_name"), mask,
                             overwrite=overwrite)
 
     def read_hitmap(self):
@@ -211,7 +214,8 @@ class BBmeta(object):
         Read the binning file and return the corresponding NmtBin object.
         """
         binning = np.load(self.path_to_binning)
-        return nmt.NmtBin.from_edges(binning["bin_low"], binning["bin_high"] + 1)
+        return nmt.NmtBin.from_edges(binning["bin_low"],
+                                     binning["bin_high"] + 1)
 
     def get_n_bandpowers(self):
         """
@@ -251,13 +255,13 @@ class BBmeta(object):
         for name in self.tf_settings:
             setattr(self, name, self.tf_settings[name])
 
-    def save_fiducial_cl(self, l, cl_dict, cl_type):
+    def save_fiducial_cl(self, ell, cl_dict, cl_type):
         """
         Save a fiducial power spectra dictionnary to disk.
 
         Parameters
         ----------
-        l : array-like
+        ell : array-like
             Multipole values.
         cl_dict : dict
             Dictionnary with the power spectra.
@@ -266,7 +270,7 @@ class BBmeta(object):
             Can be "cosmo", "tf_est" or "tf_val".
         """
         fname = getattr(self, f"{cl_type}_cls_file")
-        np.savez(fname, l=l, **cl_dict)
+        np.savez(fname, l=ell, **cl_dict)
 
     def load_fiducial_cl(self, cl_type):
         """
@@ -298,7 +302,7 @@ class BBmeta(object):
     def get_fname_mask(self, map_type='analysis'):
         """
         Get the full filepath to a mask of predefined type.
-        
+
         Parameters
         ----------
         map_type : str
@@ -306,11 +310,11 @@ class BBmeta(object):
             Defaults to 'analysis'.
         """
         base_dir = self.masks['mask_directory']
-        if map_type=='analysis':
+        if map_type == 'analysis':
             fname = os.path.join(base_dir, self.masks['analysis_mask'])
-        elif map_type=='binary':
+        elif map_type == 'binary':
             fname = os.path.join(base_dir, self.masks['binary_mask'])
-        elif map_type=='point_source':
+        elif map_type == 'point_source':
             fname = os.path.join(base_dir, self.masks['point_source_mask'])
         else:
             raise ValueError("The map_type chosen does not exits. "
@@ -323,8 +327,10 @@ class BBmeta(object):
         Get the path to file for a given `map_set` and split index.
         Can also get the path to a given simulation if `id_sim` is provided.
 
-        Path to standard map : {map_directory}/{map_set_root}_split_{id_split}.fits
-        Path to sim map : e.g. {sims_directory}/0000/{map_set_root}_split_{id_split}.fits
+        Path to standard map:
+            {map_directory}/{map_set_root}_split_{id_split}.fits
+        Path to sim map: e.g.
+            {sims_directory}/0000/{map_set_root}_split_{id_split}.fits
 
         Parameters
         ----------
@@ -345,8 +351,9 @@ class BBmeta(object):
             os.makedirs(path_to_maps, exist_ok=True)
         else:
             path_to_maps = self.map_directory
-        
-        return os.path.join(path_to_maps, f"{map_set_root}_split_{id_split}.fits")
+
+        return os.path.join(path_to_maps,
+                            f"{map_set_root}_split_{id_split}.fits")
 
     def get_map_filename_transfer2(self, id_sim, cl_type, pure_type=None):
         """
@@ -354,7 +361,7 @@ class BBmeta(object):
         path_to_maps = getattr(self, f"{cl_type}_sims_dir")
 
         pure_label = f"_{pure_type}" if pure_type else ""
-        file_name = f"TQU{pure_label}_noiseless_nside{self.nside}_lmax{self.lmax}_{id_sim:04d}.fits"
+        file_name = f"TQU{pure_label}_noiseless_nside{self.nside}_lmax{self.lmax}_{id_sim:04d}.fits"  # noqa
 
         return f"{path_to_maps}/{file_name}"
 
