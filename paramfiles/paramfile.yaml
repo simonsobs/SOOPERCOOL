@@ -127,8 +127,10 @@ tf_settings:
   power_law_pars_tf_val:
     amp:
       TT: 10.
-      EE: 1.
-      BB: 0.05
       TE: 2.5
+      TB: 0.5
+      EE: 1.
+      EB: 0.2
+      BB: 0.05
     delta_ell: 10
     power_law_index: 0.5
