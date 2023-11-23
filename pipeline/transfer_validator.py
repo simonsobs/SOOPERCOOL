@@ -1,10 +1,10 @@
 import argparse
-from bbmaster.utils import PipelineManager
+from soopercool.utils import PipelineManager
 import sacc
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-from bbmaster import BBmeta
+from soopercool import BBmeta
 
 def read_transfer(transfer_file):
     """

@@ -1,12 +1,12 @@
 import argparse
 import healpy as hp
-from bbmaster.utils import *
+from soopercool.utils import *
 import numpy as np
 import os
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from so_models_v3 import SO_Noise_Calculator_Public_v3_1_2 as noise_calc
-from bbmaster import BBmeta
+from soopercool import BBmeta
 import warnings
 
 def mocker(args):

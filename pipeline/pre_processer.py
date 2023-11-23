@@ -1,5 +1,5 @@
 import argparse
-from bbmaster import BBmeta, utils
+from soopercool import BBmeta, utils
 import numpy as np
 import os
 import healpy as hp

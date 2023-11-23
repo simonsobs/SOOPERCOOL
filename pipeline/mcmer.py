@@ -3,8 +3,8 @@ import numpy as np
 import pymaster as nmt
 import healpy as hp
 import os
-from bbmaster.utils import PipelineManager
-from bbmaster import BBmeta
+from soopercool.utils import PipelineManager
+from soopercool import BBmeta
 
 
 def mcmer(args):

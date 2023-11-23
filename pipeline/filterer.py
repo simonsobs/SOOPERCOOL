@@ -1,8 +1,8 @@
 import argparse
 import healpy as hp
-from bbmaster import utils
+from soopercool import utils
 import numpy as np
-from bbmaster import BBmeta
+from soopercool import BBmeta
 
 def filter(args):
     """

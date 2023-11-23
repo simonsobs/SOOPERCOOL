@@ -1,7 +1,7 @@
 import argparse
 import healpy as hp
-from bbmaster.utils import *
-from bbmaster import BBmeta
+from soopercool.utils import *
+from soopercool import BBmeta
 import pymaster as nmt
 import numpy as np
 import os

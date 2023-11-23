@@ -1,9 +1,9 @@
 import argparse
-from bbmaster.utils import PipelineManager
+from soopercool.utils import PipelineManager
 import sacc
 import numpy as np
 import matplotlib.pyplot as plt
-from bbmaster import BBmeta
+from soopercool import BBmeta
 
 def transfer(args):
     """

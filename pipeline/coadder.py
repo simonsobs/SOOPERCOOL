@@ -2,8 +2,8 @@ import argparse
 import healpy as hp
 import numpy as np
 import os
-from bbmaster import BBmeta
-from bbmaster.utils import *
+from soopercool import BBmeta
+from soopercool.utils import *
 import pymaster as nmt
 from itertools import product
 import matplotlib.pyplot as plt
