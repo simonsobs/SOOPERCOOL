@@ -1,0 +1,24 @@
+name: continuous-integration
+
+on:
+  push:
+    branches:
+      - main
+      - releases/*
+  pull_request: null
+
+env:
+  CACHE_NUMBER: 0  # increase to reset cache manually
+  CONDA_ENV: .github/environment.yml
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout SOOPERCOOL repository
+        uses: actions/checkout@v3
+
+      - name: Lint
+        uses: py-actions/flake8@v2
+        with:
+          args: "--config .flake8"
