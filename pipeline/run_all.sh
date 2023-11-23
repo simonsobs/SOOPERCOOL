@@ -42,7 +42,7 @@ echo "---------------------------"
 
 echo "Running cl estimation for validation"
 echo "------------------------------------"
-#python pcler.py --globals ${paramfile} --tf_val
+python pcler.py --globals ${paramfile} --tf_val
 
 echo "Running pcler on data"
 echo "---------------------"
@@ -54,8 +54,8 @@ echo "---------------------"
 
 echo "Running coadder on data"
 echo "---------------------"
-python coadder.py --globals ${paramfile} --data --plots
+#python coadder.py --globals ${paramfile} --data --plots
 
 echo "Running coadder on sims"
 echo "---------------------"
-python coadder.py --globals ${paramfile} --sims
+#python coadder.py --globals ${paramfile} --sims
