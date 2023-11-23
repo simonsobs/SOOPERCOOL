@@ -124,11 +124,13 @@ def pcler(args):
                                                          coadd=True):
             couplings = np.load(f"{meta.coupling_directory}/couplings_{map_set1}_{map_set2}.npz")  # noqa
             coupling_dict = {
-                k: couplings[f"inv_coupling_{k}"].reshape([ncl*n_bins,
-                                                           ncl*n_bins])
-                for k, ncl in zip(["spin0xspin0", "spin0xspin2",
-                                   "spin2xspin0", "spin2xspin2"],
-                                  [1, 2, 2, 4])
+                k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
+                                                             ncl*n_bins])
+                for k1, k2, ncl in zip(["spin0xspin0", "spin0xspin2",
+                                        "spin2xspin0", "spin2xspin2"],
+                                       ["spin0xspin0", "spin0xspin2",
+                                        "spin0xspin2", "spin2xspin2"],
+                                       [1, 2, 2, 4])
             }
             inv_couplings[map_set1, map_set2] = coupling_dict
             if map_set1 != map_set2:
@@ -325,11 +327,13 @@ def pcler(args):
         for filter_flag in ["filtered", "unfiltered"]:
             couplings = np.load(f"{meta.coupling_directory}/couplings_{filter_flag}.npz")  # noqa
             inv_couplings[filter_flag] = {
-                k: couplings[f"inv_coupling_{k}"].reshape([ncl*n_bins,
-                                                           ncl*n_bins])
-                for k, ncl in zip(["spin0xspin0", "spin0xspin2",
-                                   "spin2xspin0", "spin2xspin2"],
-                                  [1, 2, 2, 4])
+                k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
+                                                             ncl*n_bins])
+                for k1, k2, ncl in zip(["spin0xspin0", "spin0xspin2",
+                                        "spin2xspin0", "spin2xspin2"],
+                                       ["spin0xspin0", "spin0xspin2",
+                                        "spin0xspin2", "spin2xspin2"],
+                                       [1, 2, 2, 4])
             }
 
         for id_sim in range(meta.tf_est_num_sims):
