@@ -28,7 +28,7 @@ def mcmer(args):
 
     # Create dummy NaMaster field
     field_spin0 = nmt.NmtField(mask, None, spin=0)
-    field_spin2 = nmt.NmtField(mask, None, spin=2)
+    field_spin2 = nmt.NmtField(mask, None, spin=2, purify_b=meta.pure_B)
     
     # Binning scheme is irrelevant for us, but NaMaster needs one.
     nmt_bins = meta.read_nmt_binning()
