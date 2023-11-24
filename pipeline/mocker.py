@@ -40,8 +40,6 @@ def mocker(args):
     meta.timer.start("Computing noise cls")
     noise_model = noise_calc.SOSatV3point1(sensitivity_mode='baseline')
     lth, nlth_dict = get_noise_cls(fsky, lmax_sim+1, is_beam_deconvolved=False)
-    # DEBUG
-    print('N_ell dictionary:', [l for l in nlth_dict['P']])
     meta.timer.stop("Computing noise cls")
 
     # Load hitmap
@@ -78,8 +76,6 @@ def mocker(args):
                 cmb_map, fwhm=np.deg2rad(beam_arcmin[freq_tag] / 60))
 
             n_splits = meta.n_splits_from_map_set(map_set)
-            # DEBUG
-            print('n_splits:', n_splits, 'freq_tag:', freq_tag)
             file_root = meta.file_root_from_map_set(map_set)
             for id_split in range(n_splits):
                 noise_map = generate_noise_map(

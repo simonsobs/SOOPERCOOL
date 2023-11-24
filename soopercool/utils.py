@@ -124,7 +124,7 @@ def get_noise_cls(fsky, lmax, lmin=0, sensitivity_mode='baseline',
     return lth, nlth_dict
 
 
-def generate_noise_map(nl_T, nl_P, hitmap, n_splits):
+def generate_noise_map(nl_T, nl_P, hitmap, n_splits, is_anisotropic=True):
     """
     """
     # healpix ordering ["TT", "EE", "BB", "TE"]
@@ -134,8 +134,9 @@ def generate_noise_map(nl_T, nl_P, hitmap, n_splits):
 
     noise_map = hp.synfast(noise_mat, hp.get_nside(hitmap), pol=True, new=True)
 
-    # Weight with hitmap
-    noise_map[:, hitmap != 0] /= np.sqrt(hitmap[hitmap != 0] / np.max(hitmap))
+    if is_anisotropic:
+        # Weight with hitmap
+        noise_map[:, hitmap != 0] /= np.sqrt(hitmap[hitmap != 0] / np.max(hitmap))
 
     return noise_map
 

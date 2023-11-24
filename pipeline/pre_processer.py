@@ -40,8 +40,6 @@ def pre_processer(args):
             filename=sat_apo_file
         )
     
-    
-    
     # Third step is to create the survey mask from a hitmap
     meta.timer.start("Computing binary mask")
     hitmap = meta.read_hitmap()

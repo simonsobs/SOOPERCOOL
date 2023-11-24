@@ -383,7 +383,6 @@ def pcler(args):
                 for filter_flag in ["filtered", "unfiltered"]:
                     map_file = meta.get_map_filename_transfer2(id_sim,
                                                                cl_type=cl_type)
-                    print(map_file)
                     if filter_flag == "filtered":
                         map_file = map_file.replace(".fits", "_filtered.fits")
 

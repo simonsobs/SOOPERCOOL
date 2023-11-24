@@ -5,19 +5,19 @@
 # Define the directories
 ## Let's start with directories of data products
 data_dirs:
-  root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/data"
+  root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/data_test_2_tags"
   map_directory: "maps_test_4_splits"
-  beam_directory: "beams"
-  bandpasses_directory: "bandpasses"
+  beam_directory: "beams_test_4_splits"
+  bandpasses_directory: "bandpasses_test_4_splits"
 ## Then directories in which we will store outputs
 output_dirs: 
-  root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/outputs"
+  root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/outputs_test_2_tags"
   mask_directory: "masks"
-  pre_process_directory: "pre_processing"
-  sims_directory: "sims"
+  pre_process_directory: "pre_processing_test_4_splits"
+  sims_directory: "sims_test_4_splits"
   cell_transfer_directory: "cells_transfer"
   cell_data_directory: "cells_data_test_4_splits"
-  cell_sims_directory: "cells_sims"
+  cell_sims_directory: "cells_sims_test_4_splits"
   coupling_directory: "couplings"
 
 ##################################
@@ -59,11 +59,11 @@ map_sets:
   #   n_splits: 4
   #   freq_tag: 225
   #   exp_tag: "SAT3"
-  # SAT3_f285:
-  #   file_root: "cmb_sat3_f285"
-  #   n_splits: 4
-  #   freq_tag: 280
-  #   exp_tag: "SAT3"
+  SAT3_f285:
+    file_root: "cmb_sat3_f285"
+    n_splits: 4
+    freq_tag: 280
+    exp_tag: "SAT3"
 
 ####################
 # Masking metadata #
@@ -94,7 +94,7 @@ general_pars:
 
 ## Simulation related
 sim_pars:
-  hitmap_file: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/data/norm_nHits_SA_35FOV_ns512.fits"
+  hitmap_file: "../data/norm_nHits_SA_35FOV_ns512.fits"
   num_sims: 1
   cosmology:
     cosmomc_theta: 0.0104085
@@ -105,6 +105,7 @@ sim_pars:
     Alens: 1.0
     tau: 0.0544
     r: 0.01
+  anisotropic_noise: False
   mock_nsrcs: 80
   mock_srcs_hole_radius: 40
   
