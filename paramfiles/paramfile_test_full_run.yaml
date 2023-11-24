@@ -6,7 +6,7 @@
 ## Let's start with directories of data products
 data_dirs:
   root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/data"
-  map_directory: "maps"
+  map_directory: "maps_test_full_run"
   beam_directory: "beams"
   bandpasses_directory: "bandpasses"
 ## Then directories in which we will store outputs
@@ -16,7 +16,7 @@ output_dirs:
   pre_process_directory: "pre_processing"
   sims_directory: "sims"
   cell_transfer_directory: "cells_transfer"
-  cell_data_directory: "cells_data"
+  cell_data_directory: "cells_data_test_full_run"
   cell_sims_directory: "cells_sims"
   coupling_directory: "couplings"
 
@@ -36,12 +36,12 @@ output_dirs:
 map_sets:
   SAT1_f093:
     file_root: "cmb_sat1_f093"
-    n_splits: 3          # Number of splits
+    n_splits: 2          # Number of splits
     freq_tag: 93         # Freq. tag (e.g. useful to coadd freqs)
     exp_tag: "SAT1"      # Experiment tag (useful to get noise-bias free cross-split spectra)
   SAT1_f145:
     file_root: "cmb_sat1_f145"
-    n_splits: 3
+    n_splits: 2
     freq_tag: 145
     exp_tag: "SAT1"
   # SAT2_f093:
