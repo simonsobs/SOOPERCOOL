@@ -1,4 +1,4 @@
-paramfile='../paramfiles/paramfile_nersc.yaml'
+paramfile='../paramfiles/paramfile.yaml'
 
 echo "Running pipeline with paramfile: ${paramfile}"
 

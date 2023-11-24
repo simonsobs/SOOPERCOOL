@@ -86,7 +86,7 @@ def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
     pixel_area_arcmin = 60**2 * pixel_area_deg
 
     noise_rms_muK_T = noise_rms_muKarcmin / np.sqrt(pixel_area_arcmin)
-    
+
     out_map = np.zeros((ncomp, size))
     out_map[0, :] = np.random.randn(size) * noise_rms_muK_T
 
@@ -98,8 +98,8 @@ def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
     return out_map
 
 
-def get_noise_cls(fsky, lmax, lmin=0, sensitivity_mode='baseline', 
-                          oof_mode='optimistic', is_beam_deconvolved=True):
+def get_noise_cls(fsky, lmax, lmin=0, sensitivity_mode='baseline',
+                  oof_mode='optimistic', is_beam_deconvolved=True):
     """
     """
     # Load noise curves
@@ -113,20 +113,20 @@ def get_noise_cls(fsky, lmax, lmin=0, sensitivity_mode='baseline',
     lth = np.concatenate(([0, 1], lth))[lmin:]
     nlth_P = np.array(
         [np.concatenate(([0, 0], nl))[lmin:] for nl in nlth_P]
-        
     )
     # Only support polarization noise at the moment
     nlth_dict = {
-        "T": {freq_band: nlth_P[i]/2 for i, freq_band in enumerate(noise_model.get_bands())},
-        "P": {freq_band: nlth_P[i] for i, freq_band in enumerate(noise_model.get_bands())}
+        "T": {freq_band: nlth_P[i]/2
+              for i, freq_band in enumerate(noise_model.get_bands())},
+        "P": {freq_band: nlth_P[i]
+              for i, freq_band in enumerate(noise_model.get_bands())}
     }
-    
     return lth, nlth_dict
 
 
 def generate_noise_map(nl_T, nl_P, hitmap, n_splits):
     """
-    """    
+    """
     # healpix ordering ["TT", "EE", "BB", "TE"]
     noise_mat = np.array([nl_T, nl_P, nl_P, np.zeros_like(nl_P)])
     # Normalize the noise
@@ -139,7 +139,7 @@ def generate_noise_map(nl_T, nl_P, hitmap, n_splits):
 
     return noise_map
 
-    
+
 def random_src_mask(mask, nsrcs, mask_radius_arcmin):
     """
     pspy.so_map
@@ -148,7 +148,8 @@ def random_src_mask(mask, nsrcs, mask_radius_arcmin):
     src_ids = np.random.choice(np.where(mask == 1)[0], nsrcs)
     for src_id in src_ids:
         vec = hp.pix2vec(hp.get_nside(mask), src_id)
-        disc = hp.query_disc(hp.get_nside(mask), vec, np.deg2rad(mask_radius_arcmin / 60))
+        disc = hp.query_disc(hp.get_nside(mask), vec,
+                             np.deg2rad(mask_radius_arcmin / 60))
         ps_mask[disc] = 0
     return ps_mask
 
@@ -179,6 +180,7 @@ def beam_hpix(ll, nside):
     fwhm_hp_amin = 60 * 41.7 / nside
     return beam_gaussian(ll, fwhm_hp_amin)
 
+
 def create_binning(lmin, lmax, delta_ell):
     """
     """
@@ -188,7 +190,7 @@ def create_binning(lmin, lmax, delta_ell):
     idx = bin_high <= lmax
     bin_low, bin_high = bin_low[idx], bin_high[idx]
 
-    if not lmax in bin_high:
+    if lmax not in bin_high:
         bin_low = np.concatenate([bin_low, [bin_high[-1]+1]])
         bin_high = np.concatenate([bin_high, [lmax]])
     bin_center = (bin_low + bin_high) / 2
@@ -218,13 +220,13 @@ def m_filter_map(map, mask, m_cut):
     nside = hp.get_nside(map)
     lmax = 3 * nside - 1
 
-    alms_list = []
     alms = hp.map2alm(map_masked, lmax=lmax)
 
     n_modes_to_filter = (m_cut + 1) * (lmax + 1) - ((m_cut + 1) * m_cut) // 2
     alms[:, :n_modes_to_filter] = 0.
 
     return hp.alm2map(alms, nside=nside, lmax=lmax)
+
 
 def toast_filter_map(map, mask):
     """
@@ -243,17 +245,16 @@ def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,
         "cross": []
     }
     for split_ms1, split_ms2 in all_splits_ps_names:
-        if not (split_ms1.startswith(map_set1) and split_ms2.startswith(map_set2)):
+        if (not (split_ms1.startswith(map_set1) and
+                 split_ms2.startswith(map_set2))):
             continue
 
         if (split_ms1, split_ms2) in cross_splits_ps_names:
             split_pairs_list["cross"].append((split_ms1, split_ms2))
-        
         elif (split_ms1, split_ms2) in auto_splits_ps_names:
             split_pairs_list["auto"].append((split_ms1, split_ms2))
 
     return split_pairs_list
-
 
 
 class PipelineManager(object):
@@ -314,7 +315,8 @@ class PipelineManager(object):
             fname = os.path.join(
                 out_base_dir, '..', self.stname_pclval_in,
                 simname+'_pcl_in.fits')
-        if product == 'pcl_val_sim_filtered':  # PCL of filtered validation sims
+        if product == 'pcl_val_sim_filtered':
+            # PCL of filtered validation sims
             fname = os.path.join(
                 out_base_dir, '..', self.stname_pclval_filt,
                 simname+'_pcl_filt.fits')

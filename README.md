@@ -1,26 +1,12 @@
 # Installation
 
-- [Install mbatch](https://github.com/simonsobs/mbatch#installing)
-
-- Install BBMASTER
+- Install SOOPERCOOL
 ```
-git clone git@github.com:simonsobs/BBMASTER.git
-cd BBMASTER
+git clone git@github.com:simonsobs/SOOPERCOOL.git
+cd SOOPERCOOL
 pip install -e .
 ```
 `-e` option will install local src with [development/editable mode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
 
-# Run test
-- Prepare input files
-```
-cd data
-python get_bandpower_edges.py
-python gen_PL_sims.py
-gzip -dk mask_binary.fits.gz
-cd ..
-```
-
-- run `test_mbatch.yml`
-```
-mbatch project_name test_mbatch.yml
-```
+- Test SOOPERCOOL
+Go to the `pipeline` directory (`cd pipeline`), and run the current pipeline bash script (`./run_all.sh`).
