@@ -5,13 +5,13 @@
 # Define the directories
 ## Let's start with directories of data products
 data_dirs:
-  root: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/data"
+  root: "/global/homes/c/chervias/CMBwork/SimonsObs/pipeline/data"
   map_directory: "maps"
   beam_directory: "beams"
   bandpasses_directory: "bandpasses"
 ## Then directories in which we will store outputs
 output_dirs: 
-  root: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/outputs"
+  root: "/global/homes/c/chervias/CMBwork/SimonsObs/pipeline/output"
   mask_directory: "masks"
   pre_process_directory: "pre_processing"
   sims_directory: "sims"
@@ -111,13 +111,15 @@ sim_pars:
 
 ## Filtering transfer function related parameters
 tf_settings:
-  filtering_type: "m_filterer" # "m_filterer" or "toast"
+  filtering_type: "toast" # "m_filterer" or "toast"
   m_cut: 30 # necessary only if `filtering_type` is set to "m_filterer"
   toast: # necessary only if `filtering_type` is set to "toast"
-    schedule_file: "in_data/toast_schedule.txt"
-    par_file: "in_data/toast_pars.toml"
+    schedule: "/global/homes/c/chervias/CMBwork/SimonsObs/pipeline/data/schedule.txt"
+    instrument: "SAT1"
+    band: "SAT_f090"
+    thinfp: 8
 
-  tf_est_num_sims: 100
+  tf_est_num_sims: 4
 
   power_law_pars_tf_est:
     amp: 1.0
