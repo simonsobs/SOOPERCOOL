@@ -46,7 +46,7 @@ python pcler.py --globals ${paramfile} --tf_val
 
 echo "Running pcler on data"
 echo "---------------------"
-python pcler.py --globals ${paramfile} --data
+python pcler.py --globals ${paramfile} --data --plots
 
 echo "Running pcler on sims"
 echo "---------------------"
@@ -54,7 +54,7 @@ python pcler.py --globals ${paramfile} --sims
 
 echo "Running coadder on data"
 echo "---------------------"
-python coadder.py --globals ${paramfile} --data --plots
+python coadder.py --globals ${paramfile} --data --plots --auto
 
 echo "Running coadder on sims"
 echo "---------------------"

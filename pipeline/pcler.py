@@ -12,6 +12,14 @@ import warnings
 
 def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
     """
+    Compute the binned coupled pseudo-C_ell estimates from two
+    (spin-0 or spin-2) NaMaster fields and a multipole binning scheme.
+    Parameters
+    ----------
+    fields1, fields2 : NmtField
+        Spin-0 or spin-2 fields to correlate.
+    nmt_binning : NmtBin
+        Multipole binning scheme.
     """
     spins = list(fields1.keys())
 
@@ -31,6 +39,15 @@ def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
 
 def decouple_pseudo_cls(coupled_pseudo_cells, coupling_inv):
     """
+    Decouples the coupled pseudo-C_ell estimators computed between two fields
+    of spin 0 or 2. Returns decoupled binned power spectra labeled by field
+    pairs (e.g. 'TT', 'TE', 'EE', 'EB', 'BB' etc.).
+    Parameters
+    ----------
+    coupled_pseudo_cells : dict with keys f"spin{s1}xspin{s2}",
+        items array-like. Coupled pseudo-C_ell estimators.
+    coupling_inv : array-like
+        Inverse binned bandpower coupling matrix.
     """
     decoupled_pcls = {}
     for spin_comb, coupled_pcl in coupled_pseudo_cells.items():
@@ -53,6 +70,13 @@ def decouple_pseudo_cls(coupled_pseudo_cells, coupling_inv):
 
 def field_pairs_from_spins(cls_in_dict):
     """
+    Reorders power spectrum dictionary with a given input spin
+    pair into pairs of output (pseudo-)scalar fields on the sky
+    (T, E, or B).
+
+    Parameters
+    ----------
+    cls_in_dict: dictionary
     """
     cls_out_dict = {}
 
@@ -73,7 +97,14 @@ def field_pairs_from_spins(cls_in_dict):
 
 def get_pcls_mat_transfer(fields, nmt_binning):
     """
-    attempt to get TF for T and Pol.
+    Compute coupled binned pseudo-C_ell estimates from
+    pure-E and pure-B transfer function estimation simulations,
+    and cast them into matrix shape.
+
+    Parameters
+    ----------
+    fields: dictionary of NmtField objects (keys "pureE", "pureB")
+    nmt_binning: NmtBin object
     """
     n_bins = nmt_binning.get_n_bands()
     pcls_mat_00 = np.zeros((1, 1, n_bins))
@@ -84,9 +115,9 @@ def get_pcls_mat_transfer(fields, nmt_binning):
     cases = ["pureE", "pureB"]
     for index, (pure_type1, pure_type2) in enumerate(product(cases, cases)):
         pcls = get_coupled_pseudo_cls(fields[pure_type1],
-                                      fields[pure_type2], nmt_binning)
+                                      fields[pure_type2],
+                                      nmt_binning)
         pcls_mat_22[index] = pcls["spin2xspin2"]
-
         pcls_mat_02[cases.index(pure_type2)] = pcls["spin0xspin2"]
 
     pcls_mat_00[0] = pcls["spin0xspin0"]
@@ -98,6 +129,17 @@ def get_pcls_mat_transfer(fields, nmt_binning):
 
 def pcler(args):
     """
+    Compute all decoupled binned pseudo-C_ell estimates needed for
+    a specific task in the pipeline related to simulations or data.
+    Runs in four modes: "tf_est", "tf_val", "data" and "sims".
+    * "tf_est": simulations for the transfer function estimation
+    * "tf_val": simulations for the transfer function validation
+    * "data": real (or mock) data
+    * "sims": simulations needed for the power spectrum covariance estimation
+    Parameters
+    ----------
+    args: dictionary
+        Global parameters and command line arguments.
     """
     meta = BBmeta(args.globals)
 

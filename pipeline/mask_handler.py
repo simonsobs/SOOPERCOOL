@@ -21,6 +21,25 @@ def mask_handler(args):
 
     os.makedirs(mask_dir, exist_ok=True)
 
+    # Download SAT hits map
+    print("Download and save SAT hits map ...")
+    sat_nhits_file = f"{mask_dir}/norm_nHits_SA_35FOV_ns512.fits.fits"
+    if not os.path.exists(sat_nhits_file):
+        urllib.request.urlretrieve(
+            "https://portal.nersc.gov/cfs/sobs/users/so_bb/norm_nHits_SA_35FOV_ns512.fits",  # noqa
+            filename=sat_nhits_file
+        )
+
+    # Download SAT apodized mask used in the SO BB
+    # pipeline paper (https://arxiv.org/abs/2302.04276)
+    print("Download and save SAT apodized mask ...")
+    sat_apo_file = f"{mask_dir}/apodized_mask_bbpipe_paper.fits"
+    if not os.path.exists(sat_apo_file):
+        urllib.request.urlretrieve(
+            "https://portal.nersc.gov/cfs/sobs/users/so_bb/apodized_mask_bbpipe_paper.fits",  # noqa
+            filename=sat_apo_file
+        )
+
     # Download galactic mask
     print("Download and save planck galactic masks ...")
     mask_p15_file = f"{mask_dir}/mask_planck2015.fits"
