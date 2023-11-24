@@ -4,7 +4,8 @@ import os
 import pymaster as nmt
 import healpy as hp
 import time
-from itertools import combinations_with_replacement as cwr
+# from itertools import combinations_with_replacement as cwr
+
 
 class BBmeta(object):
     """
@@ -13,12 +14,10 @@ class BBmeta(object):
     a single interface to all the parameters and products
     that will be used from different stages of the pipeline.
     """
-
-
     def __init__(self, fname_config):
         """
         Initialize the pipeline manager from a yaml file.
-        
+
         Parameters
         ----------
         fname_config : str
@@ -32,7 +31,7 @@ class BBmeta(object):
         # Set the high-level parameters as attributes
         for key in self.config:
             setattr(self, key, self.config[key])
-        
+
         # Set all the `_directory` attributes
         self._set_directory_attributes()
 
@@ -41,13 +40,15 @@ class BBmeta(object):
 
         # Basic sanity checks
         if self.lmax > 3*self.nside-1:
-            raise ValueError(f"lmax should be lower or equal to 3*nside-1 = {3*self.nside-1}")
+            raise ValueError("lmax should be lower or equal "
+                             f"to 3*nside-1 = {3*self.nside-1}")
 
         # Path to binning
-        self.path_to_binning = f"{self.pre_process_directory}/{self.binning_file}"
+        self.path_to_binning = f"{self.pre_process_directory}/{self.binning_file}"  # noqa
 
         # Initialize method to parse map_sets metadata
-        map_sets_attributes = list(self.map_sets[next(iter(self.map_sets))].keys())
+        map_sets_attributes = list(self.map_sets[
+            next(iter(self.map_sets))].keys())
         for map_sets_attribute in map_sets_attributes:
             self._init_getter_from_map_set(map_sets_attribute)
 
@@ -59,14 +60,14 @@ class BBmeta(object):
         for mask_type in ["binary", "galactic", "point_source", "analysis"]:
             setattr(
                 self,
-                f"{mask_type}_mask_name", 
+                f"{mask_type}_mask_name",
                 getattr(self, f"_get_{mask_type}_mask_name")()
             )
 
         # Simulation
         self._init_simulation_params()
 
-        # Tf estimation 
+        # Tf estimation
         self._init_tf_estimation_params()
         self.tf_est_sims_dir = f"{self.pre_process_directory}/tf_est_sims"
         self.tf_val_sims_dir = f"{self.pre_process_directory}/tf_val_sims"
@@ -86,7 +87,7 @@ class BBmeta(object):
         in the paramfiles
         """
         for label, path in self.data_dirs.items():
-            if label == "root": 
+            if label == "root":
                 self.data_dir = self.data_dirs["root"]
             else:
                 full_path = f"{self.data_dirs['root']}/{path}"
@@ -95,20 +96,19 @@ class BBmeta(object):
                 os.makedirs(full_path, exist_ok=True)
 
         for label, path in self.output_dirs.items():
-            if label == "root": 
+            if label == "root":
                 self.output_dir = self.output_dirs["root"]
             else:
                 full_path = f"{self.output_dirs['root']}/{path}"
                 setattr(self, label, full_path)
                 setattr(self, f"{label}_rel", path)
                 os.makedirs(full_path, exist_ok=True)
-    
+
     def _set_general_attributes(self):
         """
         """
         for key, value in self.general_pars.items():
             setattr(self, key, value)
-
 
     def _get_map_sets_list(self):
         """
@@ -116,8 +116,7 @@ class BBmeta(object):
         Constructor for the map_sets_list attribute.
         """
         return list(self.map_sets.keys())
-    
-    
+
     def _get_map_list(self):
         """
         List the different maps (including splits).
@@ -125,10 +124,9 @@ class BBmeta(object):
         """
         out_list = [
             f"{map_set}__{id_split}" for map_set in self.map_sets_list
-                for id_split in range(self.n_splits_from_map_set(map_set))
+                for id_split in range(self.n_splits_from_map_set(map_set))  # noqa
         ]
         return out_list
-
 
     def _init_getter_from_map_set(self, map_set_attribute):
         """
@@ -145,14 +143,12 @@ class BBmeta(object):
             lambda map_set: self.map_sets[map_set][map_set_attribute]
         )
 
-
     def _get_galactic_mask_name(self):
         """
         Get the name of the galactic mask.
         """
-        fname = f"{self.masks['galactic_mask_root']}_{self.masks['gal_mask_mode']}.fits"
+        fname = f"{self.masks['galactic_mask_root']}_{self.masks['gal_mask_mode']}.fits"  # noqa
         return os.path.join(self.mask_directory, fname)
-
 
     def _get_binary_mask_name(self):
         """
@@ -160,21 +156,18 @@ class BBmeta(object):
         """
         return os.path.join(self.mask_directory, self.masks["binary_mask"])
 
-
     def _get_point_source_mask_name(self):
         """
         Get the name of the point source mask.
         """
-        return os.path.join(self.mask_directory, self.masks["point_source_mask"])
-
+        return os.path.join(self.mask_directory,
+                            self.masks["point_source_mask"])
 
     def _get_analysis_mask_name(self):
         """
         Get the name of the final analysis mask.
         """
         return os.path.join(self.mask_directory, self.masks["analysis_mask"])
-
-    
 
     def read_mask(self, mask_type):
         """
@@ -191,7 +184,6 @@ class BBmeta(object):
             nside_out=self.nside
         )
 
-
     def save_mask(self, mask_type, mask, overwrite=False):
         """
         Save the mask given a mask type.
@@ -206,9 +198,8 @@ class BBmeta(object):
         overwrite : bool, optional
             Overwrite the mask if it already exists.
         """
-        return hp.write_map(getattr(self, f"{mask_type}_mask_name"), mask, 
+        return hp.write_map(getattr(self, f"{mask_type}_mask_name"), mask,
                             overwrite=overwrite)
-
 
     def read_hitmap(self):
         """
@@ -218,23 +209,21 @@ class BBmeta(object):
         hitmap = hp.read_map(self.hitmap_file)
         return hp.ud_grade(hitmap, self.nside, power=-2)
 
-
     def read_nmt_binning(self):
         """
         Read the binning file and return the corresponding NmtBin object.
         """
         binning = np.load(self.path_to_binning)
-        return nmt.NmtBin.from_edges(binning["bin_low"], binning["bin_high"] + 1)
+        return nmt.NmtBin.from_edges(binning["bin_low"],
+                                     binning["bin_high"] + 1)
 
-    
     def get_n_bandpowers(self):
         """
         Read the binning file and return the number of ell-bins.
         """
         binner = self.read_nmt_binning()
         return binner.get_n_bands()
-    
-    
+
     def get_effective_ells(self):
         """
         Read the binning file and return the number of ell-bins.
@@ -249,7 +238,6 @@ class BBmeta(object):
         beam_file = f"{self.beam_directory}/beam_{file_root}.dat"
         l, bl = np.loadtxt(beam_file, unpack=True)
         return l, bl
-    
 
     def _init_simulation_params(self):
         """
@@ -260,7 +248,6 @@ class BBmeta(object):
                      "hitmap_file"]:
             setattr(self, name, self.sim_pars[name])
 
-
     def _init_tf_estimation_params(self):
         """
         Loop over the transfer function parameters and set them as attributes.
@@ -268,14 +255,13 @@ class BBmeta(object):
         for name in self.tf_settings:
             setattr(self, name, self.tf_settings[name])
 
-
-    def save_fiducial_cl(self, l, cl_dict, cl_type):
+    def save_fiducial_cl(self, ell, cl_dict, cl_type):
         """
         Save a fiducial power spectra dictionnary to disk.
 
         Parameters
         ----------
-        l : array-like
+        ell : array-like
             Multipole values.
         cl_dict : dict
             Dictionnary with the power spectra.
@@ -284,8 +270,7 @@ class BBmeta(object):
             Can be "cosmo", "tf_est" or "tf_val".
         """
         fname = getattr(self, f"{cl_type}_cls_file")
-        np.savez(fname, l=l, **cl_dict)
-
+        np.savez(fname, l=ell, **cl_dict)
 
     def load_fiducial_cl(self, cl_type):
         """
@@ -299,7 +284,6 @@ class BBmeta(object):
         """
         fname = getattr(self, f"{cl_type}_cls_file")
         return np.load(fname)
-    
 
     def plot_dir_from_output_dir(self, out_dir):
         """
@@ -315,11 +299,10 @@ class BBmeta(object):
 
         return path_to_plots
 
-
     def get_fname_mask(self, map_type='analysis'):
         """
         Get the full filepath to a mask of predefined type.
-        
+
         Parameters
         ----------
         map_type : str
@@ -327,26 +310,27 @@ class BBmeta(object):
             Defaults to 'analysis'.
         """
         base_dir = self.masks['mask_directory']
-        if map_type=='analysis':
+        if map_type == 'analysis':
             fname = os.path.join(base_dir, self.masks['analysis_mask'])
-        elif map_type=='binary':
+        elif map_type == 'binary':
             fname = os.path.join(base_dir, self.masks['binary_mask'])
-        elif map_type=='point_source':
+        elif map_type == 'point_source':
             fname = os.path.join(base_dir, self.masks['point_source_mask'])
         else:
             raise ValueError("The map_type chosen does not exits. "
                              "Choose between 'analysis', 'binary', "
                              "'point_source'.")
         return fname
-    
 
     def get_map_filename(self, map_set, id_split, id_sim=None):
         """
         Get the path to file for a given `map_set` and split index.
         Can also get the path to a given simulation if `id_sim` is provided.
 
-        Path to standard map : {map_directory}/{map_set_root}_split_{id_split}.fits
-        Path to sim map : e.g. {sims_directory}/0000/{map_set_root}_split_{id_split}.fits
+        Path to standard map:
+            {map_directory}/{map_set_root}_split_{id_split}.fits
+        Path to sim map: e.g.
+            {sims_directory}/0000/{map_set_root}_split_{id_split}.fits
 
         Parameters
         ----------
@@ -367,9 +351,9 @@ class BBmeta(object):
             os.makedirs(path_to_maps, exist_ok=True)
         else:
             path_to_maps = self.map_directory
-        
-        return os.path.join(path_to_maps, f"{map_set_root}_split_{id_split}.fits")
 
+        return os.path.join(path_to_maps,
+                            f"{map_set_root}_split_{id_split}.fits")
 
     def get_map_filename_transfer2(self, id_sim, cl_type, pure_type=None):
         """
@@ -377,11 +361,10 @@ class BBmeta(object):
         path_to_maps = getattr(self, f"{cl_type}_sims_dir")
 
         pure_label = f"_{pure_type}" if pure_type else ""
-        file_name = f"TQU{pure_label}_noiseless_nside{self.nside}_lmax{self.lmax}_{id_sim:04d}.fits"
+        file_name = f"TQU{pure_label}_noiseless_nside{self.nside}_lmax{self.lmax}_{id_sim:04d}.fits"  # noqa
 
         return f"{path_to_maps}/{file_name}"
 
-    
     def read_map(self, map_set, id_split, id_sim=None, pol_only=False):
         """
         Read a map given a map set and split index.
@@ -402,9 +385,8 @@ class BBmeta(object):
         field = [1, 2] if pol_only else [0, 1, 2]
         fname = self.get_map_filename(map_set, id_split, id_sim)
         return hp.read_map(fname, field=field)
-    
-    
-    def read_map_transfer(self, id_sim, signal=None, e_or_b=None, 
+
+    def read_map_transfer(self, id_sim, signal=None, e_or_b=None,
                           pol_only=False):
         """
         Read a map given a simulation index.
@@ -415,12 +397,12 @@ class BBmeta(object):
         id_sim : int
             Index of the simulation.
         signal : str, optional
-            Determines what signal the validation map corresponds to. For now, 
-            available choices are 'CMB' and 'dust'. 
+            Determines what signal the validation map corresponds to. For now,
+            available choices are 'CMB' and 'dust'.
             If None, assumes simulation mode.
         e_or_b : str
             Accepts either `E`, `B`, or None. Determines what pure-polarization
-            type (E or B) the map corresponds to. 
+            type (E or B) the map corresponds to.
             If None, assumes validation mode.
         pol_only : bool, optional
             Return only the polarization maps.
@@ -431,14 +413,13 @@ class BBmeta(object):
                              "`e_or_b`")
         fname = self.get_map_filename_transfer(id_sim, signal, e_or_b)
         return hp.read_map_transfer(fname, field=field)
-    
-    
+
     def get_ps_names_list(self, type="all", coadd=False):
         """
         List all the possible cross split power spectra
-        Example: 
+        Example:
             From two map_sets `ms1` and `ms2` with
-            two splits each, and `type="all"`, 
+            two splits each, and `type="all"`,
             this function will return :
             [('ms1__0', 'ms1__0'), ('ms1__0', 'ms1__1'),
              ('ms1__0', 'ms2__0'), ('ms1__0', 'ms2__1'),
@@ -450,9 +431,9 @@ class BBmeta(object):
         ----------
         type : str, optional
             Type of power spectra to return.
-            Can be "all", "auto" or "cross". "auto" returns all unique auto-split
-            spectra, while "cross" returns all unique cross-split spectra. "all"
-            is the union of both.
+            Can be "all", "auto" or "cross". "auto" returns all unique
+            auto-split spectra, while "cross" returns all unique
+            cross-split spectra. "all" is the union of both.
         coadd: bool, optional
             If True, return the cross-split power spectra names.
             Else, return the (split-)coadded power spectra names.
@@ -464,41 +445,54 @@ class BBmeta(object):
             for j, map2 in enumerate(map_iterable):
 
                 if coadd:
-                    if i > j: continue
-                    if (type == "cross") and (i == j): continue
-                    if (type == "auto") and (i != j): continue
+                    if i > j:
+                        continue
+                    if (type == "cross") and (i == j):
+                        continue
+                    if (type == "auto") and (i != j):
+                        continue
 
                 else:
                     map_set_1, split_1 = map1.split("__")
                     map_set_2, split_2 = map2.split("__")
 
-                    if (map2, map1) in ps_name_list: continue
-                    if (map_set_1 == map_set_2) and (split_1 > split_2): continue
+                    if (map2, map1) in ps_name_list:
+                        continue
+                    if (map_set_1 == map_set_2) and (split_1 > split_2):
+                        continue
 
-                    exp_tag_1 = map_set_1 #self.exp_tag_from_map_set(map_set_1)
-                    exp_tag_2 = map_set_2 #self.exp_tag_from_map_set(map_set_2)
+                    exp_tag_1 = map_set_1
+                    # self.exp_tag_from_map_set(map_set_1)
+                    exp_tag_2 = map_set_2
+                    # self.exp_tag_from_map_set(map_set_2)
 
-                    if (type == "cross") and (exp_tag_1 == exp_tag_2) and (split_1 == split_2): continue
-                    if (type == "auto") and ((exp_tag_1 != exp_tag_2) or (split_1 != split_2)): continue
+                    if ((type == "cross") and (exp_tag_1 == exp_tag_2)
+                            and (split_1 == split_2)):
+                        continue
+                    if ((type == "auto") and ((exp_tag_1 != exp_tag_2)
+                                              or (split_1 != split_2))):
+                        continue
 
                 ps_name_list.append((map1, map2))
         return ps_name_list
 
-    
-    def get_n_split_pairs_from_map_sets(self, map_set1, map_set2, type="cross"):
+    def get_n_split_pairs_from_map_sets(self, map_set1, map_set2,
+                                        type="cross"):
         n_splits1 = self.n_splits_from_map_set(map_set1)
         n_splits2 = self.n_splits_from_map_set(map_set2)
-        #exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
-        #exp_tag_2 = self.exp_tag_from_map_set(map_set_2)
+        # exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
+        # exp_tag_2 = self.exp_tag_from_map_set(map_set_2)
         if type == "cross":
-            n_pairs = n_splits1*(n_splits1-1)/2 if map_set1==map_set2 else n_splits1*n_splits2
+            n_pairs = n_splits1 * (n_splits1 - 1) / 2 if map_set1 == map_set2 \
+                else n_splits1*n_splits2
         elif type == "auto":
-            n_pairs = n_splits1 if map_set1==map_set2 else 0
+            n_pairs = n_splits1 if map_set1 == map_set2 else 0
         elif type == "all":
-            n_pairs = n_splits1*(n_splits1+1)/2 if map_set1==map_set2 else n_splits1*n_splits2
+            n_pairs = n_splits1 * (n_splits1 + 1) / 2 if map_set1 == map_set2 \
+                else n_splits1*n_splits2
         else:
-            raise ValueError("You selected an invalid type. Options are 'cross', "
-                             "'auto', and 'all'.")
+            raise ValueError("You selected an invalid type. "
+                             "Options are 'cross', 'auto', and 'all'.")
         return n_pairs
 
 
@@ -512,7 +506,6 @@ class Timer:
         Initialize the timers with an empty dict
         """
         self.timers = {}
-        
 
     def start(self, timer_label):
         """
@@ -527,7 +520,6 @@ class Timer:
         if timer_label in self.timers:
             raise ValueError(f"Timer {timer_label} already exists.")
         self.timers[timer_label] = time.time()
-
 
     def stop(self, timer_label, text_to_output=None, verbose=True):
         """
@@ -546,11 +538,12 @@ class Timer:
             Print the output text.
             Defaults to True.
         """
-        if not timer_label in self.timers:
+        if timer_label not in self.timers:
             raise ValueError(f"Timer {timer_label} does not exist.")
-        
+
         dt = time.time() - self.timers[timer_label]
         self.timers.pop(timer_label)
         if verbose:
-            prefix = f"[{text_to_output}]" if text_to_output else f"[{timer_label}]"
+            prefix = f"[{text_to_output}]" if text_to_output \
+                else f"[{timer_label}]"
             print(f"{prefix} Took {dt:.02f} s to process.")

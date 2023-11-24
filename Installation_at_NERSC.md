@@ -1,4 +1,4 @@
-#### Installation of BB MASTER at `NERSC`
+#### Installation of SOOPERCOOL at `NERSC`
 
 In principle, a standard python environment with a working version of `NaMaster` will do the job. In a general environment (like `NERSC` or a different computing cluster), a safe and fast option is `micromamba`:
 
@@ -18,11 +18,11 @@ In principle, a standard python environment with a working version of `NaMaster`
   micromamba config set channel_priority strict
   ```
 
-- Install and load `bbmaster` environment (`python=3.6` proved to work with `conda`-like environments)
+- Install and load `soopercool` environment (`python=3.6` proved to work with `conda`-like environments)
 
   ```
-  micromamba create -n bbmaster python=3.6 numpy scipy ipython matplotlib healpy astropy -y
-  micromamba activate bbmaster
+  micromamba create -n soopercool python=3.6 numpy scipy ipython matplotlib healpy astropy -y
+  micromamba activate soopercool
   ```
 
   Then, install `GSL` from source (otherwise `NaMaster` won't recognize it):
@@ -46,7 +46,7 @@ In principle, a standard python environment with a working version of `NaMaster`
   micromamba install -c conda-forge namaster
   ```
 
-- Install `bbmaster` pipeline and its dependencies:
+- Install `soopercool` pipeline and its dependencies:
 
   ```
   git clone git@github.com:simonsobs/so_noise_models.git
