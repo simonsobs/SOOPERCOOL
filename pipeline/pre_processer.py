@@ -23,7 +23,7 @@ def pre_processer(args):
     # Second step is to download hits map and apodized analysis mask
     print("Download and save SAT hits map ...")
     mask_dir = meta.mask_directory
-    sat_nhits_file = f"../data/norm_nHits_SA_35FOV_ns512.fits"
+    sat_nhits_file = "../data/norm_nHits_SA_35FOV_ns512.fits"
     if not os.path.exists(sat_nhits_file):
         urllib.request.urlretrieve(
             "https://portal.nersc.gov/cfs/sobs/users/so_bb/norm_nHits_SA_35FOV_ns512.fits",  # noqa
@@ -39,7 +39,7 @@ def pre_processer(args):
             "https://portal.nersc.gov/cfs/sobs/users/so_bb/apodized_mask_bbpipe_paper.fits",  # noqa
             filename=sat_apo_file
         )
-    
+
     # Third step is to create the survey mask from a hitmap
     meta.timer.start("Computing binary mask")
     hitmap = meta.read_hitmap()

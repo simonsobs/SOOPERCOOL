@@ -136,7 +136,7 @@ def generate_noise_map(nl_T, nl_P, hitmap, n_splits, is_anisotropic=True):
 
     if is_anisotropic:
         # Weight with hitmap
-        noise_map[:, hitmap != 0] /= np.sqrt(hitmap[hitmap != 0] / np.max(hitmap))
+        noise_map[:, hitmap != 0] /= np.sqrt(hitmap[hitmap != 0] / np.max(hitmap)) # noqa
 
     return noise_map
 

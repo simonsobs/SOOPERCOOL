@@ -81,8 +81,8 @@ def mocker(args):
                 noise_map = generate_noise_map(
                     nlth_dict["T"][freq_tag],
                     nlth_dict["P"][freq_tag],
-                    hitmap, 
-                    n_splits, 
+                    hitmap,
+                    n_splits,
                     is_anisotropic=meta.anisotropic_noise
                 )
                 split_map = cmb_map_beamed + noise_map

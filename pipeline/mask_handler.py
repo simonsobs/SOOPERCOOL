@@ -1,13 +1,13 @@
 import argparse
 import healpy as hp
-from soopercool.utils import random_src_mask
+# from soopercool.utils import random_src_mask
 from soopercool import BBmeta
 import pymaster as nmt
-import numpy as np
+# import numpy as np
 import os
 import matplotlib.pyplot as plt
 from matplotlib import cm
-import urllib.request
+# import urllib.request
 
 cmap = cm.YlOrRd
 cmap.set_under("w")
@@ -71,7 +71,7 @@ def mask_handler(args):
 #     ps_mask = random_src_mask(binary_mask, nsrcs,
 #                               mask_radius_arcmin)
 #     meta.save_mask("point_source", ps_mask, overwrite=True)
-#     meta.timer.stop("ps_mask", "Generate mock point source mask", args.verbose)
+#     meta.timer.stop("ps_mask", "Generate mock point source mask", args.verbose) # noqa
 
 #     if args.plots:
 #         plt.figure(figsize=(16, 9))
