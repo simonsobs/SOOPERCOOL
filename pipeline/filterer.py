@@ -25,12 +25,8 @@ def filter(args):
         filter_func = utils.toast_filter_map
         kwargs = {"schedule": meta.toast['schedule'], "thinfp": meta.toast['thinfp'], "instrument": meta.toast['instrument'], "band": meta.toast['band'], "nside": meta.nside, }
     else:
-<<<<<<< HEAD
         raise NotImplementedError(f"Filterer type {meta.filtering_type} "
                                   "not implemented")
-=======
-        raise NotImplementedError(f"Filterer type {meta.filtering_type} not implemented")
->>>>>>> 73611f3 (Fixing formatting stuff)
 
     # Read the mask
     mask = meta.read_mask("analysis")
@@ -47,17 +43,9 @@ def filter(args):
                         hp.write_map(map_file.replace(".fits", "_filtered.fits"), filtered_map, overwrite=True, dtype=np.float32)
                     elif meta.filtering_type == 'toast':
                         filter_func(map_file, **kwargs)
-<<<<<<< HEAD
 
     if args.sims or args.data:
         Nsims = meta.num_sims if args.sims else 1
-=======
-                    print(map_file)
-
-    if args.sims or args.data:
-        Nsims = meta.num_sims if args.sims else 1
-
->>>>>>> 73611f3 (Fixing formatting stuff)
         for map_name in meta.maps_list:
             map_set, id_split = map_name.split("__")
             for id_sim in range(Nsims):
@@ -77,13 +65,5 @@ if __name__ == "__main__":
     mode.add_argument("--transfer", action="store_true")
     mode.add_argument("--sims", action="store_true")
     mode.add_argument("--data", action="store_true")
-<<<<<<< HEAD
     args = parser.parse_args()
     filter(args)
-    
-=======
-
-    args = parser.parse_args()
-
-    filter(args)
->>>>>>> 73611f3 (Fixing formatting stuff)
