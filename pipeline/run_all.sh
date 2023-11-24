@@ -27,10 +27,10 @@ python filterer.py --globals ${paramfile} --transfer
 
 echo "Running filterer for sims"
 echo "-------------------------"
-python filterer.py --globals ${paramfile} --sims
+#python filterer.py --globals ${paramfile} --sims
 echo "Running filterer for data"
 echo "-------------------------"
-python filterer.py --globals ${paramfile} --data
+#python filterer.py --globals ${paramfile} --data
 
 echo "Running cl estimation for tf estimation"
 echo "---------------------------------------"
@@ -46,16 +46,32 @@ python pcler.py --globals ${paramfile} --tf_val
 
 echo "Running pcler on data"
 echo "---------------------"
+<<<<<<< HEAD
 python pcler.py --globals ${paramfile} --data --plots
+=======
+#python pcler.py --globals ${paramfile} --data
+>>>>>>> b6e3d16 (update to the bash file)
 
 echo "Running pcler on sims"
 echo "---------------------"
-python pcler.py --globals ${paramfile} --sims
+#python pcler.py --globals ${paramfile} --sims
 
 echo "Running coadder on data"
 echo "---------------------"
+<<<<<<< HEAD
 python coadder.py --globals ${paramfile} --data --plots --auto
 
 echo "Running coadder on sims"
 echo "---------------------"
 python coadder.py --globals ${paramfile} --sims
+=======
+#python coadder.py --globals ${paramfile} --data --plots
+
+echo "Running coadder on sims"
+echo "---------------------"
+#python coadder.py --globals ${paramfile} --sims
+
+echo "Transfer validation"
+echo "---------------------"
+python transfer_validator.py --globals ${paramfile}
+>>>>>>> b6e3d16 (update to the bash file)
