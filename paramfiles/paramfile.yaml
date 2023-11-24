@@ -105,6 +105,7 @@ sim_pars:
     Alens: 1.0
     tau: 0.0544
     r: 0.01
+  anisotropic_noise: True
   mock_nsrcs: 80
   mock_srcs_hole_radius: 40
   

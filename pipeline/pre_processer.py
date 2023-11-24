@@ -5,6 +5,7 @@ import os
 import healpy as hp
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import urllib.request
 
 
 def pre_processer(args):
@@ -19,7 +20,29 @@ def pre_processer(args):
     np.savez(meta.path_to_binning, bin_low=bin_low, bin_high=bin_high,
              bin_center=bin_center)
 
-    # Second step is to create the survey mask from a hitmap
+    # Second step is to download hits map and apodized analysis mask
+    print("Download and save SAT hits map ...")
+    mask_dir = meta.mask_directory
+    sat_nhits_file = f"../data/norm_nHits_SA_35FOV_ns512.fits"
+    if not os.path.exists(sat_nhits_file):
+        urllib.request.urlretrieve(
+            "https://portal.nersc.gov/cfs/sobs/users/so_bb/norm_nHits_SA_35FOV_ns512.fits",  # noqa
+            filename=sat_nhits_file
+        )
+
+    # Download SAT apodized mask used in the SO BB
+    # pipeline paper (https://arxiv.org/abs/2302.04276)
+    print("Download and save SAT apodized mask ...")
+    sat_apo_file = f"{mask_dir}/apodized_mask_bbpipe_paper.fits"
+    if not os.path.exists(sat_apo_file):
+        urllib.request.urlretrieve(
+            "https://portal.nersc.gov/cfs/sobs/users/so_bb/apodized_mask_bbpipe_paper.fits",  # noqa
+            filename=sat_apo_file
+        )
+    
+    
+    
+    # Third step is to create the survey mask from a hitmap
     meta.timer.start("Computing binary mask")
     hitmap = meta.read_hitmap()
     binary_mask = (hitmap > 0.).astype(float)

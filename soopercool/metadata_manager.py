@@ -243,7 +243,7 @@ class BBmeta(object):
         """
         Loop over the simulation parameters and set them as attributes.
         """
-        for name in ["num_sims", "cosmology",
+        for name in ["num_sims", "cosmology", "anisotropic_noise",
                      "mock_nsrcs", "mock_srcs_hole_radius",
                      "hitmap_file"]:
             setattr(self, name, self.sim_pars[name])
