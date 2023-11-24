@@ -217,7 +217,7 @@ def pcler(args):
 
                 # Include beam in namaster fields to deconvolve it
                 field_spin0 = nmt.NmtField(mask, [map[0]])
-                field_spin2 = nmt.NmtField(mask, [map[1], map[2]])
+                field_spin2 = nmt.NmtField(mask, [map[1], map[2]], purify_b=meta.pure_B)
 
                 fields[map_set, id_split] = {
                     "spin0": field_spin0,
@@ -339,7 +339,7 @@ def pcler(args):
                 # TO-DO: filter temperature only once !
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1]),
-                    "spin2": nmt.NmtField(mask, map[1:])
+                    "spin2": nmt.NmtField(mask, map[1:], purify_b=meta.pure_B)
                 }
 
                 if meta.filtering_type == "toast":
@@ -348,7 +348,7 @@ def pcler(args):
                     pw = [None, None]
                 field_filtered = {
                     "spin0": nmt.NmtField(mask, map_filtered[:1], beam=pw[0]),
-                    "spin2": nmt.NmtField(mask, map_filtered[1:], beam=pw[1])
+                    "spin2": nmt.NmtField(mask, map_filtered[1:], beam=pw[1], purify_b=meta.pure_B)
                 }
 
                 fields["unfiltered"][pure_type] = field
@@ -397,7 +397,7 @@ def pcler(args):
                         pw = [None, None]
                     field = {
                         "spin0": nmt.NmtField(mask, map[:1], beam=pw[0]),
-                        "spin2": nmt.NmtField(mask, map[1:], beam=pw[1])
+                        "spin2": nmt.NmtField(mask, map[1:], beam=pw[1], purify_b=meta.pure_B)
                     }
 
                     pcls = get_coupled_pseudo_cls(field, field, nmt_binning)

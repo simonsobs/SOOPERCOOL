@@ -1,4 +1,4 @@
-paramfile='../paramfiles/paramfile.yaml'
+paramfile='../paramfiles/paramfile_pure_b.yaml'
 
 echo "Running pipeline with paramfile: ${paramfile}"
 
@@ -8,7 +8,7 @@ python pre_processer.py --globals ${paramfile} --sims
 
 echo "Running mask stage..."
 echo "---------------------"
-python mask_handler.py --globals ${paramfile}
+#python mask_handler.py --globals ${paramfile}
 
 echo "Running mock stage for data..."
 echo "------------------------------"
@@ -59,3 +59,7 @@ python coadder.py --globals ${paramfile} --data --plots --auto
 echo "Running coadder on sims"
 echo "---------------------"
 python coadder.py --globals ${paramfile} --sims
+
+echo "Running transfer validator"
+echo "---------------------"
+python transfer_validator.py --globals ${paramfile}
