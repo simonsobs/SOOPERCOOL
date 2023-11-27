@@ -38,7 +38,7 @@ def filter(args):
                 for case in cases_list:
                     map_file = meta.get_map_filename_transfer2(id_sim, cl_type, pure_type=case)
                     map = hp.read_map(map_file, field=[0,1,2])
-                    if meta.filtering_type == 'm_cut':
+                    if meta.filtering_type == 'm_filterer':
                         filtered_map = filter_func(map, mask, **kwargs)
                         hp.write_map(map_file.replace(".fits", "_filtered.fits"), filtered_map, overwrite=True, dtype=np.float32)
                     elif meta.filtering_type == 'toast':
@@ -51,7 +51,7 @@ def filter(args):
             for id_sim in range(Nsims):
                 map_file = meta.get_map_filename(map_set, id_split, id_sim=id_sim if Nsims > 1 else None)
                 map = hp.read_map(map_file, field=[0,1,2])
-                if meta.filtering_type=='m_cut':
+                if meta.filtering_type=='m_filterer':
                     filtered_map = filter_func(map, mask, **kwargs)
                     hp.write_map(map_file.replace(".fits", "_filtered.fits"), filtered_map, overwrite=True, dtype=np.float32)
                 elif meta.filtering_type=='toast':
