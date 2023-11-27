@@ -1,7 +1,7 @@
 import yaml
 import numpy as np
 import os
-import pymaster as nmt
+# import pymaster as nmt
 import healpy as hp
 import time
 # from itertools import combinations_with_replacement as cwr
@@ -213,6 +213,7 @@ class BBmeta(object):
         """
         Read the binning file and return the corresponding NmtBin object.
         """
+        import pymaster as nmt
         binning = np.load(self.path_to_binning)
         return nmt.NmtBin.from_edges(binning["bin_low"],
                                      binning["bin_high"] + 1)
