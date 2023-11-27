@@ -7,7 +7,7 @@ import pymaster as nmt
 import healpy as hp
 import sacc
 import camb
-from .toast_utils import *
+#from .toast_utils import *
 
 
 def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
@@ -136,7 +136,8 @@ def generate_noise_map(nl_T, nl_P, hitmap, n_splits):
     noise_map = hp.synfast(noise_mat, hp.get_nside(hitmap), pol=True, new=True)
 
     # Weight with hitmap
-    noise_map[:, hitmap != 0] /= np.sqrt(hitmap[hitmap != 0] / np.max(hitmap))
+    print("Don't do it!")
+    #noise_map[:, hitmap != 0] /= np.sqrt(hitmap[hitmap != 0] / np.max(hitmap))
 
     return noise_map
 

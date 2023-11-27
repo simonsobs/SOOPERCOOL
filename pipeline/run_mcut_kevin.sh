@@ -1,7 +1,7 @@
 paramfile='../paramfiles/paramfile_mcut_kevin.yaml'
 micromamba activate bbpower
 
-echo "Running pipeline with paramfile: ${paramfile} and environment 'bbpower''"
+echo "Running pipeline with paramfile: ${paramfile} and environment 'bbpower'"
 
 echo "Pre-processing data..."
 echo "-------------------"
@@ -46,13 +46,13 @@ echo "Running transfer estimation"
 echo "---------------------------"
 python transfer.py --globals ${paramfile}
 
-echo "Running cl estimation for validation"
-echo "------------------------------------"
-python pcler.py --globals ${paramfile} --tf_val
+# echo "Running cl estimation for validation"
+# echo "------------------------------------"
+# python pcler.py --globals ${paramfile} --tf_val
 
-echo "Transfer validation"
-echo "---------------------"
-python transfer_validator.py --globals ${paramfile}
+# echo "Transfer validation"
+# echo "---------------------"
+# python transfer_validator.py --globals ${paramfile}
 
 echo "Running pcler on data"
 echo "---------------------"
