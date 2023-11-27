@@ -95,7 +95,7 @@ general_pars:
 ## Simulation related
 sim_pars:
   hitmap_file: "../data/norm_nHits_SA_35FOV_ns512.fits"
-  num_sims: 10
+  num_sims: 1
   cosmology:
     cosmomc_theta: 0.0104085
     As: 2.1e-9
@@ -118,7 +118,7 @@ tf_settings:
     schedule_file: "in_data/toast_schedule.txt"
     par_file: "in_data/toast_pars.toml"
 
-  tf_est_num_sims: 100
+  tf_est_num_sims: 4
 
   power_law_pars_tf_est:
     amp: 1.0
