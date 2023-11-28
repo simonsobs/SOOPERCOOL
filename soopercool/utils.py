@@ -5,6 +5,8 @@ from scipy.interpolate import interp1d
 from so_models_v3 import SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 import pymaster as nmt
 import healpy as hp
+import matplotlib.pyplot as plt
+from matplotlib import cm
 import sacc
 import camb
 
@@ -208,6 +210,7 @@ def power_law_cl(ell, amp, delta_ell, power_law_index):
             A = amp[spec]
         else:
             A = amp
+        # A is power spectrum amplitude at pivot ell == 1 - delta_ell
         pl_ps[spec] = A / (ell + delta_ell) ** power_law_index
 
     return pl_ps
@@ -256,6 +259,16 @@ def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,
             split_pairs_list["auto"].append((split_ms1, split_ms2))
 
     return split_pairs_list
+
+def plot_map(map, fname, vrange_T=300, vrange_P=10, title=None, TQU=True):
+    fields = "TQU" if TQU == True else "QU"
+    for i, m in enumerate(fields):
+        vrange = vrange_T if m == "T" else vrange_P
+        plt.figure(figsize=(16, 9))
+        hp.mollview(map[i], title=f"{title}_{m}", unit=r'$\mu$K$_{\rm CMB}$', 
+                    cmap=cm.coolwarm, min=-vrange, max=vrange)
+        hp.graticule()
+        plt.savefig(f"{fname}_{m}.png", bbox_inches="tight")
 
 
 class PipelineManager(object):
