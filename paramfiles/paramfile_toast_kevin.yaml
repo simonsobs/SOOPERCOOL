@@ -95,6 +95,7 @@ general_pars:
 ## Simulation related
 sim_pars:
   hitmap_file: "../data/norm_nHits_SA_35FOV_ns512.fits"
+  anisotropic_noise: False
   num_sims: 10
   cosmology:
     cosmomc_theta: 0.0104085

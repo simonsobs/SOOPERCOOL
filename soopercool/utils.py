@@ -3,13 +3,11 @@ import numpy as np
 import os
 from scipy.interpolate import interp1d
 from so_models_v3 import SO_Noise_Calculator_Public_v3_1_2 as noise_calc
-import pymaster as nmt
 import healpy as hp
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import sacc
 import camb
-#from .toast_utils import *
 
 
 def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
@@ -22,6 +20,7 @@ def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
     binning -> binning scheme to use
     winv -> inverse binned MCM (optional)
     """
+    import pymaster as nmt
 
     if winv is not None:
         nbpw = binning.get_n_bands()
@@ -233,6 +232,17 @@ def m_filter_map(map, mask, m_cut):
     return hp.alm2map(alms, nside=nside, lmax=lmax)
 
 def toast_filter_map(map, schedule, thinfp, instrument, band, nside ):
+    import toast
+    import sotodlib.toast as sotoast
+    from astropy import units as u
+    from .toast_utils import (
+        apply_scanning, apply_det_pointing_radec, apply_pixels_radec,
+        apply_weights_radec, apply_noise_model, apply_scan_map, create_binner,
+        apply_demodulation, make_filterbin
+    )
+        
+        
+        
     import time
     start_time = time.time()
 

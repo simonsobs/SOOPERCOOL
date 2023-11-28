@@ -1,4 +1,5 @@
 paramfile='../paramfiles/paramfile_toast_kevin.yaml'
+eval "$(micromamba shell hook --shell bash)"
 micromamba activate bbpower
 
 echo "Running pipeline with paramfile: ${paramfile} and environment 'bbpower''"
@@ -6,10 +7,6 @@ echo "Running pipeline with paramfile: ${paramfile} and environment 'bbpower''"
 echo "Pre-processing data..."
 echo "-------------------"
 python pre_processer.py --globals ${paramfile} --sims
-
-echo "Running mask stage..."
-echo "---------------------"
-python mask_handler.py --globals ${paramfile}
 
 echo "Running mock stage for data..."
 echo "------------------------------"
