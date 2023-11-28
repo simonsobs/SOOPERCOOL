@@ -4,7 +4,7 @@ from soopercool.utils import get_noise_cls, beam_gaussian, generate_noise_map
 import numpy as np
 import os
 from so_models_v3 import SO_Noise_Calculator_Public_v3_1_2 as noise_calc
-from soopercool import BBmeta
+from soopercool import BBmeta, utils
 import warnings
 
 
@@ -101,7 +101,7 @@ def mocker(args):
                 if args.plots:
                     if Nsims == 1:
                         plot_dir = meta.plot_dir_from_output_dir(
-                            meta.map_directory_relative
+                            meta.map_directory_rel
                         )
                         utils.plot_map(split_map, 
                                        f"{plot_dir}/map_{map_set}__{id_split}",
