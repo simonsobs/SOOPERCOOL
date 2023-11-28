@@ -270,6 +270,7 @@ def pcler(args):
             plot_dir = meta.plot_dir_from_output_dir(plot_dir_rel)
 
             for plot_label in cells_plots:
+                plt.clf()
                 plt.figure(figsize=(6, 4))
                 plt.title(plot_label)
 
