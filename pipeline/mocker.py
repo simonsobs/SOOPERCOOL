@@ -3,8 +3,6 @@ import healpy as hp
 from soopercool.utils import get_noise_cls, beam_gaussian, generate_noise_map
 import numpy as np
 import os
-import matplotlib.pyplot as plt
-from matplotlib import cm
 from so_models_v3 import SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 from soopercool import BBmeta
 import warnings
@@ -103,17 +101,12 @@ def mocker(args):
                 if args.plots:
                     if Nsims == 1:
                         plot_dir = meta.plot_dir_from_output_dir(
-                            meta.map_directory_relative)
-                        for i, m in enumerate("TQU"):
-                            vrange = 300 if m == "T" else 10
-                            plt.figure(figsize=(16, 9))
-                            hp.mollview(split_map[i], title=map_set,
-                                        cmap=cm.coolwarm, min=-vrange,
-                                        max=vrange)
-                            hp.graticule()
-                            plt.savefig(f"{plot_dir}/map_{map_set}__{id_split}_{m}.png",  # noqa
-                                        bbox_inches="tight")
-
+                            meta.map_directory_relative
+                        )
+                        utils.plot_map(split_map, 
+                                       f"{plot_dir}/map_{map_set}__{id_split}",
+                                       title=map_set,
+                                       TQU=True)
             meta.timer.stop(f"Generate map set {map_set} split maps")
 
 

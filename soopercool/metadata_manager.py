@@ -258,7 +258,7 @@ class BBmeta(object):
 
     def save_fiducial_cl(self, ell, cl_dict, cl_type):
         """
-        Save a fiducial power spectra dictionnary to disk.
+        Save a fiducial power spectra dictionary to disk and return file name.
 
         Parameters
         ----------
@@ -272,6 +272,7 @@ class BBmeta(object):
         """
         fname = getattr(self, f"{cl_type}_cls_file")
         np.savez(fname, l=ell, **cl_dict)
+        return fname
 
     def load_fiducial_cl(self, cl_type):
         """
