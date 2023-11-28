@@ -190,7 +190,7 @@ def pre_processer(args):
                             utils.plot_map(sim, fname, vrange_T=100*var_T**0.5, 
                                            vrange_P=100*var_P**0.5, title=title, 
                                            TQU=True)
-                        elif cl_type == "tf_cosmo":
+                        elif cl_type == "cosmo":
                             utils.plot_map(sim, fname, title=title, TQU=True)
 
             meta.timer.stop("Generate `cosmo` and `power_law` simulation "
