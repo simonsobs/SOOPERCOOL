@@ -7,6 +7,7 @@ import pymaster as nmt
 import healpy as hp
 import sacc
 import camb
+#from .toast_utils import *
 
 
 def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
@@ -228,12 +229,58 @@ def m_filter_map(map, mask, m_cut):
 
     return hp.alm2map(alms, nside=nside, lmax=lmax)
 
+def toast_filter_map(map, schedule, thinfp, instrument, band, nside ):
+    import time
+    start_time = time.time()
 
-def toast_filter_map(map, mask):
-    """
-    """
-    raise NotImplementedError("TOAST filtering not implemented yet.")
+    output_dir = map.replace('.fits','/')
+    os.makedirs(output_dir,exist_ok=True)
 
+    # Initialize schedule
+    schedule_ = toast.schedule.GroundSchedule()
+
+    if not os.path.exists(schedule):
+        raise FileNotFoundError(f"The corresponding schedule file {schedule} is not stored.")
+
+    # Read schedule
+    print('Read schedule')
+    schedule_.read(schedule)
+
+    # Setup focal plane
+    print('Initialize focal plane and telescope')
+    focalplane = sotoast.SOFocalplane(hwfile=None,
+                                      telescope=instrument, #schedule.telescope_name,
+                                      sample_rate=40 * u.Hz,
+                                      bands=band,
+                                      wafer_slots='w25', 
+                                      tube_slots=None,
+                                      thinfp=thinfp,
+                                      comm=None)
+    # Setup telescope
+    telescope = toast.Telescope(name=instrument, #schedule.telescope_name,
+                                focalplane=focalplane, 
+                                site=toast.GroundSite("Atacama", schedule_.site_lat,
+                                                      schedule_.site_lon, schedule_.site_alt))
+    # Create data object
+    data = toast.Data()
+
+    # Apply filters
+    print('Apply filters')
+    _, sim_gnd = apply_scanning(data, telescope, schedule_) # HWP info in here, + all sim_ground stuff
+    data, det_pointing_radec = apply_det_pointing_radec(data, sim_gnd)
+    data, pixels_radec = apply_pixels_radec(data, det_pointing_radec, nside)
+    data, weights_radec = apply_weights_radec(data, det_pointing_radec)
+    data, noise_model = apply_noise_model(data)
+    # Scan map
+    print('Scan input map')
+    data, scan_map = apply_scan_map(data, map, pixels_radec, weights_radec)
+    # create the binner 
+    binner = create_binner(pixels_radec, det_pointing_radec)
+    #demodulate
+    data, weights_radec = apply_demodulation(data, weights_radec, sim_gnd, binner)
+    #map filterbin
+    make_filterbin(data, binner, output_dir)
+    return ;
 
 def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,
                                        all_splits_ps_names,

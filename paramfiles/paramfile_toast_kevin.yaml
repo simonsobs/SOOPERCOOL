@@ -5,13 +5,13 @@
 # Define the directories
 ## Let's start with directories of data products
 data_dirs:
-  root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/data_test_2_tags"
+  root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/data_toast"
   map_directory: "maps"
   beam_directory: "beams"
   bandpasses_directory: "bandpasses"
 ## Then directories in which we will store outputs
 output_dirs: 
-  root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/outputs_test_2_tags"
+  root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/output_toast"
   mask_directory: "masks"
   pre_process_directory: "pre_processing"
   sims_directory: "sims"
@@ -41,7 +41,7 @@ map_sets:
     exp_tag: "SAT1"      # Experiment tag (useful to get noise-bias free cross-split spectra)
   # SAT1_f145:
   #   file_root: "cmb_sat1_f145"
-  #   n_splits: 2
+  #   n_splits: 3
   #   freq_tag: 145
   #   exp_tag: "SAT1"
   # SAT2_f093:
@@ -59,11 +59,11 @@ map_sets:
   #   n_splits: 4
   #   freq_tag: 225
   #   exp_tag: "SAT3"
-  SAT3_f285:
-    file_root: "cmb_sat3_f285"
-    n_splits: 2
-    freq_tag: 280
-    exp_tag: "SAT3"
+  # SAT3_f285:
+  #   file_root: "cmb_sat3_f285"
+  #   n_splits: 4
+  #   freq_tag: 280
+  #   exp_tag: "SAT3"
 
 ####################
 # Masking metadata #
@@ -95,7 +95,7 @@ general_pars:
 ## Simulation related
 sim_pars:
   hitmap_file: "../data/norm_nHits_SA_35FOV_ns512.fits"
-  num_sims: 1
+  num_sims: 10
   cosmology:
     cosmomc_theta: 0.0104085
     As: 2.1e-9
@@ -105,7 +105,6 @@ sim_pars:
     Alens: 1.0
     tau: 0.0544
     r: 0.01
-  anisotropic_noise: False
   mock_nsrcs: 80
   mock_srcs_hole_radius: 40
   
@@ -115,7 +114,7 @@ tf_settings:
   filtering_type: "toast" # "m_filterer" or "toast"
   m_cut: 30 # necessary only if `filtering_type` is set to "m_filterer"
   toast: # necessary only if `filtering_type` is set to "toast"
-    schedule: "/global/homes/c/chervias/CMBwork/SimonsObs/pipeline/data/schedule.txt"
+    schedule: "../../TOAST/schedules/schedule_day.txt"
     instrument: "SAT1"
     band: "SAT_f090"
     thinfp: 8

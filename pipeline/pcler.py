@@ -212,7 +212,14 @@ def pcler(args):
                 map_file = meta.get_map_filename(
                     map_set, id_split, id_sim=id_sim if Nsims > 1 else None
                 )
-                map_file = map_file.replace(".fits", "_filtered.fits")
+                if meta.filtering_type=='toast':
+                    map_file_filtered = map_file.replace(
+                        ".fits",
+                        "/FilterBin_filtered_map.fits"
+                    )
+                else:
+                    map_file_filtered = map_file.replace(".fits",
+                                                         "_filtered.fits")
                 map = hp.read_map(map_file, field=[0, 1, 2])
 
                 # Include beam in namaster fields to deconvolve it
@@ -263,6 +270,7 @@ def pcler(args):
             plot_dir = meta.plot_dir_from_output_dir(plot_dir_rel)
 
             for plot_label in cells_plots:
+                plt.clf()
                 plt.figure(figsize=(6, 4))
                 plt.title(plot_label)
 
@@ -329,9 +337,19 @@ def pcler(args):
         for id_sim in range(meta.tf_est_num_sims):
             fields = {"filtered": {}, "unfiltered": {}}
             for pure_type in ["pureE", "pureB"]:
-                map_file = meta.get_map_filename_transfer2(id_sim, "tf_est",
-                                                           pure_type=pure_type)
-                map_file_filtered = map_file.replace(".fits", "_filtered.fits")
+                map_file = meta.get_map_filename_transfer2(
+                    id_sim, 
+                    "tf_est", 
+                    pure_type=pure_type
+                )
+                if meta.filtering_type=='toast':
+                    map_file_filtered = map_file.replace(
+                        ".fits", 
+                        "/FilterBin_filtered_map.fits"
+                    )
+                else:
+                    map_file_filtered = map_file.replace(".fits", 
+                                                         "_filtered.fits")
 
                 map = hp.read_map(map_file, field=[0, 1, 2])
                 map_filtered = hp.read_map(map_file_filtered, field=[0, 1, 2])
@@ -384,7 +402,10 @@ def pcler(args):
                     map_file = meta.get_map_filename_transfer2(id_sim,
                                                                cl_type=cl_type)
                     if filter_flag == "filtered":
-                        map_file = map_file.replace(".fits", "_filtered.fits")
+                        if meta.filtering_type=='toast':
+                            map_file = map_file.replace(".fits", "/FilterBin_filtered_map.fits")
+                        else:
+                            map_file = map_file.replace(".fits", "_filtered.fits")
 
                     map = hp.read_map(map_file, field=[0, 1, 2])
 
