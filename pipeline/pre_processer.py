@@ -19,18 +19,16 @@ def pre_processer(args):
                                                          meta.deltal)
     np.savez(meta.path_to_binning, bin_low=bin_low, bin_high=bin_high,
              bin_center=bin_center)
-    
+
     if args.plots:
         plt.figure(figsize=(8, 6))
         for i in range(len(bin_low)):
-            #plt.axvline(bin_center[i])
             plt.fill_between([bin_low[i], bin_high[i]], [0, 0], [i+1, i+1],
-                           alpha=0.5)
+                             alpha=0.5)
         plt.xlabel(r'$\ell$', fontsize=14)
         plt.ylabel('bin index', fontsize=14)
         plt.title('Binning', fontsize=14)
         plt.savefig(meta.path_to_binning.replace('.npz', '.png'))
-            
 
     # Second step is to download hits map and apodized analysis mask
     print("Download and save SAT hits map ...")
@@ -75,13 +73,13 @@ def pre_processer(args):
         lmax=lmax_sim  # ensure cl accuracy up to lmax
     )
     cl_cosmo_fname = meta.save_fiducial_cl(lth, psth, cl_type="cosmo")
-    
+
     if args.plots:
         for field_pair in ["TT", "TE", "TB", "EE", "EB", "BB"]:
-            plt.figure(figsize=(8,6))
-            dlth = lth*(lth+1)/2./np.pi*psth[field_pair]
+            plt.figure(figsize=(8, 6))
+            dlth = lth*(lth + 1) / 2. / np.pi * psth[field_pair]
             plt.loglog(lth, dlth, c='b')
-            plt.loglog(lth[dlth<0], -dlth[dlth<0], ls='--', c='b')
+            plt.loglog(lth[dlth < 0], -dlth[dlth < 0], ls='--', c='b')
             plt.xlabel(r'$\ell$', fontsize=14)
             plt.ylabel(r'$\ell(\ell+1)\, C_\ell/(2\pi)$', fontsize=14)
             plt.title(f'cosmo_cls_{field_pair}')
@@ -94,13 +92,13 @@ def pre_processer(args):
         lth, **meta.power_law_pars_tf_est)
     cl_tf_est_fname = meta.save_fiducial_cl(lth, cl_power_law_tf_estimation,
                                             cl_type="tf_est")
-    
+
     if args.plots:
         for field_pair in ["TT", "TE", "TB", "EE", "EB", "BB"]:
-            plt.figure(figsize=(8,6))
+            plt.figure(figsize=(8, 6))
             dlth = cl_power_law_tf_estimation[field_pair]
             plt.loglog(lth, dlth, c='b')
-            plt.loglog(lth[dlth<0], -dlth[dlth<0], ls='--', c='b')
+            plt.loglog(lth[dlth < 0], -dlth[dlth < 0], ls='--', c='b')
             plt.xlabel(r'$\ell$', fontsize=14)
             plt.ylabel(r'$C_\ell$', fontsize=14)
             plt.title(f'tf_estimation_{field_pair}')
@@ -115,10 +113,10 @@ def pre_processer(args):
                                             cl_type="tf_val")
     if args.plots:
         for field_pair in ["TT", "TE", "TB", "EE", "EB", "BB"]:
-            plt.figure(figsize=(8,6))
+            plt.figure(figsize=(8, 6))
             dlth = cl_power_law_tf_validation[field_pair]
             plt.loglog(lth, dlth, c='b')
-            plt.loglog(lth[dlth<0], -dlth[dlth<0], ls='--', c='b')
+            plt.loglog(lth[dlth < 0], -dlth[dlth < 0], ls='--', c='b')
             plt.xlabel(r'$\ell$', fontsize=14)
             plt.ylabel(r'$C_\ell$', fontsize=14)
             plt.title(f'tf_validation_{field_pair}')
@@ -157,17 +155,18 @@ def pre_processer(args):
                         )
                         hp.write_map(map_file, sim, overwrite=True,
                                      dtype=np.float32)
-                        
+
                         if args.plots:
                             fname = map_file.replace('.fits', '')
-                            title = map_file.split('/')[-1].replace('.fits', '')
+                            title = map_file.split('/')[-1].replace('.fits',
+                                                                    '')
                             amp = meta.power_law_pars_tf_est['amp']
                             delta_ell = meta.power_law_pars_tf_est['delta_ell']
                             pl_index = meta.power_law_pars_tf_est['power_law_index'] # noqa
                             ell0 = 0 if pl_index > 0 else 2 * meta.nside
                             var = amp / (ell0 + delta_ell)**pl_index
-                            utils.plot_map(sim, fname, vrange_T=10*var**0.5, 
-                                           vrange_P=10*var**0.5, title=title, 
+                            utils.plot_map(sim, fname, vrange_T=10*var**0.5,
+                                           vrange_P=10*var**0.5, title=title,
                                            TQU=True)
 
                 else:
@@ -187,9 +186,9 @@ def pre_processer(args):
                             ell0 = 0 if pl_index > 0 else 2 * meta.nside
                             var_T = amp_T / (ell0 + delta_ell)**pl_index
                             var_P = amp_E / (ell0 + delta_ell)**pl_index
-                            utils.plot_map(sim, fname, vrange_T=100*var_T**0.5, 
-                                           vrange_P=100*var_P**0.5, title=title, 
-                                           TQU=True)
+                            utils.plot_map(sim, fname, vrange_T=100*var_T**0.5,
+                                           vrange_P=100*var_P**0.5,
+                                           title=title, TQU=True)
                         elif cl_type == "cosmo":
                             utils.plot_map(sim, fname, title=title, TQU=True)
 

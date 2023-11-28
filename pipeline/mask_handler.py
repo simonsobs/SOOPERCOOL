@@ -1,15 +1,12 @@
 import argparse
-import healpy as hp
-# from soopercool.utils import random_src_mask
 from soopercool import BBmeta
-import pymaster as nmt
 import os
-import matplotlib.pyplot as plt
-from matplotlib import cm
+# import matplotlib.pyplot as plt
+# from matplotlib import cm
 # import urllib.request
 
-cmap = cm.YlOrRd
-cmap.set_under("w")
+# cmap = cm.YlOrRd
+# cmap.set_under("w")
 
 
 def mask_handler(args):

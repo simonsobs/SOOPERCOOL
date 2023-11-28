@@ -103,7 +103,7 @@ def mocker(args):
                         plot_dir = meta.plot_dir_from_output_dir(
                             meta.map_directory_rel
                         )
-                        utils.plot_map(split_map, 
+                        utils.plot_map(split_map,
                                        f"{plot_dir}/map_{map_set}__{id_split}",
                                        title=map_set,
                                        TQU=True)

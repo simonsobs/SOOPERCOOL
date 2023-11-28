@@ -231,7 +231,10 @@ def m_filter_map(map, mask, m_cut):
 
     return hp.alm2map(alms, nside=nside, lmax=lmax)
 
-def toast_filter_map(map, schedule, thinfp, instrument, band, nside ):
+
+def toast_filter_map(map, schedule, thinfp, instrument, band, nside):
+    """
+    """
     import toast
     import sotodlib.toast as sotoast
     from astropy import units as u
@@ -240,20 +243,16 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, nside ):
         apply_weights_radec, apply_noise_model, apply_scan_map, create_binner,
         apply_demodulation, make_filterbin
     )
-        
-        
-        
-    import time
-    start_time = time.time()
 
-    output_dir = map.replace('.fits','/')
-    os.makedirs(output_dir,exist_ok=True)
+    output_dir = map.replace('.fits', '/')
+    os.makedirs(output_dir, exist_ok=True)
 
     # Initialize schedule
     schedule_ = toast.schedule.GroundSchedule()
 
     if not os.path.exists(schedule):
-        raise FileNotFoundError(f"The corresponding schedule file {schedule} is not stored.")
+        raise FileNotFoundError(f"The corresponding schedule file {schedule} "
+                                "is not stored.")
 
     # Read schedule
     print('Read schedule')
@@ -262,38 +261,48 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, nside ):
     # Setup focal plane
     print('Initialize focal plane and telescope')
     focalplane = sotoast.SOFocalplane(hwfile=None,
-                                      telescope=instrument, #schedule.telescope_name,
+                                      telescope=instrument,  # schedule.telescope_name, # noqa
                                       sample_rate=40 * u.Hz,
                                       bands=band,
-                                      wafer_slots='w25', 
+                                      wafer_slots='w25',
                                       tube_slots=None,
                                       thinfp=thinfp,
                                       comm=None)
     # Setup telescope
-    telescope = toast.Telescope(name=instrument, #schedule.telescope_name,
-                                focalplane=focalplane, 
-                                site=toast.GroundSite("Atacama", schedule_.site_lat,
-                                                      schedule_.site_lon, schedule_.site_alt))
+    telescope = toast.Telescope(
+        name=instrument,  # schedule.telescope_name,
+        focalplane=focalplane,
+        site=toast.GroundSite("Atacama", schedule_.site_lat,
+                              schedule_.site_lon, schedule_.site_alt)
+    )
     # Create data object
     data = toast.Data()
 
     # Apply filters
     print('Apply filters')
-    _, sim_gnd = apply_scanning(data, telescope, schedule_) # HWP info in here, + all sim_ground stuff
+    # HWP info in here, + all sim_ground stuff
+    _, sim_gnd = apply_scanning(data, telescope, schedule_)
     data, det_pointing_radec = apply_det_pointing_radec(data, sim_gnd)
     data, pixels_radec = apply_pixels_radec(data, det_pointing_radec, nside)
     data, weights_radec = apply_weights_radec(data, det_pointing_radec)
     data, noise_model = apply_noise_model(data)
+
     # Scan map
     print('Scan input map')
     data, scan_map = apply_scan_map(data, map, pixels_radec, weights_radec)
-    # create the binner 
+
+    # create the binner
     binner = create_binner(pixels_radec, det_pointing_radec)
-    #demodulate
-    data, weights_radec = apply_demodulation(data, weights_radec, sim_gnd, binner)
-    #map filterbin
+
+    # demodulate
+    data, weights_radec = apply_demodulation(data, weights_radec, sim_gnd,
+                                             binner)
+
+    # map filterbin
     make_filterbin(data, binner, output_dir)
-    return ;
+
+    return
+
 
 def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,
                                        all_splits_ps_names,
@@ -317,12 +326,13 @@ def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,
 
     return split_pairs_list
 
+
 def plot_map(map, fname, vrange_T=300, vrange_P=10, title=None, TQU=True):
-    fields = "TQU" if TQU == True else "QU"
+    fields = "TQU" if TQU else "QU"
     for i, m in enumerate(fields):
         vrange = vrange_T if m == "T" else vrange_P
         plt.figure(figsize=(16, 9))
-        hp.mollview(map[i], title=f"{title}_{m}", unit=r'$\mu$K$_{\rm CMB}$', 
+        hp.mollview(map[i], title=f"{title}_{m}", unit=r'$\mu$K$_{\rm CMB}$',
                     cmap=cm.coolwarm, min=-vrange, max=vrange)
         hp.graticule()
         plt.savefig(f"{fname}_{m}.png", bbox_inches="tight")
@@ -428,6 +438,7 @@ class PipelineManager(object):
         return self.bpw_edges
 
     def get_nmt_bins(self):
+        import pymaster as nmt
         bpw_edges = self.get_bpw_edges()
         b = nmt.NmtBin.from_edges(bpw_edges[:-1], bpw_edges[1:])
         return b

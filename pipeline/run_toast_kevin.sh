@@ -4,31 +4,31 @@ micromamba activate bbpower
 
 echo "Running pipeline with paramfile: ${paramfile} and environment 'bbpower''"
 
-echo "Pre-processing data..."
-echo "-------------------"
-python pre_processer.py --globals ${paramfile} --sims
+# echo "Pre-processing data..."
+# echo "-------------------"
+# python pre_processer.py --globals ${paramfile} --sims
 
-echo "Running mock stage for data..."
-echo "------------------------------"
-python mocker.py --globals ${paramfile} 
-echo "Running mock stage for sims..."
-echo "------------------------------"
-python mocker.py --globals ${paramfile} --sims
+# echo "Running mock stage for data..."
+# echo "------------------------------"
+# python mocker.py --globals ${paramfile} 
+# echo "Running mock stage for sims..."
+# echo "------------------------------"
+# python mocker.py --globals ${paramfile} --sims
 
-echo "Running mcm..."
-echo "--------------"
-python mcmer.py --globals ${paramfile}
+# echo "Running mcm..."
+# echo "--------------"
+# python mcmer.py --globals ${paramfile}
 
- echo "Switching to environment 'toast'"
+echo "Switching to environment 'toast'"
 micromamba deactivate; micromamba activate toast
 
-echo "Running filterer for transfer"
-echo "-----------------------------"
-python filterer.py --globals ${paramfile} --transfer
+# echo "Running filterer for transfer"
+# echo "-----------------------------"
+# python filterer.py --globals ${paramfile} --transfer
 
-echo "Running filterer for sims"
-echo "-------------------------"
-#python filterer.py --globals ${paramfile} --sims
+# echo "Running filterer for sims"
+# echo "-------------------------"
+# #python filterer.py --globals ${paramfile} --sims
 echo "Running filterer for data"
 echo "-------------------------"
 python filterer.py --globals ${paramfile} --data
