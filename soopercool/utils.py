@@ -270,7 +270,7 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, nside):
                                       comm=None)
     # Setup telescope
     telescope = toast.Telescope(
-        name=instrument, 
+        name=instrument,
         focalplane=focalplane,
         site=toast.GroundSite("Atacama", schedule_.site_lat,
                               schedule_.site_lon, schedule_.site_alt)
