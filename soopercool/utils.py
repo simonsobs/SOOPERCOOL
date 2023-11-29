@@ -261,7 +261,7 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, nside):
     # Setup focal plane
     print('Initialize focal plane and telescope')
     focalplane = sotoast.SOFocalplane(hwfile=None,
-                                      telescope=instrument,  # schedule.telescope_name, # noqa
+                                      telescope=instrument,
                                       sample_rate=40 * u.Hz,
                                       bands=band,
                                       wafer_slots='w25',
@@ -270,7 +270,7 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, nside):
                                       comm=None)
     # Setup telescope
     telescope = toast.Telescope(
-        name=instrument,  # schedule.telescope_name,
+        name=instrument, 
         focalplane=focalplane,
         site=toast.GroundSite("Atacama", schedule_.site_lat,
                               schedule_.site_lon, schedule_.site_alt)
@@ -280,7 +280,6 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, nside):
 
     # Apply filters
     print('Apply filters')
-    # HWP info in here, + all sim_ground stuff
     _, sim_gnd = apply_scanning(data, telescope, schedule_)
     data, det_pointing_radec = apply_det_pointing_radec(data, sim_gnd)
     data, pixels_radec = apply_pixels_radec(data, det_pointing_radec, nside)
@@ -291,14 +290,14 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, nside):
     print('Scan input map')
     data, scan_map = apply_scan_map(data, map, pixels_radec, weights_radec)
 
-    # create the binner
+    # Create the binner
     binner = create_binner(pixels_radec, det_pointing_radec)
 
-    # demodulate
+    # Demodulate
     data, weights_radec = apply_demodulation(data, weights_radec, sim_gnd,
                                              binner)
 
-    # map filterbin
+    # Map filterbin
     make_filterbin(data, binner, output_dir)
 
     return
