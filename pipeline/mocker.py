@@ -43,8 +43,8 @@ def mocker(args):
     # Load hitmap
     hitmap = meta.read_hitmap()
 
-    meta.timer.start("Generating beams")
     # Load and save beams
+    meta.timer.start("Generating beams")
 
     beam_arcmin = {freq_band: beam_arcmin
                    for freq_band, beam_arcmin in zip(noise_model.get_bands(),
@@ -56,8 +56,9 @@ def mocker(args):
 
         # Save beams
         file_root = meta.file_root_from_map_set(map_set)
-        np.savetxt(f"{beam_dir}/beam_{file_root}.dat",
-                   np.transpose([lth, beams[map_set]]))
+        if not os.path.exists(file_root):
+            np.savetxt(f"{beam_dir}/beam_{file_root}.dat",
+                       np.transpose([lth, beams[map_set]]))
     meta.timer.stop("Generating beams")
 
     hp_ordering = ["TT", "TE", "TB", "EE", "EB", "BB"]

@@ -12,6 +12,7 @@ def pre_processer(args):
     """
     """
     meta = BBmeta(args.globals)
+    timeout_seconds = 100  # Set the timeout [sec] for the socket
 
     # First step : create bandpower edges / binning_file
     bin_low, bin_high, bin_center = utils.create_binning(meta.lmin,
@@ -32,28 +33,34 @@ def pre_processer(args):
 
     # Second step is to download hits map and apodized analysis mask
     print("Download and save SAT hits map ...")
-    mask_dir = meta.mask_directory
-    sat_nhits_file = "../data/norm_nHits_SA_35FOV_ns512.fits"
+    sat_nhits_file = meta.hitmap_file
     if not os.path.exists(sat_nhits_file):
-        urllib.request.urlretrieve(
-            "https://portal.nersc.gov/cfs/sobs/users/so_bb/norm_nHits_SA_35FOV_ns512.fits",  # noqa
-            filename=sat_nhits_file
-        )
+        urlpref = "https://portal.nersc.gov/cfs/sobs/users/so_bb/"
+        url = f"{urlpref}norm_nHits_SA_35FOV_ns512.fits"
+        # Open the URL with a timeout
+        with urllib.request.urlopen(url, timeout=timeout_seconds):
+            # Retrieve the file and save it locally
+            urllib.request.urlretrieve(url, filename=sat_nhits_file)
 
     # Download SAT apodized mask used in the SO BB
     # pipeline paper (https://arxiv.org/abs/2302.04276)
     print("Download and save SAT apodized mask ...")
-    sat_apo_file = f"{mask_dir}/apodized_mask_bbpipe_paper.fits"
+    sat_apo_file = meta._get_analysis_mask_name()
     if not os.path.exists(sat_apo_file):
-        urllib.request.urlretrieve(
-            "https://portal.nersc.gov/cfs/sobs/users/so_bb/apodized_mask_bbpipe_paper.fits",  # noqa
-            filename=sat_apo_file
-        )
+        urlpref = "https://portal.nersc.gov/cfs/sobs/users/so_bb/"
+        url = f"{urlpref}apodized_mask_bbpipe_paper.fits"
+        with urllib.request.urlopen(url, timeout=timeout_seconds):
+            urllib.request.urlretrieve(url, filename=sat_apo_file)
 
     # Third step is to create the survey mask from a hitmap
     meta.timer.start("Computing binary mask")
-    hitmap = meta.read_hitmap()
-    binary_mask = (hitmap > 0.).astype(float)
+    binary_mask_file = meta._get_binary_mask_name()
+    if not os.path.exists(binary_mask_file):
+        hitmap = hp.read_map(sat_nhits_file)
+        binary_mask = (hitmap > 0).astype(float)
+        binary_mask_ud = hp.ud_grade(binary_mask, meta.nside)
+        hp.write_map(binary_mask_file, binary_mask_ud, dtype=np.int32)
+    binary_mask = hp.read_map(binary_mask_file)
     meta.save_mask("binary", binary_mask, overwrite=True)
     meta.timer.stop("Computing binary mask", args.verbose)
 
