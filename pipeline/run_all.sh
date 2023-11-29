@@ -1,18 +1,18 @@
-paramfile='../paramfiles/paramfile.yaml'
+echo "------------------------------------------------------------"
+echo "|           PREPARING BANDPOWER COUPLING MATRIX            |"
+echo "------------------------------------------------------------"
 
+paramfile='../paramfiles/paramfile.yaml'
 echo "Running pipeline with paramfile: ${paramfile}"
 
 echo "Pre-processing data..."
 echo "-------------------"
 python pre_processer.py --globals ${paramfile} --sims
 
-echo "Running mask stage..."
-echo "---------------------"
-python mask_handler.py --globals ${paramfile}
-
 echo "Running mock stage for data..."
 echo "------------------------------"
 python mocker.py --globals ${paramfile} 
+
 echo "Running mock stage for sims..."
 echo "------------------------------"
 python mocker.py --globals ${paramfile} --sims
@@ -28,6 +28,7 @@ python filterer.py --globals ${paramfile} --transfer
 echo "Running filterer for sims"
 echo "-------------------------"
 python filterer.py --globals ${paramfile} --sims
+
 echo "Running filterer for data"
 echo "-------------------------"
 python filterer.py --globals ${paramfile} --data
@@ -48,6 +49,11 @@ echo "Transfer validation"
 echo "---------------------"
 python transfer_validator.py --globals ${paramfile}
 
+
+echo "------------------------------------------------------------"
+echo "|      RUNNING PIPELINE ON MOCK DATA AND SIMULATIONS       |"
+echo "------------------------------------------------------------"
+
 echo "Running pcler on data"
 echo "---------------------"
 python pcler.py --globals ${paramfile} --data --plots
@@ -59,10 +65,6 @@ python pcler.py --globals ${paramfile} --sims
 echo "Running coadder on data"
 echo "---------------------"
 python coadder.py --globals ${paramfile} --data --plots
-
-echo "Running coadder on sims"
-echo "---------------------"
-python coadder.py --globals ${paramfile} --sims
 
 echo "Running coadder on sims"
 echo "---------------------"
