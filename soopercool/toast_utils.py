@@ -7,11 +7,6 @@ import pixell.fft
 import subprocess
 from sotodlib import core
 from sotodlib.site_pipeline.preprocess_tod import _build_pipe_from_configs
-
-# from toast.mpi import MPI, Comm
-# from toast import spt3g as t3g
-# if t3g.available:
-#     from spt3g import core as c3g
 pixell.fft.engine = "fftw"
 warnings.simplefilter("ignore")
 
@@ -139,7 +134,6 @@ def make_filterbin(data, binner, output_dir):
     filterbin.write_hits = False
     filterbin.write_cov = False
     filterbin.write_rcond = False
-    # filterbin.write_hits = True
     filterbin.apply(data)
 
 
