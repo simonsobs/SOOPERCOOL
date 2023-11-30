@@ -8,6 +8,7 @@ import healpy as hp
 import sacc
 import camb
 from .toast_utils import *
+from types import SimpleNamespace
 
 
 def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
@@ -228,8 +229,11 @@ def m_filter_map(map, mask, m_cut):
 
     return hp.alm2map(alms, nside=nside, lmax=lmax)
 
-def toast_filter_map(map, schedule, thinfp, instrument, band, nside ):
+def toast_filter_map(map, schedule, thinfp, instrument, band, group_size, nside ):
     import time
+    import toast.mpi
+
+    comm, procs, rank = toast.mpi.get_world()
     start_time = time.time()
 
     output_dir = map.replace('.fits','/')
@@ -254,14 +258,24 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, nside ):
                                       wafer_slots='w25', 
                                       tube_slots=None,
                                       thinfp=thinfp,
-                                      comm=None)
+                                      comm=comm)
     # Setup telescope
     telescope = toast.Telescope(name=instrument, #schedule.telescope_name,
                                 focalplane=focalplane, 
                                 site=toast.GroundSite("Atacama", schedule_.site_lat,
                                                       schedule_.site_lon, schedule_.site_alt))
+    
+    runargs = SimpleNamespace(node_mem=None, group_size=group_size)
+    group_size = toast.job_group_size(
+        comm,
+        runargs,
+        schedule=schedule_,
+        focalplane=focalplane,
+    )
+    toast_comm = toast.Comm(world=comm, groupsize=group_size)
+    
     # Create data object
-    data = toast.Data()
+    data = toast.Data(comm=toast_comm)
 
     # Apply filters
     print('Apply filters')
