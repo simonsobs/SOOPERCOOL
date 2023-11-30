@@ -9,9 +9,6 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import urllib.request
 
-cmap = cm.YlOrRd
-cmap.set_under("w")
-
 
 def mask_handler(args):
     """
@@ -49,7 +46,7 @@ def mask_handler(args):
         print("Download and save planck galactic masks ...")
         mask_p15_file = f"{mask_dir}/mask_planck2015.fits"
         if not os.path.exists(mask_p15_file):
-            urlpref = "http://pla.esac.esa.int/"
+            urlpref = "http://pla.esac.esa.int/pla/aio/"
             urlpref = f"{urlpref}product-action?MAP.MAP_ID="
             url = f"{urlpref}HFI_Mask_GalPlane-apo0_2048_R2.00.fits"
             with urllib.request.urlopen(url, timeout=timeout_seconds):
@@ -79,20 +76,31 @@ def mask_handler(args):
                             args.verbose)
 
             if args.plots:
+                cmap = cm.YlOrRd
+                cmap.set_under("w")
                 plt.figure(figsize=(16, 9))
                 hp.mollview(gal_mask_p15, cmap=cmap, cbar=False)
                 hp.graticule()
                 plt.savefig(fname.replace("fits", "png"))
 
-    # Get binary mask
+    # Generate binary survey mask from a hitmap
+    meta.timer.start("Computing binary mask")
     binary_mask_file = meta._get_binary_mask_name()
     if not os.path.exists(binary_mask_file):
         sat_nhits = hp.read_map(sat_nhits_file)
-        binary_mask = (sat_nhits > 0).astype(float)
-        binary_mask_ud = hp.ud_grade(binary_mask, meta.nside)
-        hp.write_map(binary_mask_file, binary_mask_ud, dtype=np.int32)
+        binary_maskk = (sat_nhits > 0).astype(float)
+        binary_mask = hp.ud_grade(binary_maskk, meta.nside)
+        meta.save_mask("binary", binary_mask, overwrite=True)
     binary_mask = hp.read_map(binary_mask_file)
+    meta.timer.stop("Computing binary mask", args.verbose)
 
+    if args.plots:
+        plt.figure(figsize=(16, 9))
+        hp.mollview(binary_mask, cmap=cmap, cbar=False)
+        hp.graticule()
+        plt.savefig(meta.binary_mask_name.replace('.fits', '.png'))
+
+    # Generate mock point source mask
     if "point_source" in meta.masks["include_in_mask"]:
         # Generate a mock source mask
         meta.timer.start("ps_mask")
