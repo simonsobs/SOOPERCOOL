@@ -7,7 +7,12 @@ import pymaster as nmt
 import healpy as hp
 import sacc
 import camb
-from .toast_utils import *
+import sotodlib.toast as sotoast
+from astropy import units as u
+from .toast_utils import apply_scanning, apply_det_pointing_radec
+from .toast_utils import apply_noise_model, apply_scan_map
+from .toast_utils import apply_weights_radec, apply_demodulation
+from .toast_utils import apply_pixels_radec, create_binner, make_filterbin
 from types import SimpleNamespace
 
 
@@ -229,21 +234,25 @@ def m_filter_map(map, mask, m_cut):
 
     return hp.alm2map(alms, nside=nside, lmax=lmax)
 
-def toast_filter_map(map, schedule, thinfp, instrument, band, group_size, nside ):
-    import time
+
+def toast_filter_map(map, schedule, thinfp, instrument, band,
+                     group_size, nside):
+    """
+    """
+
     import toast.mpi
 
     comm, procs, rank = toast.mpi.get_world()
-    start_time = time.time()
 
-    output_dir = map.replace('.fits','/')
-    os.makedirs(output_dir,exist_ok=True)
+    output_dir = map.replace('.fits', '/')
+    os.makedirs(output_dir, exist_ok=True)
 
     # Initialize schedule
     schedule_ = toast.schedule.GroundSchedule()
 
     if not os.path.exists(schedule):
-        raise FileNotFoundError(f"The corresponding schedule file {schedule} is not stored.")
+        raise FileNotFoundError(f"The corresponding schedule file {schedule} \
+        is not stored.")
 
     # Read schedule
     print('Read schedule')
@@ -252,19 +261,19 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, group_size, nside 
     # Setup focal plane
     print('Initialize focal plane and telescope')
     focalplane = sotoast.SOFocalplane(hwfile=None,
-                                      telescope=instrument, #schedule.telescope_name,
+                                      telescope=instrument,
                                       sample_rate=40 * u.Hz,
                                       bands=band,
-                                      wafer_slots='w25', 
+                                      wafer_slots='w25',
                                       tube_slots=None,
                                       thinfp=thinfp,
                                       comm=comm)
     # Setup telescope
-    telescope = toast.Telescope(name=instrument, #schedule.telescope_name,
-                                focalplane=focalplane, 
-                                site=toast.GroundSite("Atacama", schedule_.site_lat,
-                                                      schedule_.site_lon, schedule_.site_alt))
-    
+    telescope = toast.Telescope(name=instrument, focalplane=focalplane,
+                                site=toast.GroundSite("Atacama",
+                                                      schedule_.site_lat,
+                                                      schedule_.site_lon,
+                                                      schedule_.site_alt))
     runargs = SimpleNamespace(node_mem=None, group_size=group_size)
     group_size = toast.job_group_size(
         comm,
@@ -273,13 +282,13 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, group_size, nside 
         focalplane=focalplane,
     )
     toast_comm = toast.Comm(world=comm, groupsize=group_size)
-    
+
     # Create data object
     data = toast.Data(comm=toast_comm)
 
     # Apply filters
     print('Apply filters')
-    _, sim_gnd = apply_scanning(data, telescope, schedule_) # HWP info in here, + all sim_ground stuff
+    _, sim_gnd = apply_scanning(data, telescope, schedule_)
     data, det_pointing_radec = apply_det_pointing_radec(data, sim_gnd)
     data, pixels_radec = apply_pixels_radec(data, det_pointing_radec, nside)
     data, weights_radec = apply_weights_radec(data, det_pointing_radec)
@@ -287,13 +296,15 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, group_size, nside 
     # Scan map
     print('Scan input map')
     data, scan_map = apply_scan_map(data, map, pixels_radec, weights_radec)
-    # create the binner 
+    # create the binner
     binner = create_binner(pixels_radec, det_pointing_radec)
-    #demodulate
-    data, weights_radec = apply_demodulation(data, weights_radec, sim_gnd, binner)
-    #map filterbin
+    # demodulate
+    data, weights_radec = apply_demodulation(data, weights_radec,
+                                             sim_gnd, binner)
+    # map filterbin
     make_filterbin(data, binner, output_dir)
-    return ;
+    return 0
+
 
 def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,
                                        all_splits_ps_names,
