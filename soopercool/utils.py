@@ -216,7 +216,7 @@ def power_law_cl(ell, amp, delta_ell, power_law_index):
     return pl_ps
 
 
-def m_filter_map(map, mask, m_cut):
+def m_filter_map(map, map_file, mask, m_cut):
     """
     """
 
@@ -229,7 +229,13 @@ def m_filter_map(map, mask, m_cut):
     n_modes_to_filter = (m_cut + 1) * (lmax + 1) - ((m_cut + 1) * m_cut) // 2
     alms[:, :n_modes_to_filter] = 0.
 
-    return hp.alm2map(alms, nside=nside, lmax=lmax)
+    filtered_map = hp.alm2map(alms, nside=nside, lmax=lmax)
+
+    hp.write_map(map_file.replace(".fits", "_filtered.fits"),
+                 filtered_map, overwrite=True,
+                 dtype=np.float32)
+
+    return
 
 
 def toast_filter_map(map, schedule, thinfp, instrument, band, nside):

@@ -1,7 +1,6 @@
 import argparse
 import healpy as hp
 from soopercool import utils
-import numpy as np
 from soopercool import BBmeta
 
 
@@ -46,13 +45,7 @@ def filter(args):
                                                                pure_type=case)
                     map = hp.read_map(map_file, field=[0, 1, 2])
                     if meta.filtering_type == 'm_filterer':
-                        filtered_map = filter_func(map, mask, **kwargs)
-                        hp.write_map(
-                            map_file.replace(".fits", "_filtered.fits"),
-                            filtered_map,
-                            overwrite=True,
-                            dtype=np.float32,
-                        )
+                        filter_func(map, map_file, mask, **kwargs)
                     elif meta.filtering_type == 'toast':
                         filter_func(map_file, **kwargs)
 
@@ -68,10 +61,7 @@ def filter(args):
                 )
                 map = hp.read_map(map_file, field=[0, 1, 2])
                 if meta.filtering_type == 'm_filterer':
-                    filtered_map = filter_func(map, mask, **kwargs)
-                    hp.write_map(map_file.replace(".fits", "_filtered.fits"),
-                                 filtered_map, overwrite=True,
-                                 dtype=np.float32)
+                    filter_func(map, map_file, mask, **kwargs)
                 elif meta.filtering_type == 'toast':
                     filter_func(map_file, **kwargs)
                 else:
