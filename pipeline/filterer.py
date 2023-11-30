@@ -22,12 +22,12 @@ def filter(args):
 
     elif meta.filtering_type == "toast":
         filter_func = utils.toast_filter_map
-        kwargs = {
-            "schedule": meta.toast['schedule'],
-            "thinfp": meta.toast['thinfp'],
-            "instrument": meta.toast['instrument'],
-            "band": meta.toast['band'], "nside": meta.nside,
-        }
+        kwargs = {"schedule": meta.toast['schedule'],
+                  "thinfp": meta.toast['thinfp'],
+                  "instrument": meta.toast['instrument'],
+                  "band": meta.toast['band'],
+                  "group_size": meta.toast['group_size'],
+                  "nside": meta.nside, }
     else:
         raise NotImplementedError(f"Filterer type {meta.filtering_type} "
                                   "not implemented")

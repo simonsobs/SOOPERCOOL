@@ -238,7 +238,8 @@ def m_filter_map(map, map_file, mask, m_cut):
     return
 
 
-def toast_filter_map(map, schedule, thinfp, instrument, band, nside):
+def toast_filter_map(map, schedule, thinfp, instrument, band,
+                     group_size, nside):
     """
     """
     import toast
@@ -249,6 +250,10 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, nside):
         apply_weights_radec, apply_noise_model, apply_scan_map, create_binner,
         apply_demodulation, make_filterbin
     )
+    from types import SimpleNamespace
+    import toast.mpi
+
+    comm, procs, rank = toast.mpi.get_world()
 
     output_dir = map.replace('.fits', '/')
     os.makedirs(output_dir, exist_ok=True)
@@ -273,7 +278,8 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, nside):
                                       wafer_slots='w25',
                                       tube_slots=None,
                                       thinfp=thinfp,
-                                      comm=None)
+                                      comm=comm)
+
     # Setup telescope
     telescope = toast.Telescope(
         name=instrument,
@@ -281,8 +287,19 @@ def toast_filter_map(map, schedule, thinfp, instrument, band, nside):
         site=toast.GroundSite("Atacama", schedule_.site_lat,
                               schedule_.site_lon, schedule_.site_alt)
     )
+
+    # Setup toast communicator
+    runargs = SimpleNamespace(node_mem=None, groupsize=group_size)
+    group_size = toast.job_group_size(
+        comm,
+        runargs,
+        schedule=schedule_,
+        focalplane=focalplane,
+    )
+    toast_comm = toast.Comm(world=comm, groupsize=group_size)
+
     # Create data object
-    data = toast.Data()
+    data = toast.Data(comm=toast_comm)
 
     # Apply filters
     print('Apply filters')
