@@ -1,10 +1,8 @@
 import yaml
 import numpy as np
 import os
-# import pymaster as nmt
 import healpy as hp
 import time
-# from itertools import combinations_with_replacement as cwr
 
 
 class BBmeta(object):
