@@ -44,6 +44,8 @@ def filter(args):
                                                                cl_type,
                                                                pure_type=case)
                     map = hp.read_map(map_file, field=[0, 1, 2])
+                    # TODO: come up with a generic syntax for filtering
+                    # to avoid 'ifs'.
                     if meta.filtering_type == 'm_filterer':
                         filter_func(map, map_file, mask, **kwargs)
                     elif meta.filtering_type == 'toast':
