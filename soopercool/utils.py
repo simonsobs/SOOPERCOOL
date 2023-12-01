@@ -231,7 +231,10 @@ def m_filter_map(map, map_file, mask, m_cut):
 
     filtered_map = hp.alm2map(alms, nside=nside, lmax=lmax)
 
-    hp.write_map(map_file.replace(".fits", "_filtered.fits"),
+    output_dir = map_file.replace('.fits', '/')
+    os.makedirs(output_dir, exist_ok=True)
+
+    hp.write_map(f'{output_dir}FilterBin_filtered_map.fits',
                  filtered_map, overwrite=True,
                  dtype=np.float32)
 
