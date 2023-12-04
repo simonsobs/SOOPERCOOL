@@ -324,7 +324,7 @@ def toast_filter_map(map, schedule, thinfp, instrument, band,
     make_filterbin(data, binner, output_dir)
 
     # Unify name conventions
-    os.remove(output_dir + 'FilterBin_unfiltered_map.fits')
+    #os.remove(output_dir + 'FilterBin_unfiltered_map.fits')
     os.rename(output_dir + 'FilterBin_filtered_map.fits',
               output_dir[:-1] + '_filtered.fits')
     if os.path.isdir(output_dir):
