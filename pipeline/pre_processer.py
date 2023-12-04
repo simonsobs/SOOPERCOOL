@@ -91,8 +91,12 @@ def pre_processer(args):
                                      dtype=np.float32)
 
                 else:
-                    sim = hp.alm2map([alms_T, alms_E, alms_B],
-                                     meta.nside, lmax=lmax_sim)
+                    if meta.pureB_sims:
+                        sim = hp.alm2map([alms_T, alms_E*0., alms_B],
+                                         meta.nside, lmax=lmax_sim)
+                    else:
+                        sim = hp.alm2map([alms_T, alms_E, alms_B],
+                                         meta.nside, lmax=lmax_sim)
                     map_file = meta.get_map_filename_transfer2(id_sim, cl_type)
                     hp.write_map(map_file, sim, overwrite=True,
                                  dtype=np.float32)

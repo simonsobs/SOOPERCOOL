@@ -92,6 +92,7 @@ general_pars:
   deltal: 20
   binning_file: "binning.npz"
   pure_B: True
+  pureB_sims: True
 
 ## Simulation related
 sim_pars:
@@ -130,7 +131,7 @@ tf_settings:
       TT: 10.
       TE: 2.5
       TB: 0.5
-      EE: 0
+      EE: 1
       EB: 0.2
       BB: 0.05
     delta_ell: 10
