@@ -131,7 +131,7 @@ def make_filterbin(data, binner, output_dir):
     filterbin = toast.ops.FilterBin()
     filterbin.binning = binner
     filterbin.output_dir = output_dir
-    filterbin.name = 'prova'
+    filterbin.name = 'FilterBin'
     filterbin.write_hits = False
     filterbin.write_cov = False
     filterbin.write_rcond = False

@@ -213,13 +213,8 @@ def pcler(args):
                 map_file = meta.get_map_filename(
                     map_set, id_split, id_sim=id_sim if Nsims > 1 else None
                 )
-                if meta.filtering_type == 'toast':
-                    map_file = map_file.replace(
-                        ".fits",
-                        "/FilterBin_filtered_map.fits"
-                    )
-                else:
-                    map_file = map_file.replace(".fits", "_filtered.fits")
+                map_file = map_file.replace(".fits", "_filtered.fits")
+
                 map = hp.read_map(map_file, field=[0, 1, 2])
 
                 # Include beam in namaster fields to deconvolve it
@@ -342,10 +337,7 @@ def pcler(args):
                     "tf_est",
                     pure_type=pure_type
                 )
-                map_file_filtered = map_file.replace(
-                    ".fits",
-                    "/FilterBin_filtered_map.fits"
-                )
+                map_file_filtered = map_file.replace(".fits", "_filtered.fits")
 
                 map = hp.read_map(map_file, field=[0, 1, 2])
                 map_filtered = hp.read_map(map_file_filtered, field=[0, 1, 2])
@@ -398,10 +390,8 @@ def pcler(args):
                     map_file = meta.get_map_filename_transfer2(id_sim,
                                                                cl_type=cl_type)
                     if filter_flag == "filtered":
-                        map_file = map_file.replace(
-                            ".fits",
-                            "/FilterBin_filtered_map.fits"
-                        )
+                        map_file_filtered = map_file.replace(".fits",
+                                                             "_filtered.fits")
 
                     map = hp.read_map(map_file, field=[0, 1, 2])
 

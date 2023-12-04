@@ -231,14 +231,9 @@ def m_filter_map(map, map_file, mask, m_cut):
 
     filtered_map = hp.alm2map(alms, nside=nside, lmax=lmax)
 
-    output_dir = map_file.replace('.fits', '/')
-    os.makedirs(output_dir, exist_ok=True)
-
-    hp.write_map(f'{output_dir}FilterBin_filtered_map.fits',
+    hp.write_map(map_file.replace('.fits', '_filtered.fits'),
                  filtered_map, overwrite=True,
                  dtype=np.float32)
-
-    return
 
 
 def toast_filter_map(map, schedule, thinfp, instrument, band,
@@ -292,14 +287,16 @@ def toast_filter_map(map, schedule, thinfp, instrument, band,
     )
 
     # Setup toast communicator
-    runargs = SimpleNamespace(node_mem=None, groupsize=group_size)
+    runargs = SimpleNamespace(node_mem=None,
+                              group_size=group_size)  # Note the underscore
     group_size = toast.job_group_size(
         comm,
         runargs,
         schedule=schedule_,
         focalplane=focalplane,
     )
-    toast_comm = toast.Comm(world=comm, groupsize=group_size)
+    toast_comm = toast.Comm(world=comm,
+                            groupsize=group_size)  # Note no underscore
 
     # Create data object
     data = toast.Data(comm=toast_comm)
@@ -326,7 +323,12 @@ def toast_filter_map(map, schedule, thinfp, instrument, band,
     # Map filterbin
     make_filterbin(data, binner, output_dir)
 
-    return
+    # Unify name conventions
+    os.remove(output_dir + 'FilterBin_unfiltered_map.fits')
+    os.rename(output_dir + 'FilterBin_filtered_map.fits',
+              output_dir[:-1] + '_filtered.fits')
+    if os.path.isdir(output_dir):
+        os.rmdir(output_dir)
 
 
 def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,

@@ -35,6 +35,7 @@ def filter(args):
     # Read the mask
     mask = meta.read_mask("analysis")
 
+    meta.timer.start(f"Filter {meta.tf_est_num_sims} sims for TF estimation.")
     if args.transfer:
         for cl_type in ["cosmo", "tf_est", "tf_val"]:
             cases_list = ["pureE", "pureB"] if cl_type == "tf_est" else [None]
@@ -50,9 +51,12 @@ def filter(args):
                         filter_func(map, map_file, mask, **kwargs)
                     elif meta.filtering_type == 'toast':
                         filter_func(map_file, **kwargs)
+    meta.timer.stop(f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
+                    verbose=True)
 
     if args.sims or args.data:
         Nsims = meta.num_sims if args.sims else 1
+        meta.timer.start(f"Filter {Nsims} sims.")
         for map_name in meta.maps_list:
             map_set, id_split = map_name.split("__")
             for id_sim in range(Nsims):
@@ -69,6 +73,7 @@ def filter(args):
                 else:
                     raise ValueError("You have chosen an invalid filtering "
                                      "type.")
+        meta.timer.stop(f"Filter {Nsims} sims.", verbose=True)
 
 
 if __name__ == "__main__":
