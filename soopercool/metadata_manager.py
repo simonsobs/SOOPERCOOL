@@ -416,7 +416,15 @@ class BBmeta(object):
 
     def get_ps_names_list(self, type="all", coadd=False):
         """
-        List all the possible cross split power spectra
+        List the names of cross (and auto) power spectra. Every experiment has
+        a number of frequencies and map bundles (splits) with independent
+        noise realizations. This function either outputs bundle-coadded
+        power spectra (coadd=True), or the cross (and auto) bundle spectra.
+        Spectra are considered noise-unbiased if they are either across
+        different experiments or across different bundles, or both. Otherwise,
+        they have noise bias. Type "cross" selects noise-unbiased spectra,
+        type "auto" selects noise-biased spectra, and type "all" selects all.
+        
         Example:
             From two map_sets `ms1` and `ms2` with
             two splits each, and `type="all"`,
@@ -432,11 +440,11 @@ class BBmeta(object):
         type : str, optional
             Type of power spectra to return.
             Can be "all", "auto" or "cross". "auto" returns all unique
-            auto-split spectra, while "cross" returns all unique
-            cross-split spectra. "all" is the union of both.
+            noise-biased spectra, while "cross" returns all unique
+            noise-biased spectra. "all" is the union of both.
         coadd: bool, optional
-            If True, return the cross-split power spectra names.
-            Else, return the (split-)coadded power spectra names.
+            If True, return the cross (and/or auto) bundle power spectra names.
+            Else, return the (bundle-)coadded power spectra names.
         """
         map_iterable = self.map_sets_list if coadd else self.maps_list
 
@@ -461,10 +469,8 @@ class BBmeta(object):
                     if (map_set_1 == map_set_2) and (split_1 > split_2):
                         continue
 
-                    exp_tag_1 = map_set_1
-                    # self.exp_tag_from_map_set(map_set_1)
-                    exp_tag_2 = map_set_2
-                    # self.exp_tag_from_map_set(map_set_2)
+                    exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
+                    exp_tag_2 = self.exp_tag_from_map_set(map_set_2)
 
                     if ((type == "cross") and (exp_tag_1 == exp_tag_2)
                             and (split_1 == split_2)):
@@ -478,18 +484,40 @@ class BBmeta(object):
 
     def get_n_split_pairs_from_map_sets(self, map_set1, map_set2,
                                         type="cross"):
+        """
+        Returns the number of unique cross (and auto) bundle spectra that are
+        associated to a given pair of map sets ("tagged-coadded" maps).
+        Types "cross" or "auto" determine whether to output only the
+        noise-unbiased or noise-biased bundle combinations, respectively;
+        type "all" returns all of them.
+        
+        Example:
+            Given two map sets "SAT1_f093" and "SAT1_f145", and 4 bundles
+            for SAT1, output the number of splits
+            * 4*(4-1)/2 = 6  for type "cross"
+            * 4              for type "auto"
+            * 4*(4+1)/2 = 10 for type "all"
+
+        Parameters
+        ----------
+        type : str, optional
+            Type of power spectra to return.
+            Can be "all", "auto" or "cross". "auto" returns all unique
+            noise-biased spectra, while "cross" returns all unique
+            noise-biased spectra. "all" is the union of both.
+        """
         n_splits1 = self.n_splits_from_map_set(map_set1)
         n_splits2 = self.n_splits_from_map_set(map_set2)
-        # exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
-        # exp_tag_2 = self.exp_tag_from_map_set(map_set_2)
+        exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
+        exp_tag_2 = self.exp_tag_from_map_set(map_set_2)
         if type == "cross":
-            n_pairs = n_splits1 * (n_splits1 - 1) / 2 if map_set1 == map_set2 \
-                else n_splits1*n_splits2
+            n_pairs = n_splits1 * (n_splits1 - 1) / 2 if exp_tag1 == exp_tag2 \
+                else n_splits1 * n_splits2
         elif type == "auto":
-            n_pairs = n_splits1 if map_set1 == map_set2 else 0
+            n_pairs = n_splits1 if exp_tag1 == exp_tag2 else 0
         elif type == "all":
-            n_pairs = n_splits1 * (n_splits1 + 1) / 2 if map_set1 == map_set2 \
-                else n_splits1*n_splits2
+            n_pairs = n_splits1 * (n_splits1 + 1) / 2 if exp_tag1 == exp_tag2 \
+                else n_splits1 * n_splits2
         else:
             raise ValueError("You selected an invalid type. "
                              "Options are 'cross', 'auto', and 'all'.")
