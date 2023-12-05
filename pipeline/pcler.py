@@ -390,8 +390,7 @@ def pcler(args):
                     map_file = meta.get_map_filename_transfer2(id_sim,
                                                                cl_type=cl_type)
                     if filter_flag == "filtered":
-                        map_file_filtered = map_file.replace(".fits",
-                                                             "_filtered.fits")
+                        map_file = map_file.replace(".fits", "_filtered.fits")
 
                     map = hp.read_map(map_file, field=[0, 1, 2])
 
