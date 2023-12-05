@@ -323,14 +323,16 @@ def toast_filter_map(map, schedule, thinfp, instrument, band,
     # Map filterbin
     make_filterbin(data, binner, output_dir)
 
-    # Unify name conventions
-    if os.path.isfile(output_dir + 'FilterBin_unfiltered_map.fits'):
-        # only for TOAST versions < 3.0.0a20
-        os.remove(output_dir + 'FilterBin_unfiltered_map.fits')
-    os.rename(output_dir + 'FilterBin_filtered_map.fits',
-              output_dir[:-1] + '_filtered.fits')
-    if os.path.isdir(output_dir):
-        os.rmdir(output_dir)
+    if rank == 0:
+        # Only one rank can do this
+        # Unify name conventions
+        if os.path.isfile(output_dir + 'FilterBin_unfiltered_map.fits'):
+            # only for TOAST versions < 3.0.0a20
+            os.remove(output_dir + 'FilterBin_unfiltered_map.fits')
+        os.rename(output_dir + 'FilterBin_filtered_map.fits',
+                  output_dir[:-1] + '_filtered.fits')
+        if os.path.isdir(output_dir):
+            os.rmdir(output_dir)
 
 
 def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,
