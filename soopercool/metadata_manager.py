@@ -424,7 +424,7 @@ class BBmeta(object):
         different experiments or across different bundles, or both. Otherwise,
         they have noise bias. Type "cross" selects noise-unbiased spectra,
         type "auto" selects noise-biased spectra, and type "all" selects all.
-        
+
         Example:
             From two map_sets `ms1` and `ms2` with
             two splits each, and `type="all"`,
@@ -482,7 +482,7 @@ class BBmeta(object):
                 ps_name_list.append((map1, map2))
         return ps_name_list
 
-    def get_n_split_pairs_from_map_sets(self, map_set1, map_set2,
+    def get_n_split_pairs_from_map_sets(self, map_set_1, map_set_2,
                                         type="cross"):
         """
         Returns the number of unique cross (and auto) bundle spectra that are
@@ -490,7 +490,7 @@ class BBmeta(object):
         Types "cross" or "auto" determine whether to output only the
         noise-unbiased or noise-biased bundle combinations, respectively;
         type "all" returns all of them.
-        
+
         Example:
             Given two map sets "SAT1_f093" and "SAT1_f145", and 4 bundles
             for SAT1, output the number of splits
@@ -506,18 +506,22 @@ class BBmeta(object):
             noise-biased spectra, while "cross" returns all unique
             noise-biased spectra. "all" is the union of both.
         """
-        n_splits1 = self.n_splits_from_map_set(map_set1)
-        n_splits2 = self.n_splits_from_map_set(map_set2)
+        n_splits_1 = self.n_splits_from_map_set(map_set_1)
+        n_splits_2 = self.n_splits_from_map_set(map_set_2)
         exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
         exp_tag_2 = self.exp_tag_from_map_set(map_set_2)
         if type == "cross":
-            n_pairs = n_splits1 * (n_splits1 - 1) / 2 if exp_tag1 == exp_tag2 \
-                else n_splits1 * n_splits2
+            if exp_tag_1 == exp_tag_2:
+                n_pairs = n_splits_1 * (n_splits_1 - 1) / 2
+            else:
+                n_pairs = n_splits_1 * n_splits_2
         elif type == "auto":
-            n_pairs = n_splits1 if exp_tag1 == exp_tag2 else 0
+            n_pairs = n_splits_1 if exp_tag_1 == exp_tag_2 else 0
         elif type == "all":
-            n_pairs = n_splits1 * (n_splits1 + 1) / 2 if exp_tag1 == exp_tag2 \
-                else n_splits1 * n_splits2
+            if exp_tag_1 == exp_tag_2:
+                n_pairs = n_splits_1 * (n_splits_1 + 1) / 2
+            else:
+                n_pairs = n_splits_1 * n_splits_2
         else:
             raise ValueError("You selected an invalid type. "
                              "Options are 'cross', 'auto', and 'all'.")
