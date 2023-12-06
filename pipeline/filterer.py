@@ -16,21 +16,11 @@ def filter(args):
         Arguments from the command line.
     """
     meta = BBmeta(args.globals)
+    kwargs = meta.get_filter_kwargs()
     if meta.filtering_type == "m_filterer":
         filter_func = utils.m_filter_map
-        kwargs = {"m_cut": meta.m_cut}
-
     elif meta.filtering_type == "toast":
         filter_func = utils.toast_filter_map
-        kwargs = {"schedule": meta.toast['schedule'],
-                  "thinfp": meta.toast['thinfp'],
-                  "instrument": meta.toast['instrument'],
-                  "band": meta.toast['band'],
-                  "group_size": meta.toast['group_size'],
-                  "nside": meta.nside, }
-    else:
-        raise NotImplementedError(f"Filterer type {meta.filtering_type} "
-                                  "not implemented")
 
     # Read the mask
     mask = meta.read_mask("analysis")
@@ -45,12 +35,7 @@ def filter(args):
                                                                cl_type,
                                                                pure_type=case)
                     map = hp.read_map(map_file, field=[0, 1, 2])
-                    # TODO: come up with a generic syntax for filtering
-                    # to avoid 'ifs'.
-                    if meta.filtering_type == 'm_filterer':
-                        filter_func(map, map_file, mask, **kwargs)
-                    elif meta.filtering_type == 'toast':
-                        filter_func(map_file, **kwargs)
+                    filter_func(map, map_file, mask, **kwargs)
     meta.timer.stop(f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
                     verbose=True)
 
@@ -66,13 +51,7 @@ def filter(args):
                     id_sim=id_sim if Nsims > 1 else None
                 )
                 map = hp.read_map(map_file, field=[0, 1, 2])
-                if meta.filtering_type == 'm_filterer':
-                    filter_func(map, map_file, mask, **kwargs)
-                elif meta.filtering_type == 'toast':
-                    filter_func(map_file, **kwargs)
-                else:
-                    raise ValueError("You have chosen an invalid filtering "
-                                     "type.")
+                filter_func(map, map_file, mask, **kwargs)
         meta.timer.stop(f"Filter {Nsims} sims.", verbose=True)
 
 

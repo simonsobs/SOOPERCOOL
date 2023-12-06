@@ -355,6 +355,25 @@ class BBmeta(object):
         return os.path.join(path_to_maps,
                             f"{map_set_root}_split_{id_split}.fits")
 
+
+    def get_filter_kwargs(self):
+        if self.filtering_type == "m_filterer":
+            kwargs = {"m_cut": self.m_cut}
+        elif meta.filtering_type == "toast":
+            kwargs = {"schedule": self.toast['schedule'],
+                      "thinfp": self.toast['thinfp'],
+                      "instrument": self.toast['instrument'],
+                      "band": self.toast['band'],
+                      "group_size": self.toast['group_size'],
+                      "nside": self.nside
+                     }
+        else:
+            raise NotImplementedError(f"Filterer type {self.filtering_type} "
+                                      "not implemented")
+
+        return kwargs
+
+
     def get_map_filename_transfer2(self, id_sim, cl_type, pure_type=None):
         """
         """

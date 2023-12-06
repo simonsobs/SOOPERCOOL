@@ -218,6 +218,19 @@ def power_law_cl(ell, amp, delta_ell, power_law_index):
 
 def m_filter_map(map, map_file, mask, m_cut):
     """
+    Applies the m-cut mock filter to a given map with a given sky mask.
+
+    Parameters
+    ----------
+    map : array-like
+        Healpix TQU map to be filtered.
+    map_file : str
+        File path of the unfiltered map.
+    mask : array-like
+        Healpix map storing the sky mask.
+    m_cut : int
+        Maximum nonzero m-degree of the multipole expansion. All higher
+        degrees are set to zero.
     """
 
     map_masked = map * mask
@@ -236,9 +249,34 @@ def m_filter_map(map, map_file, mask, m_cut):
                  dtype=np.float32)
 
 
-def toast_filter_map(map, schedule, thinfp, instrument, band,
-                     group_size, nside):
+def toast_filter_map(map, map_file, mask,
+                     schedule, thinfp, instrument, band, group_size, nside):
     """
+    Applies the TOAST filter to a given map.
+
+    Parameters
+    ----------
+    map : array-like (unused)
+        This is an unused argument included for compatibility with other
+        filters. TOAST won't read the map itself.
+    map_file : str
+        File path of the unfiltered map.
+    mask : array-like (unused)
+        This is an unused argument included for compatibility with other
+        filters. TOAST won't read the mask itself.
+    schedule : str
+        Text file path with the TOAST schedule.
+    thinfp : int
+        Thinning factor of the number of detectors used in the TOAST
+        focalplane.
+    instrument : str
+        Name of the instrument simulated by TOAST.
+    band : str
+        Name of the frequency band simulated by TOAST.
+    group_size : int
+        Group size used for parallelizing filtering with TOAST.
+    nside : int
+        Healpix Nside parameter of the filtered map.
     """
     import toast
     import sotodlib.toast as sotoast
@@ -250,6 +288,8 @@ def toast_filter_map(map, schedule, thinfp, instrument, band,
     )
     from types import SimpleNamespace
     import toast.mpi
+
+    del map, mask  # delete unused arguments
 
     comm, procs, rank = toast.mpi.get_world()
 
