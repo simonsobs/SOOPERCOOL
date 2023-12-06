@@ -40,6 +40,10 @@ def mask_handler(args):
         url = f"{urlpref}apodized_mask_bbpipe_paper.fits"
         with urllib.request.urlopen(url, timeout=timeout_seconds):
             urllib.request.urlretrieve(url, filename=sat_apo_file)
+            sat_apo_mask = hp.read_map(sat_apo_file, field=0)
+            sat_apo_mask = hp.ud_grade(sat_apo_mask, meta.nside)
+            hp.write_map(sat_apo_file, sat_apo_mask, overwrite=True,
+                         dtype=np.int32)
 
     # Download galactic mask
     if "galactic" in meta.masks["include_in_mask"]:
