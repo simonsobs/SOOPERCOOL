@@ -1,10 +1,36 @@
-# Installation using micromamba
+# Installation
 
-These instructions show how to install `SOOPERCOOL` and `TOAST` at NERSC using
-micromamba. Micromamba is a programming environment similar to conda, but 
+These instructions show how to install `SOOPERCOOL` and setting up a working
+environment to run the pipeline and loading all its dependencies on NERSC.
+
+### Option 1 - Load `master_env`
+ ---
+
+#### Load the `master_env` module
+The module can be loaded with
+```
+module use --append /pscratch/sd/s/susannaz/conda_envs/master_env/modulefiles
+module load master_env/0.0.3
+```
+This will automatically load an existing conda environment and all the modules
+needed to run `SOOPERCOOL` and its dependencies, including `toast` and `NaMaster`.
+
+#### Make your own `master_env` conda environment
+If you wanted to create your own conda environment based on `master_env` and
+activate it,
+```
+conda create --clone /pscratch/sd/s/susannaz/conda_envs/master_env -p <path-to-your-env>
+conda activate <path-to-your-env>
+```
+This will allow you to access all the pip-installed packages that are in the
+existing conda environment, but will not load any additional modules.
+
+ 
+### Option 2 - Create a custom environment using `micromamba`
+ ---
+ 
+Micromamba is a programming environment similar to conda, but 
 based on C and therefore much quicker at resolving and installing packages.
-
-### Micromamba
 
 ```
 "${SHELL}" <(curl -L micro.mamba.pm/install.sh)
@@ -18,9 +44,7 @@ micromamba config append channels conda-forge
 micromamba config set channel_priority strict
 ```
 
-
-
-### SOOPERCOOL environment
+#### SOOPERCOOL environment
 - Set up environment (`python=3.6` proved to work with `NaMaster`)
 
   ```
@@ -56,9 +80,7 @@ micromamba config set channel_priority strict
   cd so_noise_models; pip install -e .
   ```
 
-
-
-### TOAST
+#### TOAST environment
 
 - Set up environment
 
