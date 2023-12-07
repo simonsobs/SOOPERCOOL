@@ -351,7 +351,8 @@ def toast_filter_map(map, map_file, mask,
 
     # Scan map
     print('Scan input map')
-    data, scan_map = apply_scan_map(data, map_file, pixels_radec, weights_radec)
+    data, scan_map = apply_scan_map(data, map_file, pixels_radec,
+                                    weights_radec)
 
     # Create the binner
     binner = create_binner(pixels_radec, det_pointing_radec)

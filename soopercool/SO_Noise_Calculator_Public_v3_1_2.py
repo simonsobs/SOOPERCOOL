@@ -1,4 +1,5 @@
-"""Simons Observatory LAT Noise Model
+"""
+Simons Observatory LAT Noise Model
 
 This is release v3.1.2.
 
@@ -33,15 +34,17 @@ the SO forecasts paper, but with some functional changes:
 Version 3.1.2 fixes the noise elevation scaling for the LAT MF bands.
 The MF noise elevation scalings were using an average of the feedhorn
 and lenslet values, but we are only using feedhorns at MF now.
-  
+
 """
 
 from __future__ import print_function
 
 import numpy as np
 
+
 def get_atmosphere_params(freqs, version=1, el=None):
-    """Returns atmospheric noise power parameters, for an ACTPol optics
+    """
+    Returns atmospheric noise power parameters, for an ACTPol optics
     tube.
 
     Arguments:
@@ -81,33 +84,35 @@ def get_atmosphere_params(freqs, version=1, el=None):
         el = 50.
     el_correction = np.sin(50.*np.pi/180) / np.sin(el*np.pi/180)
     if version == 0:
-        data_bands = np.array([ 27., 39., 93., 145., 225., 280.])
+        data_bands = np.array([27., 39., 93., 145., 225., 280.])
         data_C = np.array([200., 77., 1800., 12000., 68000., 124000.])
         data = {}
-        for b,C in zip(data_bands, data_C):
+        for b, C in zip(data_bands, data_C):
             data[b] = C
         # Jam in a fake value for 20 GHz.
         data[20.] = 200.
     elif version == 1:
-        data_bands = np.array([ 20., 27., 39., 93., 145., 225., 280.])
-        data_C = np.array([  3.45565594e+02 * 1.4,
-                             6.00734484e+01 * 1.4,
-                             1.45291936e+01 * 1.4,
-                             6.81426710e+02 * 1.4,
-                             1.20000000e+04,
-                             2.66015359e+05,
-                             1.56040514e+06,])
+        data_bands = np.array([20., 27., 39., 93., 145., 225., 280.])
+        data_C = np.array([3.45565594e+02 * 1.4,
+                           6.00734484e+01 * 1.4,
+                           1.45291936e+01 * 1.4,
+                           6.81426710e+02 * 1.4,
+                           1.20000000e+04,
+                           2.66015359e+05,
+                           1.56040514e+06])
         data = {}
-        for b,C in zip(data_bands, data_C):
+        for b, C in zip(data_bands, data_C):
             data[b] = C
     return (np.array([data[f] * el_correction**2 for f in freqs]),
             np.array([-3.5 for f in freqs]))
 
+
 def rolloff(ell, ell_off=None, alpha=-4, patience=2.):
-    """Get a transfer function T(ell) to roll off red noise at ell <
+    """
+    Get a transfer function T(ell) to roll off red noise at ell <
     ell_off.  ell should be an ndarray.  Above the cut-off,
     T(ell>=ell_off) = 1.  For T(ell<ell_off) will roll off smoothly,
-    approaching T(ell) \propto ell^-alpha.  The speed at which the
+    approaching T(ell) propto ell^-alpha.  The speed at which the
     transition to the full power-law occurs is set by "patience";
     patience (> 1) is the maximum allowed value of:
 
@@ -119,30 +124,31 @@ def rolloff(ell, ell_off=None, alpha=-4, patience=2.):
     roll-off in T(ell) will be applied aggressively enough that
     T(ell)*ell**alpha does not rise above "patience" times its value
     at ell_off.
-
     """
     if ell_off is None or ell_off <= 0:
         return np.ones(ell.shape)
     L2 = ell_off
-    L1 = L2 * patience ** (2./alpha)
+    L1 = L2 * patience ** (2. / alpha)
     x = -np.log(ell / L2) / np.log(L1 / L2)
     beta = alpha * np.log(L1 / L2)
-    output = x*0
-    output[x<0]  = (-x*x)[x<0]
-    output[x<-1] = (1 + 2*x)[x<-1]
+    output = x * 0
+    output[x < 0] = (-x * x)[x < 0]
+    output[x < -1] = (1 + 2 * x)[x < -1]
     return np.exp(output * beta)
 
 
-"""See lower for subclasses of SOTel -- instrument specific
-parameters are configured in __init__.  """
+"""
+See lower for subclasses of SOTel -- instrument specific
+parameters are configured in __init__.
+"""
 
 
 class SOTel:
-    """Base class for SO SAT and LAT noise models.  The sub-class
+    """
+    Base class for SO SAT and LAT noise models.  The sub-class
     constructors should set up all the internal variables and then
     call precompute().  Then the noise levels can be obtained with
     get_white_noise / get_noise_curves.
-
     """
     # Switches that tell get_noise_curves what to return.
     has_T = False
@@ -176,19 +182,19 @@ class SOTel:
             el_data = self.el_noise_params
             el_lims = el_data.get('valid')
             if el_lims[0] == 'only':
-                assert(self.el == el_lims[1])  # noise model only valid at one elevation...
+                # noise model only valid at one elevation...
+                assert (self.el == el_lims[1])
             else:
-                assert(el_lims[0] <= self.el) and (self.el <= el_lims[1])
-                band_idx = np.array([np.argmin(abs(el_data['bands'] - b)) for b in self.bands])
-                assert(np.all(abs(np.array(el_data['bands'])[band_idx] - self.bands) < 5))
+                assert (el_lims[0] <= self.el) and (self.el <= el_lims[1])
+                band_idx = np.array([np.argmin(abs(el_data['bands'] - b)) for b in self.bands])  # noqa
+                assert (np.all(abs(np.array(el_data['bands'])[band_idx] - self.bands) < 5))  # noqa
                 coeffs = el_data['coeffs']
                 white_noise_el_rescale = np.array(
-                    [el_noise_func(coeffs[i], self.el) / el_noise_func(coeffs[i], 50.)
+                    [el_noise_func(coeffs[i], self.el) / el_noise_func(coeffs[i], 50.)  # noqa
                      for i in band_idx])
 
         # Accumulate total white noise level and atmospheric
         # covariance matrix for this configuration.
-        
         band_weights = np.zeros(self.n_bands)
         for (tube_name, tube_count) in N_tubes:
             tube_noise = self.tube_configs[tube_name] * white_noise_el_rescale
@@ -200,50 +206,53 @@ class SOTel:
         self.band_sens[s] = band_weights[s]**-0.5
 
         # Special for atmospheric noise model.
-        C, alpha = get_atmosphere_params(self.bands, self.atm_version, el=self.el)
+        C, alpha = get_atmosphere_params(self.bands, self.atm_version,
+                                         el=self.el)
         self.Tatmos_C = C * self.Tatmos_FOV_mod
         self.Tatmos_alpha = alpha
         self.Tatmos_ell = 1000. + np.zeros(self.n_bands)
 
         # Compute covariant weight matrix (atmosphere parameters).
-        cov_weight = np.zeros((self.n_bands,self.n_bands))
-        pcov_weight = np.zeros((self.n_bands,self.n_bands))
+        cov_weight = np.zeros((self.n_bands, self.n_bands))
+        pcov_weight = np.zeros((self.n_bands, self.n_bands))
         for (tube_name, tube_count) in N_tubes:
-            # Get the list of coupled bands; e.g. [1,2] for MF.
+            # Get the list of coupled bands; e.g. [1, 2] for MF.
             nonz = self.tube_configs[tube_name].nonzero()[0]
             for i in nonz:
                 for j in nonz:
-                    assert(cov_weight[i,j] == 0.) # Can't do overlapping
-                                                  # tubes without weights.
-                    T_corr = {True: 1., False: self.Tatmos_band_corr}[i==j]
-                    cov_weight[i,j] += ( tube_count * N_tels /
-                                         (T_corr *
-                                          (self.Tatmos_C[i] * self.Tatmos_C[j])**.5) )
-                    P_corr = {True: 1., False: self.Patmos_band_corr}[i==j]
-                    pcov_weight[i,j] = P_corr
+                    # Can't do overlapping tubes without weights.
+                    assert (cov_weight[i, j] == 0.)
+                    T_corr = {True: 1.,
+                              False: self.Tatmos_band_corr}[i == j]
+                    cov_weight[i, j] += (
+                        tube_count * N_tels /
+                        (T_corr * (self.Tatmos_C[i] * self.Tatmos_C[j]) ** .5)
+                    )
+                    P_corr = {True: 1., False: self.Patmos_band_corr}[i == j]
+                    pcov_weight[i, j] = P_corr
 
         # Reciprocate non-zero elements.
-        s = (cov_weight!=0)
-        self.Tatmos_cov = np.diag([1e9]*self.n_bands)
-        self.Tatmos_cov[s] = 1./cov_weight[s]
+        s = (cov_weight != 0)
+        self.Tatmos_cov = np.diag([1e9] * self.n_bands)
+        self.Tatmos_cov[s] = 1. / cov_weight[s]
 
         # Polarization is simpler...
         self.Patmos_cov = pcov_weight
 
     def get_survey_time(self):
-        """Returns the effective survey time (survey_years * efficiency), in
-        seconds.
-
         """
-        t = self.survey_years * 365.25 * 86400.    ## convert years to seconds
+        Returns the effective survey time (survey_years * efficiency), in
+        seconds.
+        """
+        t = self.survey_years * 365.25 * 86400.  # convert years to seconds
         return t * self.survey_efficiency
 
     def get_survey_spread(self, f_sky, units='arcmin2'):
-        """Returns the dilution factor that converts array instrument
+        """
+        Returns the dilution factor that converts array instrument
         sensitivity (in units uK^2 sec) to map white noise level
         (units uK^2 arcmin^2).  Units are arcmin^2 / second (unless
         units='sr' is set)
-
         """
         # Factor that converts uK^2 sec -> uK^2 arcmin^2.
         A = f_sky * 4*np.pi
@@ -264,7 +273,8 @@ class SOTel:
 
     def get_noise_curves(self, f_sky, ell_max, delta_ell, deconv_beam=True,
                          full_covar=False, rolloff_ell=None):
-        """Get the noise curves N(ell) for all bands.
+        """
+        Get the noise curves N(ell) for all bands.
 
         The ell vector is determined by ell_max and delta_ell: ell =
         range(2, ell_max, delta_ell).
@@ -287,24 +297,23 @@ class SOTel:
         reduce red noise below this cutoff.  The transfer function at
         ell > rolloff_ell will be 1.  See code if you care about what
         happens below that.
-
         """
         ell = np.arange(2, ell_max, delta_ell)
-        W = self.band_sens**2
+        W = self.band_sens ** 2
 
-        # Get full covariance; indices are [band,band,ell]
-        ellf = (ell/self.Tatmos_ell[:,None])**(self.Tatmos_alpha[:,None])
-        T_noise = self.Tatmos_cov[:,:,None] * (ellf[:,None,:] * ellf[None,:,:])**.5
+        # Get full covariance; indices are [band, band, ell]
+        ellf = (ell / self.Tatmos_ell[:, None]) ** self.Tatmos_alpha[:, None]
+        T_noise = self.Tatmos_cov[:, :, None] * (ellf[:, None, :] * ellf[None, :, :]) ** .5  # noqa
 
         # P noise is tied directly to the white noise level.
-        P_low_noise = (2*W[:,None]) * (ell / self.Patmos_ell[:,None])**self.Patmos_alpha[:,None]
-        P_noise = (self.Patmos_cov[:,:,None] *
-                   (P_low_noise[:,None,:] * P_low_noise[None,:,:])**.5)
+        P_low_noise = (2 * W[:, None]) * (ell / self.Patmos_ell[:, None]) ** self.Patmos_alpha[:, None]  # noqa
+        P_noise = (self.Patmos_cov[:, :, None] *
+                   (P_low_noise[:, None, :] * P_low_noise[None, :, :]) ** .5)
 
         # Add in white noise on the diagonal.
         for i in range(len(W)):
-            T_noise[i,i] += W[i]
-            P_noise[i,i] += W[i] * 2
+            T_noise[i, i] += W[i]
+            P_noise[i, i] += W[i] * 2
 
         if rolloff_ell is not None:
             # Use the same simple rolloff for all bands, T & P.
@@ -314,16 +323,16 @@ class SOTel:
 
         # Deconvolve beams.
         if deconv_beam:
-            beam_sig_rad = self.get_beams() * np.pi/180/60 / (8.*np.log(2))**0.5
-            beams = np.exp(-0.5 * ell*(ell+1) * beam_sig_rad[:,None]**2)
-            T_noise /= (beams[:,None,:] * beams[None,:,:])
-            P_noise /= (beams[:,None,:] * beams[None,:,:])
+            beam_sig_rad = self.get_beams() * np.pi / 180 / 60 / (8. * np.log(2)) ** 0.5  # noqa
+            beams = np.exp(- 0.5 * ell * (ell + 1) * beam_sig_rad[:, None] ** 2)  # noqa
+            T_noise /= (beams[:, None, :] * beams[None, :, :])
+            P_noise /= (beams[:, None, :] * beams[None, :, :])
 
         # Diagonal only?
         if not full_covar:
             ii = range(self.n_bands)
-            T_noise = T_noise[ii,ii]
-            P_noise = P_noise[ii,ii]
+            T_noise = T_noise[ii, ii]
+            P_noise = P_noise[ii, ii]
 
         T_out, P_out = None, None
         if self.has_T:
@@ -334,23 +343,27 @@ class SOTel:
         return (ell, T_out, P_out)
 
 
-""" Elevation-dependent noise model for LAT is captured below.  Detector
+"""
+Elevation-dependent noise model for LAT is captured below.  Detector
 white noise is determined by a fixed, instrumental component as well
 as a contribution from atmospheric loading, which is should scale
 roughly with 1/sin(elevation).  The 'coeffs' below give coefficents A,
 B for the model
 
-   sens \propto A + B / sin(elevation)
+   sens propto A + B / sin(elevation)
 
 For 27 GHz and higher, results are from the Simons Observatory LAT
 noise model provided by Carlos Sierra and Jeff McMahon on March 11,
 2019.  For 20 GHz, fits from Ben Racine and Denis Barkats are used
 (for a slightly different instrument configuration that nevertheless
-gives compatible results across all bands).  """
+gives compatible results across all bands).
+"""
+
 
 def el_noise_func(P, el):
     a, b = P
-    return a + b / np.sin(el*np.pi/180)
+    return a + b / np.sin(el * np.pi / 180)
+
 
 SO_el_noise_func_params = {
     'threshold': {
@@ -358,10 +371,10 @@ SO_el_noise_func_params = {
     },
     'baseline': {
         'valid': (25., 70.),
-        'bands': [20,27,39,93,145,225,280],
+        'bands': [20, 27, 39, 93, 145, 225, 280],
         'coeffs': [
             (178.59719595, 33.72945249),  # From B. Racine & D. Barkats.
-            (.87, .09),                   # From Carlos Sierra and J. McMahon vvv
+            (.87, .09),                   # From Carlos Sierra and J. McMahon
             (.64, .25),
             (.80, .14),
             (.76, .17),
@@ -371,10 +384,10 @@ SO_el_noise_func_params = {
     },
     'goal': {
         'valid': (25., 70.),
-        'bands': [20,27,39,93,145,225,280],
+        'bands': [20, 27, 39, 93, 145, 225, 280],
         'coeffs': [
             (178.59719595, 33.72945249),  # From B. Racine & D. Barkats.
-            (.85, .11),                   # From Carlos Sierra and J. McMahon vvv
+            (.85, .11),                   # From Carlos Sierra and J. McMahon
             (.65, .25),
             (.76, .17),
             (.73, .19),
@@ -393,8 +406,9 @@ class SOLatV3(SOTel):
     Patmos_band_corr = 0.9
 
     def __init__(self, sensitivity_mode=None, N_tubes=None, survey_years=5.,
-                 survey_efficiency = 0.2*0.85, el=None):
-        """Arguments:
+                 survey_efficiency=0.2 * 0.85, el=None):
+        """
+        Arguments:
 
           sensitivity_mode (int or string): Should be 'threshold',
             'baseline', or 'goal'.  Alternately you can pass 0, 1, or
@@ -414,18 +428,15 @@ class SOLatV3(SOTel):
 
           el: Elevation, in degrees.  This affects white noise and red
             noise, through separate scalings.
-
         """
         # Define the instrument.
-        self.bands = np.array([
-            27., 39., 93., 145., 225., 280.])
-        self.beams = np.array([
-            7.4, 5.1, 2.2, 1.4, 1.0, 0.9])
+        self.bands = np.array([27., 39., 93., 145., 225., 280.])
+        self.beams = np.array([7.4, 5.1, 2.2, 1.4, 1.0, 0.9])
 
         # Set defaults for survey area, time, efficiency
         self.survey_years = survey_years
-        self.survey_efficiency  = survey_efficiency
-        
+        self.survey_efficiency = survey_efficiency
+
         # Translate integer to string mode; check it.
         sens_modes = {0: 'threshold',
                       1: 'baseline',
@@ -435,9 +446,10 @@ class SOLatV3(SOTel):
         elif sensitivity_mode in sens_modes.keys():
             sensitivity_mode = sens_modes.get(sensitivity_mode)
 
-        assert(sensitivity_mode in sens_modes.values())  # threshold,baseline,goal? 0,1,2?
+        # threshold, baseline,goal? 0,1,2?
+        assert (sensitivity_mode in sens_modes.values())
         self.sensitivity_mode = sensitivity_mode
-        
+
         # Sensitivities of each kind of optics tube, in uK rtsec, by
         # band.  0 represents 0 weight, not 0 noise!  Note the weird
         # scalings for MF (4**.5) and UHF (2**.5) are to convert to
@@ -446,19 +458,19 @@ class SOLatV3(SOTel):
         nar = np.array
         self.tube_configs = {
             'threshold': {
-                'LF':  nar([  61.,  30.,    0,    0,    0,    0 ]),
-                'MF':  nar([    0,    0,  6.5,  8.1,    0,    0 ])*4**.5,
-                'UHF': nar([    0,    0,    0,    0,  17.,  42. ])*2**.5,
+                'LF':  nar([  61.,  30.,    0,    0,    0,    0 ]),        # noqa
+                'MF':  nar([    0,    0,  6.5,  8.1,    0,    0 ])*4**.5,  # noqa
+                'UHF': nar([    0,    0,    0,    0,  17.,  42. ])*2**.5,  # noqa
             },
             'baseline': {
-                'LF':  nar([  48.,  24.,    0,    0,    0,    0 ]),
-                'MF':  nar([    0,    0,  5.4,  6.7,    0,    0 ])*4**.5,
-                'UHF': nar([    0,    0,    0,    0,  15.,  36. ])*2**.5,
+                'LF':  nar([  48.,  24.,    0,    0,    0,    0 ]),        # noqa
+                'MF':  nar([    0,    0,  5.4,  6.7,    0,    0 ])*4**.5,  # noqa
+                'UHF': nar([    0,    0,    0,    0,  15.,  36. ])*2**.5,  # noqa
             },
             'goal': {
-                'LF':  nar([  35.,  18.,    0,    0,    0,    0 ]),
-                'MF':  nar([    0,    0,  3.9,  4.2,    0,    0 ])*4**.5,
-                'UHF': nar([    0,    0,    0,    0,  10.,  25. ])*2**.5,
+                'LF':  nar([  35.,  18.,    0,    0,    0,    0 ]),        # noqa
+                'MF':  nar([    0,    0,  3.9,  4.2,    0,    0 ])*4**.5,  # noqa
+                'UHF': nar([    0,    0,    0,    0,  10.,  25. ])*2**.5,  # noqa
             },
         }[sensitivity_mode]
 
@@ -468,23 +480,23 @@ class SOLatV3(SOTel):
         if N_tubes is None:
             N_tubes = ref_tubes
         else:
-            N_tubes = [(b,x) for (b,n),x in zip(ref_tubes, N_tubes)]
-            
-        ##
-        ## T noise
-        ##
+            N_tubes = [(b, x) for (b, n), x in zip(ref_tubes, N_tubes)]
+
+        """
+        T noise
+        """
 
         # Elevation stuff
         self.el_noise_params = SO_el_noise_func_params[sensitivity_mode]
         self.el = el
 
-        ##
-        ## P noise
-        ##
+        """
+        P noise
+        """
         # "atmos" just means low-ell here.  We do not claim it
         # originates from atmospheric sources.
         self.Patmos_ell = 700. + np.zeros(self.n_bands)
-        self.Patmos_alpha = -1.4 + np.zeros(self.n_bands)
+        self.Patmos_alpha = - 1.4 + np.zeros(self.n_bands)
 
         # Do general computations.
         self.precompute(N_tubes)
@@ -495,7 +507,6 @@ class SOLatV3point1(SOLatV3):
 
 
 # SAT support
-
 class SOSatV3point1(SOTel):
     has_T = False
     has_P = True
@@ -503,9 +514,10 @@ class SOSatV3point1(SOTel):
 
     def __init__(self, sensitivity_mode=None, N_tubes=None,
                  survey_years=5.,
-                 survey_efficiency = 0.2*0.85, el=None,
+                 survey_efficiency=0.2 * 0.85, el=None,
                  one_over_f_mode=0):
-        """Arguments:
+        """
+        Arguments:
 
           sensitivity_mode (int or string): Should be 'threshold',
             'baseline', or 'goal'.  Alternately you can pass 0, 1, or
@@ -530,15 +542,13 @@ class SOSatV3point1(SOTel):
             'optimistic' red-noise behavior, respectively.
         """
         # Define the instrument.
-        self.bands = np.array([
-            27., 39., 93., 145., 225., 280.])
-        self.beams = np.array([
-            91., 63., 30., 17., 11., 9.])
+        self.bands = np.array([27., 39., 93., 145., 225., 280.])
+        self.beams = np.array([91., 63., 30., 17., 11., 9.])
 
         # Set defaults for survey area, time, efficiency
         self.survey_years = survey_years
-        self.survey_efficiency  = survey_efficiency
-        
+        self.survey_efficiency = survey_efficiency
+
         # Translate integer to string mode; check it.
         sens_modes = {0: 'threshold',
                       1: 'baseline',
@@ -548,9 +558,10 @@ class SOSatV3point1(SOTel):
         elif sensitivity_mode in sens_modes.keys():
             sensitivity_mode = sens_modes.get(sensitivity_mode)
 
-        assert(sensitivity_mode in sens_modes.values())  # threshold,baseline,goal? 0,1,2?
+        # threshold,baseline,goal? 0,1,2?
+        assert (sensitivity_mode in sens_modes.values())
         self.sensitivity_mode = sensitivity_mode
-        
+
         # Sensitivities of each kind of optics tube, in uK rtsec, by
         # band.  0 represents 0 weight, not 0 noise!  Note the weird
         # scaling for MF (2**.5) is to convert to per-tube values from
@@ -559,24 +570,24 @@ class SOSatV3point1(SOTel):
         nar = np.array
         self.tube_configs = {
             'threshold': {
-                'LF':  nar([  32.,  17.,    0,    0,    0,    0 ]),
-                'MF':  nar([    0,    0,  4.6,  5.5,    0,    0 ])*2**.5,
-                'UHF': nar([    0,    0,    0,    0,  11.,  26. ]),
+                'LF':  nar([  32.,  17.,    0,    0,    0,    0 ]),       # noqa
+                'MF':  nar([    0,    0,  4.6,  5.5,    0,    0 ])*2**.5, # noqa
+                'UHF': nar([    0,    0,    0,    0,  11.,  26. ]),       # noqa
             },
             'baseline': {
-                'LF':  nar([  21.,  13.,    0,    0,    0,    0 ]),
-                'MF':  nar([    0,    0,  3.4,  4.3,    0,    0 ])*2**.5,
-                'UHF': nar([    0,    0,    0,    0,  8.6,  22. ]),
+                'LF':  nar([  21.,  13.,    0,    0,    0,    0 ]),       # noqa
+                'MF':  nar([    0,    0,  3.4,  4.3,    0,    0 ])*2**.5, # noqa
+                'UHF': nar([    0,    0,    0,    0,  8.6,  22. ]),       # noqa
             },
             'goal': {
-                'LF':  nar([  15.,  10.,    0,    0,    0,    0 ]),
-                'MF':  nar([    0,    0,  2.4,  2.7,    0,    0 ])*2**.5,
-                'UHF': nar([    0,    0,    0,    0,  5.7,  14. ]),
+                'LF':  nar([  15.,  10.,    0,    0,    0,    0 ]),       # noqa
+                'MF':  nar([    0,    0,  2.4,  2.7,    0,    0 ])*2**.5, # noqa
+                'UHF': nar([    0,    0,    0,    0,  5.7,  14. ]),       # noqa
             },
         }[sensitivity_mode]
 
         # Save the elevation request.
-        assert(el is None)  # Sorry, no SAT elevation function!
+        assert (el is None)  # Sorry, no SAT elevation function!
         self.el = el
 
         # The reference tube config.
@@ -585,23 +596,23 @@ class SOSatV3point1(SOTel):
         if N_tubes is None:
             N_tubes = ref_tubes
         else:
-            N_tubes = [(b,x) for (b,n),x in zip(ref_tubes, N_tubes)]
-            
-        ##
-        ## T noise
-        ##
+            N_tubes = [(b, x) for (b, n), x in zip(ref_tubes, N_tubes)]
+
+        """
+        T noise
+        """
         # This model does not describe the T noise.
 
-        ##
-        ## P noise
-        ##
+        """
+        P noise
+        """
         # "atmos" just means low-ell here.  We do not claim it
         # originates from atmospheric sources.
-        self.Patmos_alpha = np.array([-2.4,-2.4,-2.5,-3,-3,-3])
+        self.Patmos_alpha = np.array([-2.4, -2.4, -2.5, -3, -3, -3])
         if one_over_f_mode == 0:
-            self.Patmos_ell = np.array([30.,30,50,50,70,100])
+            self.Patmos_ell = np.array([30., 30, 50, 50, 70, 100])
         elif one_over_f_mode == 1:
-            self.Patmos_ell = np.array([15.,15,25,25,35,40])
+            self.Patmos_ell = np.array([15., 15, 25, 25, 35, 40])
         else:
             raise ValueError('Invalid one_over_f_mode')
 

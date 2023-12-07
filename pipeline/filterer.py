@@ -1,6 +1,5 @@
 import argparse
 import healpy as hp
-from soopercool import utils
 from soopercool import BBmeta
 
 
