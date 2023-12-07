@@ -16,11 +16,7 @@ def filter(args):
         Arguments from the command line.
     """
     meta = BBmeta(args.globals)
-    kwargs = meta.get_filter_kwargs()
-    if meta.filtering_type == "m_filterer":
-        filter_func = utils.m_filter_map
-    elif meta.filtering_type == "toast":
-        filter_func = utils.toast_filter_map
+    filter_map = meta.get_filter_function()
 
     # Read the mask
     mask = meta.read_mask("analysis")
@@ -35,7 +31,7 @@ def filter(args):
                                                                cl_type,
                                                                pure_type=case)
                     map = hp.read_map(map_file, field=[0, 1, 2])
-                    filter_func(map, map_file, mask, **kwargs)
+                    filter_map(map, map_file, mask)
     meta.timer.stop(f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
                     verbose=True)
 
@@ -51,7 +47,7 @@ def filter(args):
                     id_sim=id_sim if Nsims > 1 else None
                 )
                 map = hp.read_map(map_file, field=[0, 1, 2])
-                filter_func(map, map_file, mask, **kwargs)
+                filter_map(map, map_file, mask)
         meta.timer.stop(f"Filter {Nsims} sims.", verbose=True)
 
 

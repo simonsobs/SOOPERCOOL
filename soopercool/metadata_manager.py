@@ -355,9 +355,13 @@ class BBmeta(object):
         return os.path.join(path_to_maps,
                             f"{map_set_root}_split_{id_split}.fits")
 
-    def get_filter_kwargs(self):
+    def get_filter_function(self):
+        from soopercool.utils import m_filter_map, toast_filter_map
+
         if self.filtering_type == "m_filterer":
             kwargs = {"m_cut": self.m_cut}
+            filter_function = m_filter_map
+
         elif self.filtering_type == "toast":
             kwargs = {"schedule": self.toast['schedule'],
                       "thinfp": self.toast['thinfp'],
@@ -365,11 +369,15 @@ class BBmeta(object):
                       "band": self.toast['band'],
                       "group_size": self.toast['group_size'],
                       "nside": self.nside}
+            filter_function = toast_filter_map
         else:
             raise NotImplementedError(f"Filterer type {self.filtering_type} "
                                       "not implemented")
 
-        return kwargs
+        def filter_operation(map, map_file, mask):
+            return filter_function(map, map_file, mask, **kwargs)
+
+        return filter_operation
 
     def get_map_filename_transfer2(self, id_sim, cl_type, pure_type=None):
         """
