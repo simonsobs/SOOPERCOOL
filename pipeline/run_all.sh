@@ -1,17 +1,10 @@
 paramfile='<path-to-SOOPERCOOL>/paramfiles/paramfile_SAT.yaml'
 
+# Load the environment module
+module use --append /pscratch/sd/s/susannaz/conda_envs/master_env/modulefiles
+module load master_env/0.0.3
+
 echo "Running pipeline with paramfile: ${paramfile}"
-
-# Un-comment the lines below when using use micromamba environments at NERSC
-# (for how-to, see INSTALL.md).
-# NOTE: TOAST3 needs the newest python version and is currently incompatible
-# with the conda-forge version of NaMaster (needs python version <= 3.6)
-# within a conda / micromamba environment. This workaround loads and unloads
-# two environments; one with NaMaster and one with TOAST3.
-
-# echo "Switching to environment with NaMaster"
-# eval "$(micromamba shell hook --shell bash)"
-# micromamba activate <namaster_env>
 
 echo "------------------------------------------------------------"
 echo "|           PREPARING METADATA AND SIMULATIONS             |"
@@ -38,9 +31,6 @@ python mcmer.py --globals ${paramfile} --plot
 echo "------------------------------------------------------------"
 echo "|             FILTERING SIMULATIONS AND DATA               |"
 echo "------------------------------------------------------------"
-
-# echo "Switching to environment with TOAST"
-# micromamba deactivate; micromamba activate <toast_env>
 
 echo "Running filterer for transfer"
 echo "-----------------------------"

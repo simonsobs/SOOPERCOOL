@@ -142,7 +142,6 @@ def pcler(args):
         Global parameters and command line arguments.
     """
     meta = BBmeta(args.globals)
-    print('yes')
     mask = meta.read_mask("analysis")
     nmt_binning = meta.read_nmt_binning()
     n_bins = nmt_binning.get_n_bands()
@@ -155,8 +154,6 @@ def pcler(args):
         cl_dir = meta.cell_data_directory
     if args.sims:
         cl_dir = meta.cell_sims_directory
-
-    print(cl_dir)
     if args.data or args.sims:
         # Set the number of sims to loop over
         Nsims = meta.num_sims if args.sims else 1
