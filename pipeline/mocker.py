@@ -3,10 +3,8 @@ import healpy as hp
 from soopercool.utils import get_noise_cls, beam_gaussian, generate_noise_map
 import numpy as np
 import os
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from so_models_v3 import SO_Noise_Calculator_Public_v3_1_2 as noise_calc
-from soopercool import BBmeta
+import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
+from soopercool import BBmeta, utils
 import warnings
 
 
@@ -45,8 +43,8 @@ def mocker(args):
     # Load hitmap
     hitmap = meta.read_hitmap()
 
-    meta.timer.start("Generating beams")
     # Load and save beams
+    meta.timer.start("Generating beams")
 
     beam_arcmin = {freq_band: beam_arcmin
                    for freq_band, beam_arcmin in zip(noise_model.get_bands(),
@@ -58,8 +56,9 @@ def mocker(args):
 
         # Save beams
         file_root = meta.file_root_from_map_set(map_set)
-        np.savetxt(f"{beam_dir}/beam_{file_root}.dat",
-                   np.transpose([lth, beams[map_set]]))
+        if not os.path.exists(file_root):
+            np.savetxt(f"{beam_dir}/beam_{file_root}.dat",
+                       np.transpose([lth, beams[map_set]]))
     meta.timer.stop("Generating beams")
 
     hp_ordering = ["TT", "TE", "TB", "EE", "EB", "BB"]
@@ -78,9 +77,13 @@ def mocker(args):
             n_splits = meta.n_splits_from_map_set(map_set)
             file_root = meta.file_root_from_map_set(map_set)
             for id_split in range(n_splits):
-                noise_map = generate_noise_map(nlth_dict["T"][freq_tag],
-                                               nlth_dict["P"][freq_tag],
-                                               hitmap, n_splits)
+                noise_map = generate_noise_map(
+                    nlth_dict["T"][freq_tag],
+                    nlth_dict["P"][freq_tag],
+                    hitmap,
+                    n_splits,
+                    is_anisotropic=meta.anisotropic_noise
+                )
                 split_map = cmb_map_beamed + noise_map
 
                 split_map *= binary_mask
@@ -99,17 +102,12 @@ def mocker(args):
                 if args.plots:
                     if Nsims == 1:
                         plot_dir = meta.plot_dir_from_output_dir(
-                            meta.map_directory_relative)
-                        for i, m in enumerate("TQU"):
-                            vrange = 300 if m == "T" else 10
-                            plt.figure(figsize=(16, 9))
-                            hp.mollview(split_map[i], title=map_set,
-                                        cmap=cm.coolwarm, min=-vrange,
-                                        max=vrange)
-                            hp.graticule()
-                            plt.savefig(f"{plot_dir}/map_{map_set}__{id_split}_{m}.png",  # noqa
-                                        bbox_inches="tight")
-
+                            meta.map_directory_rel
+                        )
+                        utils.plot_map(split_map,
+                                       f"{plot_dir}/map_{map_set}__{id_split}",
+                                       title=map_set,
+                                       TQU=True)
             meta.timer.stop(f"Generate map set {map_set} split maps")
 
 

@@ -90,15 +90,15 @@ def mcmer(args):
             spin2xspin2_binned=mcm_binned[3:, :, 3:, :]
         )
 
-#    if args.plot:
-#        import matplotlib.pyplot as plt
-#
-#        print("Plotting")
-#        plt.figure()
-#        plt.imshow(mcm.reshape([nspec*nl, nspec*nl]))
-#        plt.colorbar()
-#        fname = f"{coupling_dir}/mcm.png"
-#        plt.savefig(fname, bbox_inches='tight')
+    if args.plots:
+        import matplotlib.pyplot as plt
+
+        print("Plotting")
+        plt.figure()
+        plt.imshow(mcm.reshape([nspec*nl, nspec*nl]))
+        plt.colorbar()
+        fname = f"{coupling_dir}/mcm.png"
+        plt.savefig(fname, bbox_inches='tight')
 
 
 if __name__ == '__main__':
@@ -106,7 +106,7 @@ if __name__ == '__main__':
     parser.add_argument("--globals", type=str,
                         help='Path to yaml with global parameters')
     parser.add_argument("--output-dir", type=str, help='Output directory')
-    parser.add_argument("--plot", action='store_true',
+    parser.add_argument("--plots", action='store_true',
                         help='Pass to generate a plot of the MCM.')
     args = parser.parse_args()
 

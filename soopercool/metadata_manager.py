@@ -1,10 +1,8 @@
 import yaml
 import numpy as np
 import os
-import pymaster as nmt
 import healpy as hp
 import time
-# from itertools import combinations_with_replacement as cwr
 
 
 class BBmeta(object):
@@ -213,6 +211,7 @@ class BBmeta(object):
         """
         Read the binning file and return the corresponding NmtBin object.
         """
+        import pymaster as nmt
         binning = np.load(self.path_to_binning)
         return nmt.NmtBin.from_edges(binning["bin_low"],
                                      binning["bin_high"] + 1)
@@ -243,7 +242,7 @@ class BBmeta(object):
         """
         Loop over the simulation parameters and set them as attributes.
         """
-        for name in ["num_sims", "cosmology",
+        for name in ["num_sims", "cosmology", "anisotropic_noise",
                      "mock_nsrcs", "mock_srcs_hole_radius",
                      "hitmap_file"]:
             setattr(self, name, self.sim_pars[name])
@@ -257,7 +256,7 @@ class BBmeta(object):
 
     def save_fiducial_cl(self, ell, cl_dict, cl_type):
         """
-        Save a fiducial power spectra dictionnary to disk.
+        Save a fiducial power spectra dictionary to disk and return file name.
 
         Parameters
         ----------
@@ -271,6 +270,7 @@ class BBmeta(object):
         """
         fname = getattr(self, f"{cl_type}_cls_file")
         np.savez(fname, l=ell, **cl_dict)
+        return fname
 
     def load_fiducial_cl(self, cl_type):
         """
@@ -355,6 +355,30 @@ class BBmeta(object):
         return os.path.join(path_to_maps,
                             f"{map_set_root}_split_{id_split}.fits")
 
+    def get_filter_function(self):
+        from soopercool.utils import m_filter_map, toast_filter_map
+
+        if self.filtering_type == "m_filterer":
+            kwargs = {"m_cut": self.m_cut}
+            filter_function = m_filter_map
+
+        elif self.filtering_type == "toast":
+            kwargs = {"schedule": self.toast['schedule'],
+                      "thinfp": self.toast['thinfp'],
+                      "instrument": self.toast['instrument'],
+                      "band": self.toast['band'],
+                      "group_size": self.toast['group_size'],
+                      "nside": self.nside}
+            filter_function = toast_filter_map
+        else:
+            raise NotImplementedError(f"Filterer type {self.filtering_type} "
+                                      "not implemented")
+
+        def filter_operation(map, map_file, mask):
+            return filter_function(map, map_file, mask, **kwargs)
+
+        return filter_operation
+
     def get_map_filename_transfer2(self, id_sim, cl_type, pure_type=None):
         """
         """
@@ -416,7 +440,15 @@ class BBmeta(object):
 
     def get_ps_names_list(self, type="all", coadd=False):
         """
-        List all the possible cross split power spectra
+        List the names of cross (and auto) power spectra. Every experiment has
+        a number of frequencies and map bundles (splits) with independent
+        noise realizations. This function either outputs bundle-coadded
+        power spectra (coadd=True), or the cross (and auto) bundle spectra.
+        Spectra are considered noise-unbiased if they are either across
+        different experiments or across different bundles, or both. Otherwise,
+        they have noise bias. Type "cross" selects noise-unbiased spectra,
+        type "auto" selects noise-biased spectra, and type "all" selects all.
+
         Example:
             From two map_sets `ms1` and `ms2` with
             two splits each, and `type="all"`,
@@ -432,11 +464,11 @@ class BBmeta(object):
         type : str, optional
             Type of power spectra to return.
             Can be "all", "auto" or "cross". "auto" returns all unique
-            auto-split spectra, while "cross" returns all unique
-            cross-split spectra. "all" is the union of both.
+            noise-biased spectra, while "cross" returns all unique
+            noise-biased spectra. "all" is the union of both.
         coadd: bool, optional
-            If True, return the cross-split power spectra names.
-            Else, return the (split-)coadded power spectra names.
+            If True, return the cross (and/or auto) bundle power spectra names.
+            Else, return the (bundle-)coadded power spectra names.
         """
         map_iterable = self.map_sets_list if coadd else self.maps_list
 
@@ -461,10 +493,8 @@ class BBmeta(object):
                     if (map_set_1 == map_set_2) and (split_1 > split_2):
                         continue
 
-                    exp_tag_1 = map_set_1
-                    # self.exp_tag_from_map_set(map_set_1)
-                    exp_tag_2 = map_set_2
-                    # self.exp_tag_from_map_set(map_set_2)
+                    exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
+                    exp_tag_2 = self.exp_tag_from_map_set(map_set_2)
 
                     if ((type == "cross") and (exp_tag_1 == exp_tag_2)
                             and (split_1 == split_2)):
@@ -476,20 +506,46 @@ class BBmeta(object):
                 ps_name_list.append((map1, map2))
         return ps_name_list
 
-    def get_n_split_pairs_from_map_sets(self, map_set1, map_set2,
+    def get_n_split_pairs_from_map_sets(self, map_set_1, map_set_2,
                                         type="cross"):
-        n_splits1 = self.n_splits_from_map_set(map_set1)
-        n_splits2 = self.n_splits_from_map_set(map_set2)
-        # exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
-        # exp_tag_2 = self.exp_tag_from_map_set(map_set_2)
+        """
+        Returns the number of unique cross (and auto) bundle spectra that are
+        associated to a given pair of map sets ("tagged-coadded" maps).
+        Types "cross" or "auto" determine whether to output only the
+        noise-unbiased or noise-biased bundle combinations, respectively;
+        type "all" returns all of them.
+
+        Example:
+            Given two map sets "SAT1_f093" and "SAT1_f145", and 4 bundles
+            for SAT1, output the number of splits
+            * 4*(4-1)/2 = 6  for type "cross"
+            * 4              for type "auto"
+            * 4*(4+1)/2 = 10 for type "all"
+
+        Parameters
+        ----------
+        type : str, optional
+            Type of power spectra to return.
+            Can be "all", "auto" or "cross". "auto" returns all unique
+            noise-biased spectra, while "cross" returns all unique
+            noise-biased spectra. "all" is the union of both.
+        """
+        n_splits_1 = self.n_splits_from_map_set(map_set_1)
+        n_splits_2 = self.n_splits_from_map_set(map_set_2)
+        exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
+        exp_tag_2 = self.exp_tag_from_map_set(map_set_2)
         if type == "cross":
-            n_pairs = n_splits1 * (n_splits1 - 1) / 2 if map_set1 == map_set2 \
-                else n_splits1*n_splits2
+            if exp_tag_1 == exp_tag_2:
+                n_pairs = n_splits_1 * (n_splits_1 - 1) / 2
+            else:
+                n_pairs = n_splits_1 * n_splits_2
         elif type == "auto":
-            n_pairs = n_splits1 if map_set1 == map_set2 else 0
+            n_pairs = n_splits_1 if exp_tag_1 == exp_tag_2 else 0
         elif type == "all":
-            n_pairs = n_splits1 * (n_splits1 + 1) / 2 if map_set1 == map_set2 \
-                else n_splits1*n_splits2
+            if exp_tag_1 == exp_tag_2:
+                n_pairs = n_splits_1 * (n_splits_1 + 1) / 2
+            else:
+                n_pairs = n_splits_1 * n_splits_2
         else:
             raise ValueError("You selected an invalid type. "
                              "Options are 'cross', 'auto', and 'all'.")
