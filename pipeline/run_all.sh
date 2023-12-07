@@ -1,4 +1,4 @@
-paramfile='<path-to-SOOPERCOOL>/paramfiles/paramfile_SAT.yaml'
+paramfile='/global/homes/k/kwolz/bbdev/SOOPERCOOL/paramfiles/paramfile_mcut_kevin.yaml'
 
 # Load the environment module
 module use --append /pscratch/sd/s/susannaz/conda_envs/master_env/modulefiles
