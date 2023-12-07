@@ -2,7 +2,7 @@ import yaml
 import numpy as np
 import os
 from scipy.interpolate import interp1d
-from so_models_v3 import SO_Noise_Calculator_Public_v3_1_2 as noise_calc
+import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 import healpy as hp
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -293,7 +293,7 @@ def toast_filter_map(map, map_file, mask,
 
     comm, procs, rank = toast.mpi.get_world()
 
-    output_dir = map.replace('.fits', '/')
+    output_dir = map_file.replace('.fits', '/')
     os.makedirs(output_dir, exist_ok=True)
 
     # Initialize schedule
@@ -351,7 +351,7 @@ def toast_filter_map(map, map_file, mask,
 
     # Scan map
     print('Scan input map')
-    data, scan_map = apply_scan_map(data, map, pixels_radec, weights_radec)
+    data, scan_map = apply_scan_map(data, map_file, pixels_radec, weights_radec)
 
     # Create the binner
     binner = create_binner(pixels_radec, det_pointing_radec)

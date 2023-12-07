@@ -3,7 +3,7 @@ import healpy as hp
 from soopercool.utils import get_noise_cls, beam_gaussian, generate_noise_map
 import numpy as np
 import os
-from so_models_v3 import SO_Noise_Calculator_Public_v3_1_2 as noise_calc
+import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 from soopercool import BBmeta, utils
 import warnings
 
