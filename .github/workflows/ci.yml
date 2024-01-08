@@ -58,3 +58,7 @@ jobs:
         uses: py-actions/flake8@v2
         with:
           args: "--config .flake8"
+
+      - name: Tests
+        run: pytest -vv --cov=soopercool 
+        
