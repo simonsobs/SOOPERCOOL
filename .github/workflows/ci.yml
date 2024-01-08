@@ -33,9 +33,9 @@ jobs:
         env:
           FC: ${{ steps.setup-fortran.outputs.fc }}
 
-      #- name: Install pymaster dependencies
-      #  run: |
-      #    sudo -H apt-get install libgsl-dev libfftw3-dev libcfitsio-dev
+      - name: Install dependencies
+        run: |
+          sudo -H apt-get install libgsl-dev libfftw3-dev libcfitsio-dev
 
       - name: Install soopercool & dependencies
         run: |
