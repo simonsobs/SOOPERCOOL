@@ -35,7 +35,7 @@ def mcmer(args):
     w = nmt.NmtWorkspace()
     w.compute_coupling_matrix(field_spin0, field_spin2, nmt_bins, is_teb=True)
 
-    nl = meta.lmax + 1
+    nl = 3*meta.nside
     nspec = 7
     mcm = np.transpose(w.get_coupling_matrix().reshape([nl, nspec, nl, nspec]),
                        axes=[1, 0, 3, 2])
