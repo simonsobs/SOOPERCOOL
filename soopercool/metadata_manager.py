@@ -35,6 +35,11 @@ class BBmeta(object):
 
         # Set the general attributes (nside, lmax, etc...)
         self._set_general_attributes()
+        
+        # Copy the configuration file to output directory
+        import shutil
+        shutil.copyfile(fname_config, 
+                        self.output_dirs["root"]+"/paramfile_copy.yaml")
 
         # Basic sanity checks
         if self.lmax > 3*self.nside-1:
