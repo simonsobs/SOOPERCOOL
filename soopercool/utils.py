@@ -594,3 +594,53 @@ class PipelineManager(object):
             else:
                 raise ValueError(f"Unknown kind {which}")
         return fnames
+
+
+def get_apodized_mask_from_nhits(nhits_map,
+                                 galactic_mask=None,
+                                 point_source_mask=None,
+                                 zero_threshold=1e-3,
+                                 apod_radius=10.,
+                                 apod_radius_point_source=4.,
+                                 apod_type="C1"):
+    """
+    Produces an appropriately apodized mask from an nhits map as used in
+    the BB pipeline paper (https://arxiv.org/abs/2302.04276).
+
+    Procedure:
+    1) Make binary mask by smoothing, normalizing and thresholding nhits map
+    2) (optional) multiply binary mask by galactic mask
+    3) Apodize (binary * galactic)
+    4) (optional) multiply (binary * galactic) with point source mask
+    5) (optional) apodize (binary * galactic * point source)
+    6) Multiply everything by nhits map
+    """
+    import pymaster as nmt
+
+    # Smooth nhits map
+    nhits_smoothed = hp.smoothing(nhits_map, fwhm=np.pi/180, verbose=False)
+    nhits_smoothed[nhits_smoothed < 0] = 0
+
+    # Normalize maps
+    nhits_map /= np.amax(nhits_map)
+    nhits_smoothed /= np.amax(nhits_smoothed)
+
+    # Make binary mask by thresholding smoothed nhits map
+    binary_mask = np.zeros_like(nhits_smoothed)
+    binary_mask[nhits_smoothed > zero_threshold] = 1
+
+    # Multiply by Galactic mask
+    if galactic_mask is not None:
+        binary_mask *= galactic_mask
+
+    # Apodize the binary mask
+    binary_mask = nmt.mask_apodization(binary_mask, apod_radius,
+                                       apotype=apod_type)
+
+    # Multiply with point source mask
+    if point_source_mask is not None:
+        binary_mask *= point_source_mask
+        binary_mask = nmt.mask_apodization(binary_mask, apod_radius_point_source,
+                                           apotype=apod_type)
+
+    return nhits_map * binary_mask

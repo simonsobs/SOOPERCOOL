@@ -1,6 +1,6 @@
 import argparse
 import healpy as hp
-from soopercool.utils import random_src_mask
+from soopercool.utils import random_src_mask, get_apodized_mask_from_nhits
 from soopercool import BBmeta
 import pymaster as nmt
 import numpy as np
@@ -26,19 +26,18 @@ def mask_handler(args):
 
     # Download SAT hits map
     print("Download and save SAT hits map ...")
-    sat_nhits_file = meta.hitmap_file
-    # if not os.path.exists(sat_nhits_file):
+    nhits_file = meta.hitmap_file
     urlpref = "https://portal.nersc.gov/cfs/sobs/users/so_bb/"
     url = f"{urlpref}norm_nHits_SA_35FOV_ns512.fits"
     # Open the URL with a timeout
     with urllib.request.urlopen(url, timeout=timeout_seconds):
         # Retrieve the file and save it locally
-        urllib.request.urlretrieve(url, filename=sat_nhits_file)
+        urllib.request.urlretrieve(url, filename=nhits_file)
 
     # Generate binary survey mask from a hitmap
     meta.timer.start("Computing binary mask")
-    sat_nhits = hp.read_map(sat_nhits_file)
-    binary_maskk = (sat_nhits > 0).astype(float)
+    nhits = hp.read_map(nhits_file)
+    binary_maskk = (nhits > 0).astype(float)
     binary_mask = hp.ud_grade(binary_maskk, meta.nside)
     meta.save_mask("binary", binary_mask, overwrite=True)
     meta.timer.stop("Computing binary mask", args.verbose)
@@ -65,7 +64,6 @@ def mask_handler(args):
     else:
         # Assemble custom analysis mask from hits map, Galactic mask and
         # point source mask
-        raise NotImplementedError("Can only download analysis mask for now")
 
         # Download galactic mask
         if "galactic" in meta.masks["include_in_mask"]:
@@ -127,18 +125,22 @@ def mask_handler(args):
 
         # Add the masks
         meta.timer.start("final_mask")
-        final_mask = binary_mask.copy()
+        galactic_mask = None
+        point_source_mask = None
         if "galactic" in meta.masks["include_in_mask"]:
-            mask = meta.read_mask("galactic")
-            final_mask *= mask
+            galactic_mask = meta.read_mask("galactic")
         if "point_source" in meta.masks["include_in_mask"]:
-            mask = meta.read_mask("point_source")
-            final_mask *= mask
+            point_source_mask = meta.read_mask("point_source")
 
-        # TODO: Implement thresholding and smoothing
-        final_mask = nmt.mask_apodization(final_mask,
-                                          meta.masks["apod_radius"],
-                                          apotype=meta.masks["apod_type"])
+        # Combine, apodize, and hits-weight the masks
+        final_mask = get_apodized_mask_from_nhits(
+            nhits_map, 
+            galactic_mask=galactic_mask,
+            point_source_mask=point_source_mask,
+            zero_threshold=1e-3, apod_radius=meta.masks["apod_radius"],
+            apod_radius_point_source=meta.masks["apod_radius_point_source"],
+            apod_type="C1")
+
         meta.save_mask("analysis", final_mask, overwrite=True)
         meta.timer.stop("final_mask", "Compute and save final analysis mask",
                         args.verbose)
