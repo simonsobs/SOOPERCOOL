@@ -13,7 +13,7 @@ echo "------------------------------------------------------------"
 echo "Pre-processing data..."
 echo "-------------------"
 python pre_processer.py --globals ${paramfile} --sims
-python mask_handler.py --globals ${paramfile}
+python mask_handler.py --globals ${paramfile} --self_assemble
 
 echo "Running mock stage for data..."
 echo "------------------------------"
