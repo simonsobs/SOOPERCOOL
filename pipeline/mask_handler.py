@@ -3,7 +3,6 @@ import healpy as hp
 from soopercool.utils import (random_src_mask, get_apodized_mask_from_nhits,
                               get_binary_mask_from_nhits)
 from soopercool import BBmeta
-import pymaster as nmt
 import numpy as np
 import os
 import matplotlib.pyplot as plt
