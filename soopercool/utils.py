@@ -184,18 +184,12 @@ def beam_hpix(ll, nside):
     return beam_gaussian(ll, fwhm_hp_amin)
 
 
-def create_binning(lmin, lmax, delta_ell):
+def create_binning(nside, delta_ell):
     """
     """
-    bin_low = np.arange(lmin, lmax, delta_ell)
+    bin_low = np.arange(0, 3*nside, delta_ell)
     bin_high = bin_low + delta_ell - 1
-
-    idx = bin_high <= lmax
-    bin_low, bin_high = bin_low[idx], bin_high[idx]
-
-    if lmax not in bin_high:
-        bin_low = np.concatenate([bin_low, [bin_high[-1]+1]])
-        bin_high = np.concatenate([bin_high, [lmax]])
+    bin_high[-1] = 3*nside - 1
     bin_center = (bin_low + bin_high) / 2
 
     return bin_low, bin_high, bin_center
