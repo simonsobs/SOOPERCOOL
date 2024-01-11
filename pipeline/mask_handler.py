@@ -1,6 +1,7 @@
 import argparse
 import healpy as hp
-from soopercool.utils import random_src_mask, get_apodized_mask_from_nhits
+from soopercool.utils import (random_src_mask, get_apodized_mask_from_nhits,
+                              get_binary_mask_from_nhits)
 from soopercool import BBmeta
 import pymaster as nmt
 import numpy as np
@@ -24,21 +25,27 @@ def mask_handler(args):
 
     os.makedirs(mask_dir, exist_ok=True)
 
-    # Download SAT hits map
-    print("Download and save SAT hits map ...")
+    # Download hits map
+    print("Download and save hits map ...")
     nhits_file = meta.hitmap_file
     urlpref = "https://portal.nersc.gov/cfs/sobs/users/so_bb/"
     url = f"{urlpref}norm_nHits_SA_35FOV_ns512.fits"
     # Open the URL with a timeout
     with urllib.request.urlopen(url, timeout=timeout_seconds):
-        # Retrieve the file and save it locally
         urllib.request.urlretrieve(url, filename=nhits_file)
+        nhits = hp.ud_grade(hp.read_map(nhits_file), meta.nside, power=-2)
+        hp.write_map(meta.hitmap_file, nhits, overwrite=True)
+    if args.plots:
+        plt.figure(figsize=(16, 9))
+        hp.mollview(nhits, cmap=cmap, cbar=False)
+        hp.graticule()
+        plt.savefig(meta.binary_mask_name.replace('.fits', '_nhits.png'))
 
-    # Generate binary survey mask from a hitmap
+    # Generate binary survey mask from the hits map
     meta.timer.start("Computing binary mask")
     nhits = hp.read_map(nhits_file)
-    binary_maskk = (nhits > 0).astype(float)
-    binary_mask = hp.ud_grade(binary_maskk, meta.nside)
+    binary_mask = get_binary_mask_from_nhits(nhits, meta.nside,
+                                             zero_threshold=1e-3)
     meta.save_mask("binary", binary_mask, overwrite=True)
     meta.timer.stop("Computing binary mask", args.verbose)
 
@@ -134,12 +141,13 @@ def mask_handler(args):
 
         # Combine, apodize, and hits-weight the masks
         final_mask = get_apodized_mask_from_nhits(
-            nhits_map, 
+            nhits, meta.nside,
             galactic_mask=galactic_mask,
             point_source_mask=point_source_mask,
             zero_threshold=1e-3, apod_radius=meta.masks["apod_radius"],
             apod_radius_point_source=meta.masks["apod_radius_point_source"],
-            apod_type="C1")
+            apod_type="C1"
+        )
 
         meta.save_mask("analysis", final_mask, overwrite=True)
         meta.timer.stop("final_mask", "Compute and save final analysis mask",
