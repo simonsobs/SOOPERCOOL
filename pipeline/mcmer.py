@@ -25,7 +25,7 @@ def mcmer(args):
 
     # Create dummy NaMaster fields, spin-2 is optionally purified.
     field_spin0 = nmt.NmtField(mask, None, spin=0)
-    field_spin2 = nmt.NmtField(mask, None, spin=0)
+    field_spin2 = nmt.NmtField(mask, None, spin=2)
     if meta.pure_B:
         field_spin2_pure = nmt.NmtField(mask, None, spin=2,
                                         purify_b=meta.pure_B)

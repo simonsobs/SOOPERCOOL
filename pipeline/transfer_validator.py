@@ -222,6 +222,9 @@ def transfer_validator(args):
                 main.set_xlim(2, meta.lmax)
                 sub.set_xlim(*main.get_xlim())
 
+                # Suplot y range
+                sub.set_ylim((-5., 5.))
+
                 # Cosmetix
                 main.set_title(f1+f2, fontsize=14)
                 if spec == "TT":
