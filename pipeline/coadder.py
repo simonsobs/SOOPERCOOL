@@ -38,7 +38,6 @@ def coadder(args):
         # Load split C_ells
         for id_sim in range(Nsims):
             cells_save = {}
-            debug_ct = 0
             for map_name1, map_name2 in meta.get_ps_names_list(type=type,
                                                                coadd=False):
                 map_set1, id_split1 = map_name1.split("__")
@@ -55,10 +54,6 @@ def coadder(args):
                     if cells_label not in cells_save:
                         cells_save[cells_label] = np.zeros(n_bins)
                     cells_save[cells_label] += cells_dict[field_pair]/n_pairs
-                    # DEBUG
-                    if cells_label == "SAT1_f145__SAT1_f145__EE":
-                        print(f"{map_name1}_{map_name2}")
-                        debug_ct += 1
 
             for cells_label in cells_save:
                 np.savez(

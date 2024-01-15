@@ -5,13 +5,13 @@
 # Define the directories
 ## Let's start with directories of data products
 data_dirs:
-  root: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/data"
+  root: "<path-to-SOOPERCOOL>/data"
   map_directory: "maps"
   beam_directory: "beams"
   bandpasses_directory: "bandpasses"
 ## Then directories in which we will store outputs
 output_dirs: 
-  root: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/outputs"
+  root: "<path-to-SOOPERCOOL>/outputs"
   mask_directory: "masks"
   pre_process_directory: "pre_processing"
   sims_directory: "sims"
@@ -44,26 +44,6 @@ map_sets:
     n_splits: 3
     freq_tag: 145
     exp_tag: "SAT1"
-  # SAT2_f093:
-  #   file_root: "cmb_sat2_f093"
-  #   n_splits: 4
-  #   freq_tag: 93
-  #   exp_tag: "SAT2"
-  # SAT2_f145:
-  #   file_root: "cmb_sat2_f145"
-  #   n_splits: 4
-  #   freq_tag: 145
-  #   exp_tag: "SAT2"
-  # SAT3_f225:
-  #   file_root: "cmb_sat3_f225"
-  #   n_splits: 4
-  #   freq_tag: 225
-  #   exp_tag: "SAT3"
-  # SAT3_f285:
-  #   file_root: "cmb_sat3_f285"
-  #   n_splits: 4
-  #   freq_tag: 280
-  #   exp_tag: "SAT3"
 
 ####################
 # Masking metadata #
@@ -75,11 +55,11 @@ masks:
   galactic_mask_root: "planck_galactic_mask"
   point_source_mask: "point_source_mask.fits"
 
-  include_in_mask: ["galactic"]
+  include_in_mask: []
   gal_mask_mode: "gal070"
-  apod_radius: 4.0
+  apod_radius: 10.0
+  apod_radius_point_source: 4.0
   apod_type: "C1"
-
 
 ####################################
 # Metadata related to the analysis #
@@ -91,11 +71,13 @@ general_pars:
   lmax: 600
   deltal: 10
   binning_file: "binning.npz"
+  pure_B: True
 
 ## Simulation related
 sim_pars:
-  hitmap_file: "/pscratch/sd/k/kwolz/bbdev/BBMASTER/data/norm_nHits_SA_35FOV_ns512.fits"
-  num_sims: 10
+  hitmap_file: "<path-to-SOOPERCOOL>/outputs/masks/norm_nHits_SA_35FOV_ns512.fits"
+  anisotropic_noise: False
+  num_sims: 3
   cosmology:
     cosmomc_theta: 0.0104085
     As: 2.1e-9
@@ -106,18 +88,20 @@ sim_pars:
     tau: 0.0544
     r: 0.01
   mock_nsrcs: 80
-  mock_srcs_hole_radius: 40
-  
+  mock_srcs_hole_radius: 40  
 
 ## Filtering transfer function related parameters
 tf_settings:
   filtering_type: "m_filterer" # "m_filterer" or "toast"
   m_cut: 30 # necessary only if `filtering_type` is set to "m_filterer"
   toast: # necessary only if `filtering_type` is set to "toast"
-    schedule_file: "in_data/toast_schedule.txt"
-    par_file: "in_data/toast_pars.toml"
+    schedule: "<path-to-SOOPERCOOL>/schedules/schedule_sat.txt"
+    instrument: "SAT1"
+    band: "SAT_f090"
+    thinfp: 8
+    group_size: 4
 
-  tf_est_num_sims: 100
+  tf_est_num_sims: 4
 
   power_law_pars_tf_est:
     amp: 1.0

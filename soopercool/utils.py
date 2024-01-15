@@ -2,9 +2,10 @@ import yaml
 import numpy as np
 import os
 from scipy.interpolate import interp1d
-from so_models_v3 import SO_Noise_Calculator_Public_v3_1_2 as noise_calc
-import pymaster as nmt
+import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 import healpy as hp
+import matplotlib.pyplot as plt
+from matplotlib import cm
 import sacc
 import camb
 
@@ -19,6 +20,7 @@ def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
     binning -> binning scheme to use
     winv -> inverse binned MCM (optional)
     """
+    import pymaster as nmt
 
     if winv is not None:
         nbpw = binning.get_n_bands()
@@ -124,7 +126,7 @@ def get_noise_cls(fsky, lmax, lmin=0, sensitivity_mode='baseline',
     return lth, nlth_dict
 
 
-def generate_noise_map(nl_T, nl_P, hitmap, n_splits):
+def generate_noise_map(nl_T, nl_P, hitmap, n_splits, is_anisotropic=True):
     """
     """
     # healpix ordering ["TT", "EE", "BB", "TE"]
@@ -134,8 +136,9 @@ def generate_noise_map(nl_T, nl_P, hitmap, n_splits):
 
     noise_map = hp.synfast(noise_mat, hp.get_nside(hitmap), pol=True, new=True)
 
-    # Weight with hitmap
-    noise_map[:, hitmap != 0] /= np.sqrt(hitmap[hitmap != 0] / np.max(hitmap))
+    if is_anisotropic:
+        # Weight with hitmap
+        noise_map[:, hitmap != 0] /= np.sqrt(hitmap[hitmap != 0] / np.max(hitmap)) # noqa
 
     return noise_map
 
@@ -181,18 +184,12 @@ def beam_hpix(ll, nside):
     return beam_gaussian(ll, fwhm_hp_amin)
 
 
-def create_binning(lmin, lmax, delta_ell):
+def create_binning(nside, delta_ell):
     """
     """
-    bin_low = np.arange(lmin, lmax, delta_ell)
+    bin_low = np.arange(0, 3*nside, delta_ell)
     bin_high = bin_low + delta_ell - 1
-
-    idx = bin_high <= lmax
-    bin_low, bin_high = bin_low[idx], bin_high[idx]
-
-    if lmax not in bin_high:
-        bin_low = np.concatenate([bin_low, [bin_high[-1]+1]])
-        bin_high = np.concatenate([bin_high, [lmax]])
+    bin_high[-1] = 3*nside - 1
     bin_center = (bin_low + bin_high) / 2
 
     return bin_low, bin_high, bin_center
@@ -207,13 +204,27 @@ def power_law_cl(ell, amp, delta_ell, power_law_index):
             A = amp[spec]
         else:
             A = amp
+        # A is power spectrum amplitude at pivot ell == 1 - delta_ell
         pl_ps[spec] = A / (ell + delta_ell) ** power_law_index
 
     return pl_ps
 
 
-def m_filter_map(map, mask, m_cut):
+def m_filter_map(map, map_file, mask, m_cut):
     """
+    Applies the m-cut mock filter to a given map with a given sky mask.
+
+    Parameters
+    ----------
+    map : array-like
+        Healpix TQU map to be filtered.
+    map_file : str
+        File path of the unfiltered map.
+    mask : array-like
+        Healpix map storing the sky mask.
+    m_cut : int
+        Maximum nonzero m-degree of the multipole expansion. All higher
+        degrees are set to zero.
     """
 
     map_masked = map * mask
@@ -225,13 +236,138 @@ def m_filter_map(map, mask, m_cut):
     n_modes_to_filter = (m_cut + 1) * (lmax + 1) - ((m_cut + 1) * m_cut) // 2
     alms[:, :n_modes_to_filter] = 0.
 
-    return hp.alm2map(alms, nside=nside, lmax=lmax)
+    filtered_map = hp.alm2map(alms, nside=nside, lmax=lmax)
+
+    hp.write_map(map_file.replace('.fits', '_filtered.fits'),
+                 filtered_map, overwrite=True,
+                 dtype=np.float32)
 
 
-def toast_filter_map(map, mask):
+def toast_filter_map(map, map_file, mask,
+                     schedule, thinfp, instrument, band, group_size, nside):
     """
+    Applies the TOAST filter to a given map.
+
+    Parameters
+    ----------
+    map : array-like (unused)
+        This is an unused argument included for compatibility with other
+        filters. TOAST won't read the map itself.
+    map_file : str
+        File path of the unfiltered map.
+    mask : array-like (unused)
+        This is an unused argument included for compatibility with other
+        filters. TOAST won't read the mask itself.
+    schedule : str
+        Text file path with the TOAST schedule.
+    thinfp : int
+        Thinning factor of the number of detectors used in the TOAST
+        focalplane.
+    instrument : str
+        Name of the instrument simulated by TOAST.
+    band : str
+        Name of the frequency band simulated by TOAST.
+    group_size : int
+        Group size used for parallelizing filtering with TOAST.
+    nside : int
+        Healpix Nside parameter of the filtered map.
     """
-    raise NotImplementedError("TOAST filtering not implemented yet.")
+    import toast
+    import sotodlib.toast as sotoast
+    from astropy import units as u
+    from .toast_utils import (
+        apply_scanning, apply_det_pointing_radec, apply_pixels_radec,
+        apply_weights_radec, apply_noise_model, apply_scan_map, create_binner,
+        apply_demodulation, make_filterbin
+    )
+    from types import SimpleNamespace
+    import toast.mpi
+
+    del map, mask  # delete unused arguments
+
+    comm, procs, rank = toast.mpi.get_world()
+
+    output_dir = map_file.replace('.fits', '/')
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Initialize schedule
+    schedule_ = toast.schedule.GroundSchedule()
+
+    if not os.path.exists(schedule):
+        raise FileNotFoundError(f"The corresponding schedule file {schedule} "
+                                "is not stored.")
+
+    # Read schedule
+    print('Read schedule')
+    schedule_.read(schedule)
+
+    # Setup focal plane
+    print('Initialize focal plane and telescope')
+    focalplane = sotoast.SOFocalplane(hwfile=None,
+                                      telescope=instrument,
+                                      sample_rate=40 * u.Hz,
+                                      bands=band,
+                                      wafer_slots='w25',
+                                      tube_slots=None,
+                                      thinfp=thinfp,
+                                      comm=comm)
+
+    # Setup telescope
+    telescope = toast.Telescope(
+        name=instrument,
+        focalplane=focalplane,
+        site=toast.GroundSite("Atacama", schedule_.site_lat,
+                              schedule_.site_lon, schedule_.site_alt)
+    )
+
+    # Setup toast communicator
+    runargs = SimpleNamespace(node_mem=None,
+                              group_size=group_size)  # Note the underscore
+    group_size = toast.job_group_size(
+        comm,
+        runargs,
+        schedule=schedule_,
+        focalplane=focalplane,
+    )
+    toast_comm = toast.Comm(world=comm,
+                            groupsize=group_size)  # Note no underscore
+
+    # Create data object
+    data = toast.Data(comm=toast_comm)
+
+    # Apply filters
+    print('Apply filters')
+    _, sim_gnd = apply_scanning(data, telescope, schedule_)
+    data, det_pointing_radec = apply_det_pointing_radec(data, sim_gnd)
+    data, pixels_radec = apply_pixels_radec(data, det_pointing_radec, nside)
+    data, weights_radec = apply_weights_radec(data, det_pointing_radec)
+    data, noise_model = apply_noise_model(data)
+
+    # Scan map
+    print('Scan input map')
+    data, scan_map = apply_scan_map(data, map_file, pixels_radec,
+                                    weights_radec)
+
+    # Create the binner
+    binner = create_binner(pixels_radec, det_pointing_radec)
+
+    # Demodulate
+    data, weights_radec = apply_demodulation(data, weights_radec, sim_gnd,
+                                             binner)
+
+    # Map filterbin
+    make_filterbin(data, binner, output_dir)
+
+    if rank == 0:
+        # Only one rank can do this
+        # Unify name conventions
+        if os.path.isfile(output_dir + 'FilterBin_unfiltered_map.fits'):
+            # only for TOAST versions < 3.0.0a20
+            os.remove(output_dir + 'FilterBin_unfiltered_map.fits')
+        os.rename(output_dir + 'FilterBin_filtered_map.fits',
+                  output_dir[:-1] + '_filtered.fits')
+        if os.path.isdir(output_dir):
+            os.rmdir(output_dir)
 
 
 def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,
@@ -255,6 +391,17 @@ def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,
             split_pairs_list["auto"].append((split_ms1, split_ms2))
 
     return split_pairs_list
+
+
+def plot_map(map, fname, vrange_T=300, vrange_P=10, title=None, TQU=True):
+    fields = "TQU" if TQU else "QU"
+    for i, m in enumerate(fields):
+        vrange = vrange_T if m == "T" else vrange_P
+        plt.figure(figsize=(16, 9))
+        hp.mollview(map[i], title=f"{title}_{m}", unit=r'$\mu$K$_{\rm CMB}$',
+                    cmap=cm.coolwarm, min=-vrange, max=vrange)
+        hp.graticule()
+        plt.savefig(f"{fname}_{m}.png", bbox_inches="tight")
 
 
 class PipelineManager(object):
@@ -357,6 +504,7 @@ class PipelineManager(object):
         return self.bpw_edges
 
     def get_nmt_bins(self):
+        import pymaster as nmt
         bpw_edges = self.get_bpw_edges()
         b = nmt.NmtBin.from_edges(bpw_edges[:-1], bpw_edges[1:])
         return b
@@ -446,3 +594,64 @@ class PipelineManager(object):
             else:
                 raise ValueError(f"Unknown kind {which}")
         return fnames
+
+
+def get_binary_mask_from_nhits(nhits_map, nside, zero_threshold=1e-3):
+    """
+    Make binary mask by smoothing, normalizing and thresholding nhits map.
+    """
+    nhits_smoothed = hp.smoothing(hp.ud_grade(nhits_map, nside, power=-2),
+                                  fwhm=np.pi/180, verbose=False)
+    nhits_smoothed[nhits_smoothed < 0] = 0
+    nhits_smoothed /= np.amax(nhits_smoothed)
+    binary_mask = np.zeros_like(nhits_smoothed)
+    binary_mask[nhits_smoothed > zero_threshold] = 1
+
+    return binary_mask
+
+
+def get_apodized_mask_from_nhits(nhits_map, nside,
+                                 galactic_mask=None,
+                                 point_source_mask=None,
+                                 zero_threshold=1e-3,
+                                 apod_radius=10.,
+                                 apod_radius_point_source=4.,
+                                 apod_type="C1"):
+    """
+    Produce an appropriately apodized mask from an nhits map as used in
+    the BB pipeline paper (https://arxiv.org/abs/2302.04276).
+
+    Procedure:
+    * Make binary mask by smoothing, normalizing and thresholding nhits map
+    * (optional) multiply binary mask by galactic mask
+    * Apodize (binary * galactic)
+    * (optional) multiply (binary * galactic) with point source mask
+    * (optional) apodize (binary * galactic * point source)
+    * Multiply everything by (smoothed) nhits map
+    """
+    import pymaster as nmt
+
+    # Smooth and normalize hits map
+    nhits_map = hp.smoothing(hp.ud_grade(nhits_map, nside, power=-2),
+                             fwhm=np.pi/180, verbose=False)
+    nhits_map /= np.amax(nhits_map)
+
+    # Get binary mask
+    binary_mask = get_binary_mask_from_nhits(nhits_map, nside)
+
+    # Multiply by Galactic mask
+    if galactic_mask is not None:
+        binary_mask *= hp.ud_grade(galactic_mask, nside)
+
+    # Apodize the binary mask
+    binary_mask = nmt.mask_apodization(binary_mask, apod_radius,
+                                       apotype=apod_type)
+
+    # Multiply with point source mask
+    if point_source_mask is not None:
+        binary_mask *= hp.ud_grade(point_source_mask, nside)
+        binary_mask = nmt.mask_apodization(binary_mask,
+                                           apod_radius_point_source,
+                                           apotype=apod_type)
+
+    return nhits_map * binary_mask

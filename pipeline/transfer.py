@@ -26,7 +26,7 @@ def transfer(args):
 
     nmt_binning = meta.read_nmt_binning()
     n_bins = nmt_binning.get_n_bands()
-    nl = meta.lmax + 1
+    nl = 3*meta.nside
 
     # Load the pseudo-cl matrices for each simulation
     # Should be (n_comb_pure, n_comb_mode, n_bins)
@@ -190,53 +190,3 @@ if __name__ == "__main__":
     parser.add_argument("--globals", type=str, help="Path to the yaml file")
     args = parser.parse_args()
     transfer(args)
-
-_ = """
-    # Save to file
-    fname = man.get_filename('transfer_function', o.output_dir)
-    np.savez(fname,
-             mcm=mcm,  # We save the original mcm for completeness
-             bmcm=bmcm,  # We save the original mcm for completeness
-             transfer_function=trans,
-             transfer_function_error=etrans,
-             bpw_windows=bpw_windows,
-             wcal_inv=wcal_inv)
-
-    if o.plot:
-        # Reliable ells
-        goodl = leff < 2*man.nside
-
-        # Now recover Cl_filt from Cl_in
-        cl_filt_r = np.einsum('ijl,kjl->kil', trans, cl_in)
-        combs = ['EE', 'EB', 'BE', 'BB']
-        for i, comb in enumerate(combs):
-            plt.figure()
-            plt.title(comb)
-            plt.plot(leff[goodl], cl_filt[i, i][goodl], 'k-')
-            plt.plot(leff[goodl], cl_filt_r[i, i][goodl], 'r:')
-        plt.show()
-        exit(1)
-
-        for i1, comb1 in enumerate(combs):
-            for i2, comb2 in enumerate(combs):
-                plt.figure()
-                plt.title(f'{comb2}->{comb1}')
-                plt.plot(leff[goodl], trans[i1, i2][goodl], 'k-')
-        plt.show()
-
-        for i1, c1 in enumerate(['EE', 'EB', 'BE', 'BB']):
-            plt.figure()
-            plt.title(f'{c1}->XY')
-            for i2, (c2, col) in enumerate(zip(['EE', 'EB', 'BE', 'BB'],
-                                               ['r', 'b', 'y', 'c'])):
-                p = cl_th[i1, i2]
-
-                plt.plot(leff[goodl], p[goodl], col+'-', label=f'XY={c2}')
-                plt.plot(leff[goodl], -p[goodl], col+':')
-                plt.errorbar(leff[goodl], np.fabs(cl_in[i1, i2][goodl]),
-                             yerr=ecl_in[i1, i2][goodl]/np.sqrt(nsims),
-                             fmt=col+'.')
-            plt.loglog()
-            plt.legend()
-        plt.show()
-"""

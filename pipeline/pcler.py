@@ -142,7 +142,6 @@ def pcler(args):
         Global parameters and command line arguments.
     """
     meta = BBmeta(args.globals)
-
     mask = meta.read_mask("analysis")
     nmt_binning = meta.read_nmt_binning()
     n_bins = nmt_binning.get_n_bands()
@@ -155,7 +154,6 @@ def pcler(args):
         cl_dir = meta.cell_data_directory
     if args.sims:
         cl_dir = meta.cell_sims_directory
-
     if args.data or args.sims:
         # Set the number of sims to loop over
         Nsims = meta.num_sims if args.sims else 1
@@ -213,6 +211,7 @@ def pcler(args):
                     map_set, id_split, id_sim=id_sim if Nsims > 1 else None
                 )
                 map_file = map_file.replace(".fits", "_filtered.fits")
+
                 map = hp.read_map(map_file, field=[0, 1, 2])
 
                 # Include beam in namaster fields to deconvolve it
@@ -264,6 +263,7 @@ def pcler(args):
             plot_dir = meta.plot_dir_from_output_dir(plot_dir_rel)
 
             for plot_label in cells_plots:
+                plt.clf()
                 plt.figure(figsize=(6, 4))
                 plt.title(plot_label)
 
@@ -330,8 +330,11 @@ def pcler(args):
         for id_sim in range(meta.tf_est_num_sims):
             fields = {"filtered": {}, "unfiltered": {}}
             for pure_type in ["pureE", "pureB"]:
-                map_file = meta.get_map_filename_transfer2(id_sim, "tf_est",
-                                                           pure_type=pure_type)
+                map_file = meta.get_map_filename_transfer2(
+                    id_sim,
+                    "tf_est",
+                    pure_type=pure_type
+                )
                 map_file_filtered = map_file.replace(".fits", "_filtered.fits")
 
                 map = hp.read_map(map_file, field=[0, 1, 2])
@@ -384,7 +387,6 @@ def pcler(args):
                 for filter_flag in ["filtered", "unfiltered"]:
                     map_file = meta.get_map_filename_transfer2(id_sim,
                                                                cl_type=cl_type)
-                    print(map_file)
                     if filter_flag == "filtered":
                         map_file = map_file.replace(".fits", "_filtered.fits")
 
