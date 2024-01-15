@@ -23,10 +23,12 @@ def mcmer(args):
     print("Reading mask")
     mask = meta.read_mask("analysis")
 
-    # Create dummy NaMaster field
+    # Create dummy NaMaster fields, spin-2 is optionally purified.
     field_spin0 = nmt.NmtField(mask, None, spin=0)
-    field_spin2 = nmt.NmtField(mask, None, spin=2,
-                               purify_b=meta.pure_B)
+    field_spin2 = nmt.NmtField(mask, None, spin=0)
+    if meta.pure_B:
+        field_spin2_pure = nmt.NmtField(mask, None, spin=2,
+                                        purify_b=meta.pure_B)
 
     # Binning scheme is irrelevant for us, but NaMaster needs one.
     nmt_bins = meta.read_nmt_binning()
@@ -35,11 +37,20 @@ def mcmer(args):
     print("Computing MCM")
     w = nmt.NmtWorkspace()
     w.compute_coupling_matrix(field_spin0, field_spin2, nmt_bins, is_teb=True)
+    if meta.pure_B:
+        w_pure = nmt.NmtWorkspace()
+        w_pure.compute_coupling_matrix(field_spin0, field_spin2_pure, nmt_bins,
+                                       is_teb=True)
 
     nl = meta.lmax + 1
     nspec = 7
     mcm = np.transpose(w.get_coupling_matrix().reshape([nl, nspec, nl, nspec]),
                        axes=[1, 0, 3, 2])
+    if meta.pure_B:
+        mcm_pure = np.transpose(
+            w_pure.get_coupling_matrix().reshape([nl, nspec, nl, nspec]),
+            axes=[1, 0, 3, 2]
+        )
 
     # Load beams to correct the mode coupling matrix
     beams = {}
@@ -47,10 +58,11 @@ def mcmer(args):
         l, bl = meta.read_beam(map_set)
         beams[map_set] = bl[:nl]
 
-    # Correct the mode coupling matrix
+    # Beam-correct the mode coupling matrix
     beamed_mcm = {}
     for map_set1, map_set2 in meta.get_ps_names_list("all", coadd=True):
-        beamed_mcm[map_set1, map_set2] = mcm * \
+        m = mcm_pure if meta.pure_B else mcm
+        beamed_mcm[map_set1, map_set2] = m * \
             np.outer(beams[map_set1], beams[map_set2])[np.newaxis, :,
                                                        np.newaxis, :]
 
