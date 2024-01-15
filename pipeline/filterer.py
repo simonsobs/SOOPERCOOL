@@ -18,7 +18,7 @@ def filter(args):
     filter_map = meta.get_filter_function()
 
     # Read the mask
-    mask = meta.read_mask("analysis")
+    mask = meta.read_mask("binary")
 
     meta.timer.start(f"Filter {meta.tf_est_num_sims} sims for TF estimation.")
     if args.transfer:

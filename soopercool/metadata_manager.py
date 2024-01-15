@@ -36,6 +36,10 @@ class BBmeta(object):
         # Set the general attributes (nside, lmax, etc...)
         self._set_general_attributes()
 
+        # Copy the configuration file to output directory
+        with open(f"{self.output_dirs['root']}/config.yaml", "w") as f:
+            yaml.dump(self.config, f)
+
         # Basic sanity checks
         if self.lmax > 3*self.nside-1:
             raise ValueError("lmax should be lower or equal "

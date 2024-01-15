@@ -12,8 +12,7 @@ def pre_processer(args):
     meta = BBmeta(args.globals)
 
     # First step : create bandpower edges / binning_file
-    bin_low, bin_high, bin_center = utils.create_binning(meta.lmin,
-                                                         meta.lmax,
+    bin_low, bin_high, bin_center = utils.create_binning(meta.nside,
                                                          meta.deltal)
     np.savez(meta.path_to_binning, bin_low=bin_low, bin_high=bin_high,
              bin_center=bin_center)

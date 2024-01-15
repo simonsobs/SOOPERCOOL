@@ -36,6 +36,7 @@ def transfer_validator(args):
     tf_dict = read_transfer(f"{meta.coupling_directory}/transfer_function.npz")
 
     nmt_binning = meta.read_nmt_binning()
+    nl = nmt_binning.lmax+1
     lb = nmt_binning.get_effective_ells()
 
     plot_dir = meta.plot_dir_from_output_dir(meta.coupling_directory)
@@ -131,16 +132,16 @@ def transfer_validator(args):
         bpw_mat = bp_win[f"bp_win_{spin_comb}"]
         for val_type in val_types:
             if spin_comb == "spin0xspin0":
-                cls_vec = np.array([cls_theory[val_type]["TT"][:meta.lmax+1]])
-                cls_vec = cls_vec.reshape(1, meta.lmax+1)
+                cls_vec = np.array([cls_theory[val_type]["TT"][:nl]])
+                cls_vec = cls_vec.reshape(1, nl)
             elif spin_comb == "spin0xspin2":
-                cls_vec = np.array([cls_theory[val_type]["TE"][:meta.lmax+1],
-                                    cls_theory[val_type]["TB"][:meta.lmax+1]])
+                cls_vec = np.array([cls_theory[val_type]["TE"][:nl],
+                                    cls_theory[val_type]["TB"][:nl]])
             elif spin_comb == "spin2xspin2":
-                cls_vec = np.array([cls_theory[val_type]["EE"][:meta.lmax+1],
-                                    cls_theory[val_type]["EB"][:meta.lmax+1],
-                                    cls_theory[val_type]["EB"][:meta.lmax+1],
-                                    cls_theory[val_type]["BB"][:meta.lmax+1]])
+                cls_vec = np.array([cls_theory[val_type]["EE"][:nl],
+                                    cls_theory[val_type]["EB"][:nl],
+                                    cls_theory[val_type]["EB"][:nl],
+                                    cls_theory[val_type]["BB"][:nl]])
 
             cls_vec_binned = np.einsum("ijkl,kl", bpw_mat, cls_vec)
             if spin_comb == "spin0xspin0":
@@ -203,7 +204,7 @@ def transfer_validator(args):
                 residual_filtered = \
                     (cls_mean_dict[val_type, "filtered", spec] -
                      cls_theory_binned[val_type, spec]) / \
-                    cls_std_dict[val_type, "unfiltered", spec]
+                    cls_std_dict[val_type, "filtered", spec]
 
                 sub.axhspan(-2, 2, color="gray", alpha=0.2)
                 sub.axhspan(-1, 1, color="gray", alpha=0.7)

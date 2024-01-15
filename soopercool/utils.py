@@ -184,18 +184,12 @@ def beam_hpix(ll, nside):
     return beam_gaussian(ll, fwhm_hp_amin)
 
 
-def create_binning(lmin, lmax, delta_ell):
+def create_binning(nside, delta_ell):
     """
     """
-    bin_low = np.arange(lmin, lmax, delta_ell)
+    bin_low = np.arange(0, 3*nside, delta_ell)
     bin_high = bin_low + delta_ell - 1
-
-    idx = bin_high <= lmax
-    bin_low, bin_high = bin_low[idx], bin_high[idx]
-
-    if lmax not in bin_high:
-        bin_low = np.concatenate([bin_low, [bin_high[-1]+1]])
-        bin_high = np.concatenate([bin_high, [lmax]])
+    bin_high[-1] = 3*nside - 1
     bin_center = (bin_low + bin_high) / 2
 
     return bin_low, bin_high, bin_center
@@ -600,3 +594,64 @@ class PipelineManager(object):
             else:
                 raise ValueError(f"Unknown kind {which}")
         return fnames
+
+
+def get_binary_mask_from_nhits(nhits_map, nside, zero_threshold=1e-3):
+    """
+    Make binary mask by smoothing, normalizing and thresholding nhits map.
+    """
+    nhits_smoothed = hp.smoothing(hp.ud_grade(nhits_map, nside, power=-2),
+                                  fwhm=np.pi/180, verbose=False)
+    nhits_smoothed[nhits_smoothed < 0] = 0
+    nhits_smoothed /= np.amax(nhits_smoothed)
+    binary_mask = np.zeros_like(nhits_smoothed)
+    binary_mask[nhits_smoothed > zero_threshold] = 1
+
+    return binary_mask
+
+
+def get_apodized_mask_from_nhits(nhits_map, nside,
+                                 galactic_mask=None,
+                                 point_source_mask=None,
+                                 zero_threshold=1e-3,
+                                 apod_radius=10.,
+                                 apod_radius_point_source=4.,
+                                 apod_type="C1"):
+    """
+    Produce an appropriately apodized mask from an nhits map as used in
+    the BB pipeline paper (https://arxiv.org/abs/2302.04276).
+
+    Procedure:
+    * Make binary mask by smoothing, normalizing and thresholding nhits map
+    * (optional) multiply binary mask by galactic mask
+    * Apodize (binary * galactic)
+    * (optional) multiply (binary * galactic) with point source mask
+    * (optional) apodize (binary * galactic * point source)
+    * Multiply everything by (smoothed) nhits map
+    """
+    import pymaster as nmt
+
+    # Smooth and normalize hits map
+    nhits_map = hp.smoothing(hp.ud_grade(nhits_map, nside, power=-2),
+                             fwhm=np.pi/180, verbose=False)
+    nhits_map /= np.amax(nhits_map)
+
+    # Get binary mask
+    binary_mask = get_binary_mask_from_nhits(nhits_map, nside)
+
+    # Multiply by Galactic mask
+    if galactic_mask is not None:
+        binary_mask *= hp.ud_grade(galactic_mask, nside)
+
+    # Apodize the binary mask
+    binary_mask = nmt.mask_apodization(binary_mask, apod_radius,
+                                       apotype=apod_type)
+
+    # Multiply with point source mask
+    if point_source_mask is not None:
+        binary_mask *= hp.ud_grade(point_source_mask, nside)
+        binary_mask = nmt.mask_apodization(binary_mask,
+                                           apod_radius_point_source,
+                                           apotype=apod_type)
+
+    return nhits_map * binary_mask
