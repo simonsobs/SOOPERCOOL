@@ -5,13 +5,13 @@
 # Define the directories
 ## Let's start with directories of data products
 data_dirs:
-  root: "<path-to-SOOPERCOOL>/data"
+  root: "../data"
   map_directory: "maps"
   beam_directory: "beams"
   bandpasses_directory: "bandpasses"
 ## Then directories in which we will store outputs
 output_dirs: 
-  root: "<path-to-SOOPERCOOL>/outputs"
+  root: "../outputs"
   mask_directory: "masks"
   pre_process_directory: "pre_processing"
   sims_directory: "sims"
@@ -49,7 +49,7 @@ map_sets:
 # Masking metadata #
 ####################
 masks:
-  analysis_mask: "apodized_mask_bbpipe_paper.fits"
+  analysis_mask: "analysis_mask.fits"
 
   binary_mask: "binary_mask.fits"
   galactic_mask_root: "planck_galactic_mask"
@@ -75,7 +75,7 @@ general_pars:
 
 ## Simulation related
 sim_pars:
-  hitmap_file: "<path-to-SOOPERCOOL>/outputs/masks/norm_nHits_SA_35FOV_ns512.fits"
+  hitmap_file: "../outputs/masks/norm_nHits_SA_35FOV_ns512.fits"
   anisotropic_noise: False
   num_sims: 3
   cosmology:
@@ -95,7 +95,7 @@ tf_settings:
   filtering_type: "m_filterer" # "m_filterer" or "toast"
   m_cut: 30 # necessary only if `filtering_type` is set to "m_filterer"
   toast: # necessary only if `filtering_type` is set to "toast"
-    schedule: "<path-to-SOOPERCOOL>/schedules/schedule_sat.txt"
+    schedule: "../outputs/schedules/schedule_sat.txt"
     instrument: "SAT1"
     band: "SAT_f090"
     thinfp: 8

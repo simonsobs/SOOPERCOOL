@@ -1,4 +1,4 @@
-paramfile='<path_to_SOOPERCOOL>/paramfiles/paramfile_pure_b.yaml'
+paramfile='../paramfiles/paramfile_SAT.yaml'
 
 echo "Running pipeline with paramfile: ${paramfile}"
 
