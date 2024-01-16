@@ -77,6 +77,7 @@ general_pars:
 sim_pars:
   hitmap_file: "../outputs/masks/norm_nHits_SA_35FOV_ns512.fits"
   anisotropic_noise: False
+  null_e_modes: False
   num_sims: 3
   cosmology:
     cosmomc_theta: 0.0104085

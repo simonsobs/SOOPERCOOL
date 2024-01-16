@@ -272,6 +272,8 @@ def pcler(args):
                 el_th, cl_th_dict = theory_cls(meta.cosmology,
                                                meta.lmax, lmin=meta.lmin)
                 cl_th = cl_th_dict[field_pair]
+                if meta.null_e_modes and "E" in field_pair:
+                    cl_th = np.zeros_like(cl_th)
                 do_theory_plot = True
                 for split_label in cells_plots[plot_label]:
                     cells_splits = cells_plots[plot_label][split_label]
