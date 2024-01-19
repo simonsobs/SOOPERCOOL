@@ -61,6 +61,12 @@ def transfer(args):
         spin_pair: mcm[f"{spin_pair}_binned"] for spin_pair in spin_pairs
     }
 
+    # If we B-purify, load also the un-beamed purified mode coupling matrix
+    mcm_pure = np.load(f"{coupling_dir}/mcm_pure.npz")
+    mcms_dict_nobeam_pure = {
+        spin_pair: mcm_pure[f"{spin_pair}_binned"] for spin_pair in spin_pairs
+    }
+
     meta.timer.stop("Load mode-coupling matrices", verbose=True)
 
     meta.timer.start("Inverse the unfiltered pcls matrix")
@@ -150,36 +156,47 @@ def transfer(args):
 
     for filter_tag in ["filtered", "unfiltered"]:
         couplings_nobeam = {}
-        for spin_pair in spin_pairs:
-            if filter_tag == "filtered":
-                tbmcm = np.einsum('ijk,jklm->iklm', trans[spin_pair],
-                                  mcms_dict_nobeam[spin_pair])
-            else:
-                tbmcm = mcms_dict_nobeam[spin_pair]
-            btbmcm = np.transpose(
-                np.array([np.sum(
-                    tbmcm[:, :, :, nmt_binning.get_ell_list(i)], axis=-1)
-                          for i in range(n_bins)]),
-                axes=[1, 2, 3, 0])
-            # Invert and multiply by tbmcm to get final bandpower
-            # window functions.
-            if spin_pair == "spin0xspin0":
-                size = 1
-            elif spin_pair == "spin0xspin2":
-                size = 2
-            elif spin_pair == "spin2xspin2":
-                size = 4
-            ibtbmcm = np.linalg.inv(btbmcm.reshape([size*n_bins, size*n_bins]))
-            winflat = np.dot(ibtbmcm, tbmcm.reshape([size*n_bins, size*nl]))
-            wcal_inv = ibtbmcm.reshape([size, n_bins, size, n_bins])
-            bpw_windows = winflat.reshape([size, n_bins, size, nl])
+        couplings_nobeam_pure = {}
+        for couplings, mcms_dict in zip([couplings_nobeam,
+                                         couplings_nobeam_pure],
+                                        [mcms_dict_nobeam,
+                                         mcms_dict_nobeam_pure]):
+            for spin_pair in spin_pairs:
+                if filter_tag == "filtered":
+                    tbmcm = np.einsum('ijk,jklm->iklm', trans[spin_pair],
+                                      mcms_dict[spin_pair])
+                else:
+                    tbmcm = mcms_dict[spin_pair]
+                btbmcm = np.transpose(
+                    np.array([np.sum(
+                        tbmcm[:, :, :, nmt_binning.get_ell_list(i)], axis=-1)
+                            for i in range(n_bins)]),
+                    axes=[1, 2, 3, 0])
+                # Invert and multiply by tbmcm to get final bandpower
+                # window functions.
+                if spin_pair == "spin0xspin0":
+                    size = 1
+                elif spin_pair == "spin0xspin2":
+                    size = 2
+                elif spin_pair == "spin2xspin2":
+                    size = 4
+                ibtbmcm = np.linalg.inv(btbmcm.reshape([size*n_bins,
+                                                        size*n_bins]))
+                winflat = np.dot(ibtbmcm, tbmcm.reshape([size*n_bins,
+                                                         size*nl]))
+                wcal_inv = ibtbmcm.reshape([size, n_bins, size, n_bins])
+                bpw_windows = winflat.reshape([size, n_bins, size, nl])
 
-            couplings_nobeam[f"bp_win_{spin_pair}"] = bpw_windows
-            couplings_nobeam[f"inv_coupling_{spin_pair}"] = wcal_inv
+                couplings[f"bp_win_{spin_pair}"] = bpw_windows
+                couplings[f"inv_coupling_{spin_pair}"] = wcal_inv
 
         np.savez(
             f"{coupling_dir}/couplings_{filter_tag}.npz",
             **couplings_nobeam
+        )
+        np.savez(
+            f"{coupling_dir}/couplings_{filter_tag}_pure.npz",
+            **couplings_nobeam_pure
         )
 
     meta.timer.stop("Compute full coupling", verbose=True)

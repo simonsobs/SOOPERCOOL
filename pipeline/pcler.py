@@ -373,7 +373,7 @@ def pcler(args):
     if args.tf_val:
         inv_couplings = {}
         for filter_flag in ["filtered", "unfiltered"]:
-            couplings = np.load(f"{meta.coupling_directory}/couplings_{filter_flag}.npz")  # noqa
+            couplings = np.load(f"{meta.coupling_directory}/couplings_{filter_flag}_pure.npz")  # noqa
             inv_couplings[filter_flag] = {
                 k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
                                                              ncl*n_bins])
@@ -402,7 +402,8 @@ def pcler(args):
                         pw = [None, None]
                     field = {
                         "spin0": nmt.NmtField(mask, map[:1], beam=pw[0]),
-                        "spin2": nmt.NmtField(mask, map[1:], beam=pw[1])
+                        "spin2": nmt.NmtField(mask, map[1:], beam=pw[1],
+                                              purify_b=meta.pure_B)
                     }
 
                     pcls = get_coupled_pseudo_cls(field, field, nmt_binning)

@@ -19,6 +19,9 @@ def mcmer(args):
 
     coupling_dir = meta.coupling_directory
 
+    nl = 3*meta.nside
+    nspec = 7
+
     # Read and degrade mask
     print("Reading mask")
     mask = meta.read_mask("analysis")
@@ -33,6 +36,11 @@ def mcmer(args):
     # Binning scheme is irrelevant for us, but NaMaster needs one.
     nmt_bins = meta.read_nmt_binning()
 
+    # Create binner
+    n_bins = nmt_bins.get_n_bands()
+    binner = np.array([nmt_bins.bin_cell(np.array([cl]))[0]
+                       for cl in np.eye(nl)]).T
+
     # Alright, compute and reshape coupling matrix.
     print("Computing MCM")
     w = nmt.NmtWorkspace()
@@ -42,15 +50,15 @@ def mcmer(args):
         w_pure.compute_coupling_matrix(field_spin0, field_spin2_pure, nmt_bins,
                                        is_teb=True)
 
-    nl = 3*meta.nside
-    nspec = 7
     mcm = np.transpose(w.get_coupling_matrix().reshape([nl, nspec, nl, nspec]),
                        axes=[1, 0, 3, 2])
+    mcm_binned = np.einsum('ij,kjlm->kilm', binner, mcm)
     if meta.pure_B:
         mcm_pure = np.transpose(
             w_pure.get_coupling_matrix().reshape([nl, nspec, nl, nspec]),
             axes=[1, 0, 3, 2]
         )
+        mcm_pure_binned = np.einsum('ij,kjlm->kilm', binner, mcm_pure)
 
     # Load beams to correct the mode coupling matrix
     beams = {}
@@ -63,18 +71,10 @@ def mcmer(args):
     for map_set1, map_set2 in meta.get_ps_names_list("all", coadd=True):
         m = mcm_pure if meta.pure_B else mcm
         beamed_mcm[map_set1, map_set2] = m * \
-            np.outer(beams[map_set1], beams[map_set2])[np.newaxis, :,
-                                                       np.newaxis, :]
-
-    # Create binner
-    n_bins = nmt_bins.get_n_bands()
-    binner = np.array([nmt_bins.bin_cell(np.array([cl]))[0]
-                       for cl in np.eye(nl)]).T
-
-    mcm_binned = np.einsum('ij,kjlm->kilm', binner, mcm)
-
+            np.outer(beams[map_set1],
+                     beams[map_set2])[np.newaxis, :, np.newaxis, :]
     # Save files
-    # Starting with the standard un-beamed MCM
+    # Starting with the un-beamed non-purified MCM
     fname = f"{coupling_dir}/mcm.npz"
     np.savez(
         fname,
@@ -86,6 +86,22 @@ def mcmer(args):
         spin0xspin2_binned=mcm_binned[1:3, :, 1:3, :],
         spin2xspin2_binned=mcm_binned[3:, :, 3:, :]
     )
+
+    # If we B-purify, store also the un-beamed purified MCM
+    if meta.pure_B:
+        fname = f"{coupling_dir}/mcm_pure.npz"
+        np.savez(
+            fname,
+            binner=binner,
+            spin0xspin0=mcm_pure[0, :, 0, :].reshape([1, nl, 1, nl]),
+            spin0xspin2=mcm_pure[1:3, :, 1:3, :],
+            spin2xspin2=mcm_pure[3:, :, 3:, :],
+            spin0xspin0_binned=mcm_pure_binned[0, :, 0, :].reshape([1, n_bins,
+                                                                    1, nl]),
+            spin0xspin2_binned=mcm_pure_binned[1:3, :, 1:3, :],
+            spin2xspin2_binned=mcm_pure_binned[3:, :, 3:, :]
+        )
+
     # Then the beamed MCM
     for map_set1, map_set2 in meta.get_ps_names_list("all", coadd=True):
         mcm = beamed_mcm[map_set1, map_set2]
