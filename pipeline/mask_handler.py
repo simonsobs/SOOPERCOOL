@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import urllib.request
 import pathlib
+import shutil
+import tempfile
 
 
 def mask_handler(args):
@@ -33,10 +35,12 @@ def mask_handler(args):
     urlpref = "https://portal.nersc.gov/cfs/sobs/users/so_bb/"
     url = f"{urlpref}norm_nHits_SA_35FOV_ns512.fits"
     # Open the URL with a timeout
-    with urllib.request.urlopen(url, timeout=timeout_seconds):
-        urllib.request.urlretrieve(url, filename=nhits_file)
-        nhits = hp.ud_grade(hp.read_map(nhits_file), meta.nside, power=-2)
-        hp.write_map(meta.hitmap_file, nhits, overwrite=True)
+    with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
+        # Create a temp file to store download fits file
+        with tempfile.NamedTemporaryFile() as tmp_file:
+            shutil.copyfileobj(response, tmp_file)
+            nhits = hp.ud_grade(hp.read_map(tmp_file.name), meta.nside, power=-2)
+            hp.write_map(meta.hitmap_file, nhits, overwrite=True)
     if args.plots:
         plt.figure(figsize=(16, 9))
         hp.mollview(nhits, cmap=cmap, cbar=False)
@@ -65,11 +69,13 @@ def mask_handler(args):
         sat_apo_file = meta._get_analysis_mask_name()
         urlpref = "https://portal.nersc.gov/cfs/sobs/users/so_bb/"
         url = f"{urlpref}apodized_mask_bbpipe_paper.fits"
-        with urllib.request.urlopen(url, timeout=timeout_seconds):
-            urllib.request.urlretrieve(url, filename=sat_apo_file)
-            sat_apo_mask = hp.read_map(sat_apo_file, field=0)
-            sat_apo_mask = hp.ud_grade(sat_apo_mask, meta.nside)
-            meta.save_mask("analysis", sat_apo_mask, overwrite=True)
+        with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
+            # Create a temp file to store download fits file
+            with tempfile.NamedTemporaryFile() as tmp_file:
+                shutil.copyfileobj(response, tmp_file)
+                sat_apo_mask = hp.read_map(tmp_file.name, field=0)
+                sat_apo_mask = hp.ud_grade(sat_apo_mask, meta.nside)
+                meta.save_mask("analysis", sat_apo_mask, overwrite=True)
     else:
         # Assemble custom analysis mask from hits map, Galactic mask and
         # point source mask
@@ -82,8 +88,9 @@ def mask_handler(args):
                 urlpref = "http://pla.esac.esa.int/pla/aio/"
                 urlpref = f"{urlpref}product-action?MAP.MAP_ID="
                 url = f"{urlpref}HFI_Mask_GalPlane-apo0_2048_R2.00.fits"
-                with urllib.request.urlopen(url, timeout=timeout_seconds):
-                    urllib.request.urlretrieve(url, filename=mask_p15_file)
+                with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
+                    with open(mask_p15_file, 'w+b') as f:
+                        f.write(response.read())
 
             # Save different galactic masks
             gal_keys = ["GAL020", "GAL040", "GAL060", "GAL070",
