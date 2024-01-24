@@ -8,6 +8,7 @@ import os
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import urllib.request
+import pathlib
 
 
 def mask_handler(args):
@@ -24,9 +25,11 @@ def mask_handler(args):
 
     os.makedirs(mask_dir, exist_ok=True)
 
-    # Download hits map
     print("Download and save hits map ...")
     nhits_file = meta.hitmap_file
+    # Create hitmap_file directory if not exist
+    pathlib.Path(nhits_file).parent.mkdir(parents=True, exist_ok=True)
+    # Download hits map
     urlpref = "https://portal.nersc.gov/cfs/sobs/users/so_bb/"
     url = f"{urlpref}norm_nHits_SA_35FOV_ns512.fits"
     # Open the URL with a timeout
