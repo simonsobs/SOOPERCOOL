@@ -76,6 +76,8 @@ def mask_handler(args):
                 sat_apo_mask = hp.read_map(tmp_file.name, field=0)
                 sat_apo_mask = hp.ud_grade(sat_apo_mask, meta.nside)
                 meta.save_mask("analysis", sat_apo_mask, overwrite=True)
+                with open(sat_apo_file, 'w+b') as f:
+                    f.write(response.read())
     else:
         # Assemble custom analysis mask from hits map, Galactic mask and
         # point source mask
