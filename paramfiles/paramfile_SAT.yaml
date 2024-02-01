@@ -49,8 +49,14 @@ map_sets:
 # Masking metadata #
 ####################
 masks:
-  analysis_mask: "analysis_mask.fits"
+  # Load nhits map from disk? Give absolute location here.
+  # If left blank, the mask handler will download the nominal nhits map.
+  input_nhits_path:
 
+  # Masks will be written to the following file names, located under the
+  # mask directory  
+  analysis_mask: "analysis_mask.fits"
+  nhits_map: "nhits_map.fits"
   binary_mask: "binary_mask.fits"
   galactic_mask_root: "planck_galactic_mask"
   point_source_mask: "point_source_mask.fits"
@@ -72,10 +78,10 @@ general_pars:
   deltal: 10
   binning_file: "binning.npz"
   pure_B: True
+  tf_est_pure_B: True
 
 ## Simulation related
 sim_pars:
-  hitmap_file: "../outputs/masks/norm_nHits_SA_35FOV_ns512.fits"
   anisotropic_noise: False
   null_e_modes: False
   num_sims: 3

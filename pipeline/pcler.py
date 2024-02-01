@@ -345,7 +345,8 @@ def pcler(args):
                 # TO-DO: filter temperature only once !
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1]),
-                    "spin2": nmt.NmtField(mask, map[1:])
+                    "spin2": nmt.NmtField(mask, map[1:],
+                                          purify_b=meta.tf_est_pure_B)
                 }
 
                 if meta.filtering_type == "toast":
@@ -354,7 +355,8 @@ def pcler(args):
                     pw = [None, None]
                 field_filtered = {
                     "spin0": nmt.NmtField(mask, map_filtered[:1], beam=pw[0]),
-                    "spin2": nmt.NmtField(mask, map_filtered[1:], beam=pw[1])
+                    "spin2": nmt.NmtField(mask, map_filtered[1:], beam=pw[1],
+                                          purify_b=meta.tf_est_pure_B)
                 }
 
                 fields["unfiltered"][pure_type] = field
