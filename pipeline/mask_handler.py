@@ -27,14 +27,17 @@ def mask_handler(args):
     # Download hits map
     print("Download and save hits map ...")
     nhits_file = meta.hitmap_file
-    urlpref = "https://portal.nersc.gov/cfs/sobs/users/so_bb/"
-    url = f"{urlpref}norm_nHits_SA_35FOV_ns512.fits"
-    # Open the URL with a timeout
-    with urllib.request.urlopen(url, timeout=timeout_seconds):
-        urllib.request.urlretrieve(url, filename=nhits_file)
-        nhits = hp.ud_grade(hp.read_map(nhits_file), meta.nside, power=-2)
-        hp.write_map(meta.hitmap_file, nhits, overwrite=True)
+    if not os.path.exists(nhits_file):
+        urlpref = "https://portal.nersc.gov/cfs/sobs/users/so_bb/"
+        url = f"{urlpref}norm_nHits_SA_35FOV_ns512.fits"
+        # Open the URL with a timeout
+        with urllib.request.urlopen(url, timeout=timeout_seconds):
+            urllib.request.urlretrieve(url, filename=nhits_file)
+    nhits = hp.ud_grade(hp.read_map(nhits_file), meta.nside, power=-2)
+    hp.write_map(meta.hitmap_file, nhits, overwrite=True)
+
     if args.plots:
+        # binary_mask_nhits
         plt.figure(figsize=(16, 9))
         hp.mollview(nhits, cmap=cmap, cbar=False)
         hp.graticule()
@@ -43,12 +46,15 @@ def mask_handler(args):
     # Generate binary survey mask from the hits map
     meta.timer.start("Computing binary mask")
     nhits = hp.read_map(nhits_file)
+    binary_mask_file = meta._get_binary_mask_name()
     binary_mask = get_binary_mask_from_nhits(nhits, meta.nside,
                                              zero_threshold=1e-3)
-    meta.save_mask("binary", binary_mask, overwrite=True)
+    if not os.path.exists(binary_mask_file):
+        meta.save_mask("binary", binary_mask, overwrite=True)
     meta.timer.stop("Computing binary mask", args.verbose)
 
     if args.plots:
+        # binary_mask
         plt.figure(figsize=(16, 9))
         hp.mollview(binary_mask, cmap=cmap, cbar=False)
         hp.graticule()
@@ -153,6 +159,7 @@ def mask_handler(args):
                         args.verbose)
 
     if args.plots:
+        # apodized_mask
         plt.figure(figsize=(16, 9))
         hp.mollview(meta.read_mask("analysis"), cmap=cmap, cbar=False)
         hp.graticule()
@@ -165,8 +172,8 @@ if __name__ == "__main__":
     parser.add_argument("--globals", type=str,
                         help="Path to yaml with global parameters")
     parser.add_argument("--plots", action="store_true")
-    parser.add_argument("--verbose", action="store_true")
-    parser.add_argument("--self_assemble", action="store_true")
+    parser.add_argument("--verbose", action="store_false")
+    parser.add_argument("--self_assemble", action="store_false")
     args = parser.parse_args()
 
     mask_handler(args)
