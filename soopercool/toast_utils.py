@@ -127,12 +127,12 @@ def apply_demodulation(data, weights_radec, sim_gnd, binner):
     return data, demod_weights
 
 
-def make_filterbin(data, binner, output_dir):
+def make_filterbin(data, binner, output_dir, hitsmap):
     filterbin = toast.ops.FilterBin()
     filterbin.binning = binner
     filterbin.output_dir = output_dir
     filterbin.name = 'FilterBin'
-    filterbin.write_hits = False
+    filterbin.write_hits = True if hitsmap else False
     filterbin.write_cov = False
     filterbin.write_rcond = False
     filterbin.apply(data)

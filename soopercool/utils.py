@@ -1,6 +1,7 @@
 import yaml
 import numpy as np
 import os
+import pathlib
 from scipy.interpolate import interp1d
 import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 import healpy as hp
@@ -244,7 +245,8 @@ def m_filter_map(map, map_file, mask, m_cut):
 
 
 def toast_filter_map(map, map_file, mask,
-                     schedule, thinfp, instrument, band, group_size, nside):
+                     schedule, thinfp, instrument, band, group_size, nside,
+                     hitsmap_only=False):
     """
     Applies the TOAST filter to a given map.
 
@@ -254,7 +256,8 @@ def toast_filter_map(map, map_file, mask,
         This is an unused argument included for compatibility with other
         filters. TOAST won't read the map itself.
     map_file : str
-        File path of the unfiltered map.
+        If hitmap_only == False, file path of the unfiltered map.
+        If hitmap_only == True, file path of the hits map.
     mask : array-like (unused)
         This is an unused argument included for compatibility with other
         filters. TOAST won't read the mask itself.
@@ -271,6 +274,8 @@ def toast_filter_map(map, map_file, mask,
         Group size used for parallelizing filtering with TOAST.
     nside : int
         Healpix Nside parameter of the filtered map.
+    hitsmap_only : bool
+        If True, only get a hits map from TOAST schedule file.
     """
     import toast
     import sotodlib.toast as sotoast
@@ -343,10 +348,11 @@ def toast_filter_map(map, map_file, mask,
     data, weights_radec = apply_weights_radec(data, det_pointing_radec)
     data, noise_model = apply_noise_model(data)
 
-    # Scan map
-    print('Scan input map')
-    data, scan_map = apply_scan_map(data, map_file, pixels_radec,
-                                    weights_radec)
+    if not hitsmap_only:
+        # Scan map
+        print('Scan input map')
+        data, scan_map = apply_scan_map(data, map_file, pixels_radec,
+                                        weights_radec)
 
     # Create the binner
     binner = create_binner(pixels_radec, det_pointing_radec)
@@ -356,7 +362,7 @@ def toast_filter_map(map, map_file, mask,
                                              binner)
 
     # Map filterbin
-    make_filterbin(data, binner, output_dir)
+    make_filterbin(data, binner, output_dir, hitsmap_only)
 
     if rank == 0:
         # Only one rank can do this
@@ -364,8 +370,11 @@ def toast_filter_map(map, map_file, mask,
         if os.path.isfile(output_dir + 'FilterBin_unfiltered_map.fits'):
             # only for TOAST versions < 3.0.0a20
             os.remove(output_dir + 'FilterBin_unfiltered_map.fits')
-        os.rename(output_dir + 'FilterBin_filtered_map.fits',
-                  output_dir[:-1] + '_filtered.fits')
+        if not hitsmap_only:
+            os.rename(output_dir + 'FilterBin_filtered_map.fits',
+                      output_dir[:-1] + '_filtered.fits')
+        else:
+            os.rename(output_dir + 'FilterBin_hits.fits', map_file)
         if os.path.isdir(output_dir):
             os.rmdir(output_dir)
 
