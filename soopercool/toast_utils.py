@@ -132,7 +132,7 @@ def make_filterbin(data, binner, output_dir, write_hits):
     filterbin.binning = binner
     filterbin.output_dir = output_dir
     filterbin.name = 'FilterBin'
-    filterbin.write_hits = True if write_hits else False
+    filterbin.write_hits = write_hits
     filterbin.write_cov = False
     filterbin.write_rcond = False
     filterbin.apply(data)
