@@ -399,18 +399,21 @@ class BBmeta(object):
 
         return filter_operation
 
-    def get_hits_map_from_toast_schedule(self):
+    def get_nhits_map_from_toast_schedule(self):
         if self.filtering_type != "toast":
             raise NotImplementedError(f"Filterer type {self.filtering_type} "
                                       "not implemented")
-        kwargs = {"schedule": self.toast['schedule'],
+        kwargs = {"map": None,
+                  "map_file": self.masks["input_nhits_path"],
+                  "mask": None,
+                  "schedule": self.toast['schedule'],
                   "thinfp": self.toast['thinfp'],
                   "instrument": self.toast['instrument'],
                   "band": self.toast['band'],
                   "group_size": self.toast['group_size'],
-                  "nside": self.nside
-                  "hitsmap_only": True}
-        toast_filter_map(map=None, map_file=self.hitmap_file, mask=None,**kwargs)
+                  "nside": self.nside,
+                  "nhits_map_only": True}
+        toast_filter_map(**kwargs)
 
     def get_map_filename_transfer2(self, id_sim, cl_type, pure_type=None):
         """

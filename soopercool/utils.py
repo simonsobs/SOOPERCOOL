@@ -246,7 +246,7 @@ def m_filter_map(map, map_file, mask, m_cut):
 
 def toast_filter_map(map, map_file, mask,
                      schedule, thinfp, instrument, band, group_size, nside,
-                     hitsmap_only=False):
+                     nhits_map_only=False):
     """
     Applies the TOAST filter to a given map.
 
@@ -256,8 +256,8 @@ def toast_filter_map(map, map_file, mask,
         This is an unused argument included for compatibility with other
         filters. TOAST won't read the map itself.
     map_file : str
-        If hitmap_only == False, file path of the unfiltered map.
-        If hitmap_only == True, file path of the hits map.
+        If nhits_map_only == False, file path of the unfiltered map.
+        If nhits_map_only == True, file path of the hits map.
     mask : array-like (unused)
         This is an unused argument included for compatibility with other
         filters. TOAST won't read the mask itself.
@@ -274,7 +274,7 @@ def toast_filter_map(map, map_file, mask,
         Group size used for parallelizing filtering with TOAST.
     nside : int
         Healpix Nside parameter of the filtered map.
-    hitsmap_only : bool
+    nhits_map_only : bool
         If True, only get a hits map from TOAST schedule file.
     """
     import toast
@@ -348,7 +348,7 @@ def toast_filter_map(map, map_file, mask,
     data, weights_radec = apply_weights_radec(data, det_pointing_radec)
     data, noise_model = apply_noise_model(data)
 
-    if not hitsmap_only:
+    if not nhits_map_only:
         # Scan map
         print('Scan input map')
         data, scan_map = apply_scan_map(data, map_file, pixels_radec,
@@ -362,7 +362,7 @@ def toast_filter_map(map, map_file, mask,
                                              binner)
 
     # Map filterbin
-    make_filterbin(data, binner, output_dir, hitsmap_only)
+    make_filterbin(data, binner, output_dir, nhits_map_only)
 
     if rank == 0:
         # Only one rank can do this
@@ -370,7 +370,7 @@ def toast_filter_map(map, map_file, mask,
         if os.path.isfile(output_dir + 'FilterBin_unfiltered_map.fits'):
             # only for TOAST versions < 3.0.0a20
             os.remove(output_dir + 'FilterBin_unfiltered_map.fits')
-        if not hitsmap_only:
+        if not nhits_map_only:
             os.rename(output_dir + 'FilterBin_filtered_map.fits',
                       output_dir[:-1] + '_filtered.fits')
         else:

@@ -44,6 +44,15 @@ def mask_handler(args):
                      overwrite=True)
         nhits = nhits_nominal
     else:
+        if not os.path.exists(meta.masks["input_nhits_path"])
+            print("Could not find input nhits map.")
+            if meta.filtering_type == "toast":
+                print("Get nhits map from provided TOAST schedule.")
+                meta.get_nhits_map_from_toast_schedule()
+            else:
+                raise FileNotFoundError(
+                    "Cannot find nhits file {}".format(
+                        meta.masks["input_nhits_path"]))
         print("Using custom apodized mask for analysis")
         nhits = meta.read_hitmap_from_disk()
     meta.timer.stop("nhits", "Get hits map", args.verbose)
