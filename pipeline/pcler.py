@@ -216,7 +216,8 @@ def pcler(args):
 
                 # Include beam in namaster fields to deconvolve it
                 field_spin0 = nmt.NmtField(mask, [map[0]])
-                field_spin2 = nmt.NmtField(mask, [map[1], map[2]])
+                field_spin2 = nmt.NmtField(mask, [map[1], map[2]],
+                                           purify_b=meta.pure_B)
 
                 fields[map_set, id_split] = {
                     "spin0": field_spin0,
@@ -271,6 +272,8 @@ def pcler(args):
                 el_th, cl_th_dict = theory_cls(meta.cosmology,
                                                meta.lmax, lmin=meta.lmin)
                 cl_th = cl_th_dict[field_pair]
+                if meta.null_e_modes and "E" in field_pair:
+                    cl_th = np.zeros_like(cl_th)
                 do_theory_plot = True
                 for split_label in cells_plots[plot_label]:
                     cells_splits = cells_plots[plot_label][split_label]
@@ -342,7 +345,8 @@ def pcler(args):
                 # TO-DO: filter temperature only once !
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1]),
-                    "spin2": nmt.NmtField(mask, map[1:])
+                    "spin2": nmt.NmtField(mask, map[1:],
+                                          purify_b=meta.tf_est_pure_B)
                 }
 
                 if meta.filtering_type == "toast":
@@ -351,7 +355,8 @@ def pcler(args):
                     pw = [None, None]
                 field_filtered = {
                     "spin0": nmt.NmtField(mask, map_filtered[:1], beam=pw[0]),
-                    "spin2": nmt.NmtField(mask, map_filtered[1:], beam=pw[1])
+                    "spin2": nmt.NmtField(mask, map_filtered[1:], beam=pw[1],
+                                          purify_b=meta.tf_est_pure_B)
                 }
 
                 fields["unfiltered"][pure_type] = field
@@ -370,7 +375,7 @@ def pcler(args):
     if args.tf_val:
         inv_couplings = {}
         for filter_flag in ["filtered", "unfiltered"]:
-            couplings = np.load(f"{meta.coupling_directory}/couplings_{filter_flag}.npz")  # noqa
+            couplings = np.load(f"{meta.coupling_directory}/couplings_{filter_flag}_pure.npz")  # noqa
             inv_couplings[filter_flag] = {
                 k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
                                                              ncl*n_bins])
@@ -399,7 +404,8 @@ def pcler(args):
                         pw = [None, None]
                     field = {
                         "spin0": nmt.NmtField(mask, map[:1], beam=pw[0]),
-                        "spin2": nmt.NmtField(mask, map[1:], beam=pw[1])
+                        "spin2": nmt.NmtField(mask, map[1:], beam=pw[1],
+                                              purify_b=meta.pure_B)
                     }
 
                     pcls = get_coupled_pseudo_cls(field, field, nmt_binning)

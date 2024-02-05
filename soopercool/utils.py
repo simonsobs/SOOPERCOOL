@@ -609,8 +609,9 @@ def get_binary_mask_from_nhits(nhits_map, nside, zero_threshold=1e-3):
     """
     Make binary mask by smoothing, normalizing and thresholding nhits map.
     """
-    nhits_smoothed = hp.smoothing(hp.ud_grade(nhits_map, nside, power=-2),
-                                  fwhm=np.pi/180, verbose=False)
+    nhits_smoothed = hp.smoothing(
+        hp.ud_grade(nhits_map, nside, power=-2, dtype=np.float64),
+        fwhm=np.pi/180)
     nhits_smoothed[nhits_smoothed < 0] = 0
     nhits_smoothed /= np.amax(nhits_smoothed)
     binary_mask = np.zeros_like(nhits_smoothed)
@@ -641,12 +642,13 @@ def get_apodized_mask_from_nhits(nhits_map, nside,
     import pymaster as nmt
 
     # Smooth and normalize hits map
-    nhits_map = hp.smoothing(hp.ud_grade(nhits_map, nside, power=-2),
-                             fwhm=np.pi/180, verbose=False)
+    nhits_map = hp.smoothing(
+        hp.ud_grade(nhits_map, nside, power=-2, dtype=np.float64),
+        fwhm=np.pi/180)
     nhits_map /= np.amax(nhits_map)
 
     # Get binary mask
-    binary_mask = get_binary_mask_from_nhits(nhits_map, nside)
+    binary_mask = get_binary_mask_from_nhits(nhits_map, nside, zero_threshold)
 
     # Multiply by Galactic mask
     if galactic_mask is not None:
@@ -664,3 +666,19 @@ def get_apodized_mask_from_nhits(nhits_map, nside,
                                            apotype=apod_type)
 
     return nhits_map * binary_mask
+
+
+def get_spin_derivatives(map):
+    """
+    First and second spin derivatives of a given spin-0 map.
+    """
+    nside = hp.npix2nside(np.shape(map)[-1])
+    ell = np.arange(3*nside)
+    alpha1i = np.sqrt(ell*(ell + 1.))
+    alpha2i = np.sqrt((ell - 1.)*ell*(ell + 1.)*(ell + 2.))
+    first = hp.alm2map(hp.almxfl(hp.map2alm(map), alpha1i), nside=nside)
+    second = hp.alm2map(hp.almxfl(hp.map2alm(map), alpha2i), nside=nside)
+    cmap = cm.YlOrRd
+    cmap.set_under("w")
+
+    return first, second
