@@ -1,7 +1,6 @@
 import yaml
 import numpy as np
 import os
-import pathlib
 from scipy.interpolate import interp1d
 import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 import healpy as hp
