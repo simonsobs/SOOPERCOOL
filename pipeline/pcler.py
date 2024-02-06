@@ -375,7 +375,8 @@ def pcler(args):
     if args.tf_val:
         inv_couplings = {}
         for filter_flag in ["filtered", "unfiltered"]:
-            couplings = np.load(f"{meta.coupling_directory}/couplings_{filter_flag}_pure.npz")  # noqa
+            pure_str = "_pure" if meta.tf_est_pure_B else ""
+            couplings = np.load(f"{meta.coupling_directory}/couplings_{filter_flag}{pure_str}.npz")  # noqa
             inv_couplings[filter_flag] = {
                 k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
                                                              ncl*n_bins])

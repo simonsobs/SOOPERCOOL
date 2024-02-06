@@ -61,11 +61,13 @@ def transfer(args):
         spin_pair: mcm[f"{spin_pair}_binned"] for spin_pair in spin_pairs
     }
 
-    # If we B-purify, load also the un-beamed purified mode coupling matrix
-    mcm_pure = np.load(f"{coupling_dir}/mcm_pure.npz")
-    mcms_dict_nobeam_pure = {
-        spin_pair: mcm_pure[f"{spin_pair}_binned"] for spin_pair in spin_pairs
-    }
+    # If we B-purify for transfer function estimation, load the un-beamed
+    # purified mode coupling matrix
+    if meta.tf_est_pure_B:
+        mcm_pure = np.load(f"{coupling_dir}/mcm_pure.npz")
+        mcms_dict_nobeam_pure = {
+            spin_pair: mcm_pure[f"{spin_pair}_binned"] for spin_pair in spin_pairs
+        }
 
     meta.timer.stop("Load mode-coupling matrices", verbose=True)
 
@@ -156,11 +158,15 @@ def transfer(args):
 
     for filter_tag in ["filtered", "unfiltered"]:
         couplings_nobeam = {}
-        couplings_nobeam_pure = {}
-        for couplings, mcms_dict in zip([couplings_nobeam,
-                                         couplings_nobeam_pure],
-                                        [mcms_dict_nobeam,
-                                         mcms_dict_nobeam_pure]):
+        couplings_list = [couplings_nobeam]
+        mcms_list = [mcms_dict_nobeam]
+
+        if meta.tf_est_pure_B:
+            couplings_nobeam_pure = {}
+            couplings_list.append(couplings_nobeam_pure)
+            mcms_list.append(mcms_dict_nobeam_pure)
+
+        for couplings, mcms_dict in zip(couplings_list, mcms_list):
             for spin_pair in spin_pairs:
                 if filter_tag == "filtered":
                     tbmcm = np.einsum('ijk,jklm->iklm', trans[spin_pair],
@@ -194,10 +200,11 @@ def transfer(args):
             f"{coupling_dir}/couplings_{filter_tag}.npz",
             **couplings_nobeam
         )
-        np.savez(
-            f"{coupling_dir}/couplings_{filter_tag}_pure.npz",
-            **couplings_nobeam_pure
-        )
+        if meta.tf_est_pure_B:
+            np.savez(
+                f"{coupling_dir}/couplings_{filter_tag}_pure.npz",
+                **couplings_nobeam_pure
+            )
 
     meta.timer.stop("Compute full coupling", verbose=True)
 

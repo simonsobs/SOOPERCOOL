@@ -77,8 +77,8 @@ general_pars:
   lmax: 600
   deltal: 10
   binning_file: "binning.npz"
-  pure_B: True
-  tf_est_pure_B: True
+  pure_B: False  # Compute data and covariance sims with purified B-modes
+  tf_est_pure_B: True  # Compute transfer function with purified B-modes
 
 ## Simulation related
 sim_pars:
@@ -99,9 +99,9 @@ sim_pars:
 
 ## Filtering transfer function related parameters
 tf_settings:
-  filtering_type: "m_filterer" # "m_filterer" or "toast"
-  m_cut: 30 # necessary only if `filtering_type` is set to "m_filterer"
-  toast: # necessary only if `filtering_type` is set to "toast"
+  filtering_type: "m_filterer"  # "m_filterer" or "toast"
+  m_cut: 30  # necessary only if `filtering_type` is set to "m_filterer"
+  toast:  # necessary only if `filtering_type` is set to "toast"
     schedule: "../outputs/schedules/schedule_sat.txt"
     instrument: "SAT1"
     band: "SAT_f090"
