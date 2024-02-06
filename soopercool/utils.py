@@ -374,6 +374,7 @@ def toast_filter_map(map, map_file, mask,
                       output_dir[:-1] + '_filtered.fits')
         else:
             os.rename(output_dir + 'FilterBin_hits.fits', map_file)
+            os.remove(output_dir + 'FilterBin_filtered_map.fits')
         if os.path.isdir(output_dir):
             os.rmdir(output_dir)
 

@@ -400,6 +400,7 @@ class BBmeta(object):
         return filter_operation
 
     def get_nhits_map_from_toast_schedule(self):
+        from soopercool.utils import toast_filter_map
         if self.filtering_type != "toast":
             raise NotImplementedError(f"Filterer type {self.filtering_type} "
                                       "not implemented")
