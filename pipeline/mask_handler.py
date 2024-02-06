@@ -45,7 +45,7 @@ def mask_handler(args):
         nhits = nhits_nominal
     else:
         print("Using custom apodized mask for analysis")
-        nhits = meta.read_hitmap_from_disk()
+        nhits = meta.read_hitmap()
     meta.timer.stop("nhits", "Get hits map", args.verbose)
 
     if args.plots:

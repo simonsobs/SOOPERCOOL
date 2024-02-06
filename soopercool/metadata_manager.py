@@ -179,7 +179,12 @@ class BBmeta(object):
         """
         Get the name of the hits counts map.
         """
-        return os.path.join(self.mask_directory, self.masks["nhits_map"])
+        if not self.use_input_nhits:
+            # Not using custom nhits map
+            return os.path.join(self.mask_directory, self.masks["nhits_map"])
+        else:
+            # Using custom nhits map
+            return self.masks["input_nhits_path"]
 
     def read_mask(self, mask_type):
         """
@@ -219,13 +224,6 @@ class BBmeta(object):
         share the same hitmap.
         """
         hitmap = hp.read_map(self.nhits_map_name)
-        return hp.ud_grade(hitmap, self.nside, power=-2)
-
-    def read_hitmap_from_disk(self):
-        """
-        Read the input hitmap from disk
-        """
-        hitmap = hp.read_map(self.masks["input_nhits_path"])
         return hp.ud_grade(hitmap, self.nside, power=-2)
 
     def read_nmt_binning(self):
