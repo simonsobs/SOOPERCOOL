@@ -66,7 +66,7 @@ def transfer(args):
     if meta.tf_est_pure_B:
         mcm_pure = np.load(f"{coupling_dir}/mcm_pure.npz")
         mcms_dict_nobeam_pure = {
-            spin_pair: mcm_pure[f"{spin_pair}_binned"] for spin_pair in spin_pairs
+            spin_pair: mcm_pure[f"{spin_pair}_binned"] for spin_pair in spin_pairs  # noqa
         }
 
     meta.timer.stop("Load mode-coupling matrices", verbose=True)
