@@ -218,14 +218,12 @@ class BBmeta(object):
         Read the hitmap. For now, we assume that all tags
         share the same hitmap.
         """
-        hitmap = hp.read_map(self.nhits_map_name)
-        return hp.ud_grade(hitmap, self.nside, power=-2)
-
-    def read_hitmap_from_disk(self):
-        """
-        Read the input hitmap from disk
-        """
-        hitmap = hp.read_map(self.masks["input_nhits_path"])
+        if not self.use_input_nhits:
+            # Not using custom nhits map
+            hitmap = hp.read_map(self.nhits_map_name)
+        else:
+            # Using custom nhits map
+            hitmap = hp.read_map(self.masks["input_nhits_path"])
         return hp.ud_grade(hitmap, self.nside, power=-2)
 
     def read_nmt_binning(self):
