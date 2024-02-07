@@ -53,10 +53,9 @@ masks:
   # If left blank, the mask handler will download the nominal nhits map.
   input_nhits_path:
 
-  # Masks will be written to the following file names, located under the
-  # mask directory  
+  # Copies of all masks are stored under these names inside mask_directory
   analysis_mask: "analysis_mask.fits"
-  nhits_map: "nhits_map.fits"    # Not used if input_nhits_path is provided.
+  nhits_map: "nhits_map.fits"
   binary_mask: "binary_mask.fits"
   galactic_mask_root: "planck_galactic_mask"
   point_source_mask: "point_source_mask.fits"
