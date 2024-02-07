@@ -78,8 +78,8 @@ def mask_handler(args):
         nhits_nominal, meta.nside,
         galactic_mask=None,
         point_source_mask=None,
-        zero_threshold=1e-3, apod_radius=meta.masks["apod_radius"],
-        apod_radius_point_source=meta.masks["apod_radius_point_source"],
+        zero_threshold=1e-3, apod_radius=10.0,
+        apod_radius_point_source=4.0,
         apod_type="C1"
     )
     first_nom, second_nom = get_spin_derivatives(nominal_mask)
@@ -185,7 +185,7 @@ def mask_handler(args):
             point_source_mask=point_source_mask,
             zero_threshold=1e-3, apod_radius=meta.masks["apod_radius"],
             apod_radius_point_source=meta.masks["apod_radius_point_source"],
-            apod_type="C1"
+            apod_type=meta.masks["apod_type"]
         )
 
         # Make sure first two spin derivatives are bounded below twice the
