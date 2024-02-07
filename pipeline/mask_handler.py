@@ -22,6 +22,7 @@ def mask_handler(args):
     if args.plots:
         cmap = cm.YlOrRd
         cmap.set_under("w")
+        plot_dir = meta.plot_dir_from_output_dir(meta.mask_directory_rel)
 
     os.makedirs(mask_dir, exist_ok=True)
 
@@ -40,19 +41,21 @@ def mask_handler(args):
     # If we don't use a custom nhits map, work with the nominal nhits map.
     if not meta.use_input_nhits:
         print("Using nominal apodized mask for analysis")
-        hp.write_map(meta.nhits_map_name, nhits_nominal, dtype=np.float32,
-                     overwrite=True)
         nhits = nhits_nominal
     else:
         print("Using custom apodized mask for analysis")
         nhits = meta.read_hitmap()
+    meta.save_hitmap(nhits)
+
     meta.timer.stop("nhits", "Get hits map", args.verbose)
 
     if args.plots:
         plt.figure(figsize=(16, 9))
         hp.mollview(nhits, cmap=cmap, cbar=False)
         hp.graticule()
-        plt.savefig(meta.nhits_map_name.replace('.fits', '.png'))
+        nhits_save_path = os.path.join(plot_dir,
+                                       meta.masks["nhits_map"])
+        plt.savefig(nhits_save_path.replace('.fits', '.png'))
 
     # Generate binary survey mask from the hits map
     meta.timer.start("binary")
@@ -65,7 +68,9 @@ def mask_handler(args):
         plt.figure(figsize=(16, 9))
         hp.mollview(binary_mask, cmap=cmap, cbar=False)
         hp.graticule()
-        plt.savefig(meta.binary_mask_name.replace('.fits', '.png'))
+        plt.savefig(os.path.join(plot_dir,
+                                 meta.masks["binary_mask"]).replace('.fits',
+                                                                    '.png'))
 
     # Make nominal apodized mask from the nominal hits map
     meta.timer.start("apodized")
@@ -128,7 +133,11 @@ def mask_handler(args):
                     plt.figure(figsize=(16, 9))
                     hp.mollview(gal_mask_p15, cmap=cmap, cbar=False)
                     hp.graticule()
-                    plt.savefig(fname.replace("fits", "png"))
+                    plt.savefig(
+                        os.path.join(plot_dir,
+                                     fname.split("/")[-1].replace('.fits',
+                                                                  '.png'))
+                    )
 
         # Get point source mask
         if "point_source" in meta.masks["include_in_mask"]:
@@ -154,7 +163,11 @@ def mask_handler(args):
                 plt.figure(figsize=(16, 9))
                 hp.mollview(ps_mask, cmap=cmap, cbar=False)
                 hp.graticule()
-                plt.savefig(ps_fname.replace(".fits", ".png"))
+                plt.savefig(
+                    os.path.join(plot_dir,
+                                 ps_fname.split("/")[-1].replace('.fits',
+                                                                 '.png'))
+                )
 
         # Add the masks
         meta.timer.start("final_mask")
@@ -206,13 +219,15 @@ def mask_handler(args):
     meta.save_mask("analysis", final_mask, overwrite=True)
 
     if args.plots:
-        analysis_fname = meta.analysis_mask_name
         # Plot analysis mask
         plt.figure(figsize=(16, 9))
         hp.mollview(final_mask, cmap=cmap, cbar=False)
         hp.graticule()
-        plt.savefig(analysis_fname.replace(".fits", ".png"),
-                    bbox_inches="tight")
+        plt.savefig(
+            os.path.join(plot_dir,
+                         meta.masks["analysis_mask"]).replace('.fits',
+                                                              '.png')
+        )
         plt.clf()
 
         # Plot first spin derivative of analysis mask
@@ -220,8 +235,11 @@ def mask_handler(args):
         hp.mollview(first, title="First spin derivative", cmap=cmap,
                     cbar=True)
         hp.graticule()
-        plt.savefig(analysis_fname.replace(".fits", "_first.png"),
-                    bbox_inches="tight")
+        plt.savefig(
+            os.path.join(plot_dir,
+                         meta.masks["analysis_mask"]).replace('.fits',
+                                                              '_first.png')
+        )
         plt.clf()
 
         # Plot second spin derivative of analysis mask
@@ -229,8 +247,11 @@ def mask_handler(args):
         hp.mollview(second, title="Second spin derivative", cmap=cmap,
                     cbar=True)
         hp.graticule()
-        plt.savefig(analysis_fname.replace(".fits", "_second.png"),
-                    bbox_inches="tight")
+        plt.savefig(
+            os.path.join(plot_dir,
+                         meta.masks["analysis_mask"]).replace('.fits',
+                                                              '_second.png')
+        )
         plt.clf()
 
 

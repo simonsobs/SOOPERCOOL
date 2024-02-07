@@ -230,6 +230,20 @@ class BBmeta(object):
         hitmap = hp.read_map(self.nhits_map_name)
         return hp.ud_grade(hitmap, self.nside, power=-2)
 
+    def save_hitmap(self, map, overwrite=True):
+        """
+        Save the hitmap to disk.
+
+        Parameters
+        ----------
+        map : array-like
+            Mask to save.
+        """
+        hp.write_map(
+            os.path.join(self.mask_directory, self.masks["nhits_map"]),
+            map, dtype=np.float32, overwrite=overwrite
+        )
+
     def read_nmt_binning(self):
         """
         Read the binning file and return the corresponding NmtBin object.
