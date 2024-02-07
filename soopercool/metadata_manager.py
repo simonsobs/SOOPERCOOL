@@ -115,6 +115,10 @@ class BBmeta(object):
         """
         for key, value in self.general_pars.items():
             setattr(self, key, value)
+        # If "tf_est_pure_B" is left unspecified, use B-mode purification
+        # on the TF estimation sims only if data is also B-purified.
+        if "tf_est_pure_B" not in self.general_pars:
+            setattr(self, "tf_est_pure_B", self.pure_B)
 
     def _get_map_sets_list(self):
         """

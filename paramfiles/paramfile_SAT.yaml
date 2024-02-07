@@ -77,8 +77,7 @@ general_pars:
   lmax: 600
   deltal: 10
   binning_file: "binning.npz"
-  pure_B: False  # Compute data and covariance sims with purified B-modes
-  tf_est_pure_B: True  # Compute transfer function with purified B-modes
+  pure_B: True
 
 ## Simulation related
 sim_pars:
