@@ -115,6 +115,10 @@ class BBmeta(object):
         """
         for key, value in self.general_pars.items():
             setattr(self, key, value)
+        # If "tf_est_pure_B" is left unspecified, use B-mode purification
+        # on the TF estimation sims only if data is also B-purified.
+        if "tf_est_pure_B" not in self.general_pars:
+            setattr(self, "tf_est_pure_B", self.pure_B)
 
     def _get_map_sets_list(self):
         """
@@ -225,6 +229,20 @@ class BBmeta(object):
         """
         hitmap = hp.read_map(self.nhits_map_name)
         return hp.ud_grade(hitmap, self.nside, power=-2)
+
+    def save_hitmap(self, map, overwrite=True):
+        """
+        Save the hitmap to disk.
+
+        Parameters
+        ----------
+        map : array-like
+            Mask to save.
+        """
+        hp.write_map(
+            os.path.join(self.mask_directory, self.masks["nhits_map"]),
+            map, dtype=np.float32, overwrite=overwrite
+        )
 
     def read_nmt_binning(self):
         """

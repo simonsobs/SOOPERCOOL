@@ -348,14 +348,9 @@ def pcler(args):
                     "spin2": nmt.NmtField(mask, map[1:],
                                           purify_b=meta.tf_est_pure_B)
                 }
-
-                if meta.filtering_type == "toast":
-                    pw = hp.pixwin(meta.nside, pol=True, lmax=3*meta.nside-1)
-                else:
-                    pw = [None, None]
                 field_filtered = {
-                    "spin0": nmt.NmtField(mask, map_filtered[:1], beam=pw[0]),
-                    "spin2": nmt.NmtField(mask, map_filtered[1:], beam=pw[1],
+                    "spin0": nmt.NmtField(mask, map_filtered[:1]),
+                    "spin2": nmt.NmtField(mask, map_filtered[1:],
                                           purify_b=meta.tf_est_pure_B)
                 }
 
@@ -397,15 +392,9 @@ def pcler(args):
 
                     map = hp.read_map(map_file, field=[0, 1, 2])
 
-                    if ((filter_flag == "filtered") and
-                            (meta.filtering_type == "toast")):
-                        pw = hp.pixwin(meta.nside, pol=True,
-                                       lmax=3*meta.nside-1)
-                    else:
-                        pw = [None, None]
                     field = {
-                        "spin0": nmt.NmtField(mask, map[:1], beam=pw[0]),
-                        "spin2": nmt.NmtField(mask, map[1:], beam=pw[1],
+                        "spin0": nmt.NmtField(mask, map[:1]),
+                        "spin2": nmt.NmtField(mask, map[1:],
                                               purify_b=meta.pure_B)
                     }
 
