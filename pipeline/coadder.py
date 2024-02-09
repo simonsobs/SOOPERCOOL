@@ -78,6 +78,8 @@ def coadder(args):
                 el_th, cl_th_dict = theory_cls(meta.cosmology,
                                                meta.lmax, lmin=meta.lmin)
                 cl_th = cl_th_dict[field_pair]
+                if meta.null_e_modes and "E" in field_pair:
+                    cl_th = np.zeros_like(cl_th)
                 plt.plot(el_th,
                          el_th*(el_th+1)/2./np.pi*(cl_th),
                          lw=1, ls='--', c='darkred',

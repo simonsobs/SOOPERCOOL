@@ -5,13 +5,13 @@
 # Define the directories
 ## Let's start with directories of data products
 data_dirs:
-  root: "<path-to-SOOPERCOOL>/data"
+  root: "../data"
   map_directory: "maps"
   beam_directory: "beams"
   bandpasses_directory: "bandpasses"
 ## Then directories in which we will store outputs
 output_dirs: 
-  root: "<path-to-SOOPERCOOL>/outputs"
+  root: "../outputs"
   mask_directory: "masks"
   pre_process_directory: "pre_processing"
   sims_directory: "sims"
@@ -49,8 +49,13 @@ map_sets:
 # Masking metadata #
 ####################
 masks:
-  analysis_mask: "apodized_mask_bbpipe_paper.fits"
+  # Load nhits map from disk? Give absolute location here.
+  # If left blank, the mask handler will download the nominal nhits map.
+  input_nhits_path:
 
+  # Copies of all masks are stored under these names inside mask_directory
+  analysis_mask: "analysis_mask.fits"
+  nhits_map: "nhits_map.fits"
   binary_mask: "binary_mask.fits"
   galactic_mask_root: "planck_galactic_mask"
   point_source_mask: "point_source_mask.fits"
@@ -71,11 +76,12 @@ general_pars:
   lmax: 600
   deltal: 10
   binning_file: "binning.npz"
+  pure_B: True
 
 ## Simulation related
 sim_pars:
-  hitmap_file: "<path-to-SOOPERCOOL>/outputs/masks/norm_nHits_SA_35FOV_ns512.fits"
   anisotropic_noise: False
+  null_e_modes: False
   num_sims: 3
   cosmology:
     cosmomc_theta: 0.0104085
@@ -91,10 +97,10 @@ sim_pars:
 
 ## Filtering transfer function related parameters
 tf_settings:
-  filtering_type: "m_filterer" # "m_filterer" or "toast"
-  m_cut: 30 # necessary only if `filtering_type` is set to "m_filterer"
-  toast: # necessary only if `filtering_type` is set to "toast"
-    schedule: "<path-to-SOOPERCOOL>/schedules/schedule_sat.txt"
+  filtering_type: "m_filterer"  # "m_filterer" or "toast"
+  m_cut: 30  # necessary only if `filtering_type` is set to "m_filterer"
+  toast:  # necessary only if `filtering_type` is set to "toast"
+    schedule: "../outputs/schedules/schedule_sat.txt"
     instrument: "SAT1"
     band: "SAT_f090"
     thinfp: 8

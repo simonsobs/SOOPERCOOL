@@ -1,7 +1,8 @@
 import argparse
 import healpy as hp
 from soopercool.utils import (random_src_mask, get_apodized_mask_from_nhits,
-                              get_binary_mask_from_nhits)
+                              get_binary_mask_from_nhits,
+                              get_spin_derivatives)
 from soopercool import BBmeta
 import numpy as np
 import os
@@ -21,57 +22,80 @@ def mask_handler(args):
     if args.plots:
         cmap = cm.YlOrRd
         cmap.set_under("w")
+        plot_dir = meta.plot_dir_from_output_dir(meta.mask_directory_rel)
 
     os.makedirs(mask_dir, exist_ok=True)
 
-    # Download hits map
-    print("Download and save hits map ...")
-    nhits_file = meta.hitmap_file
+    # Get nhits map
+    # Download nominal hits map from URL with a timeout and save temporarily.
+    meta.timer.start("nhits")
     urlpref = "https://portal.nersc.gov/cfs/sobs/users/so_bb/"
     url = f"{urlpref}norm_nHits_SA_35FOV_ns512.fits"
-    # Open the URL with a timeout
-    with urllib.request.urlopen(url, timeout=timeout_seconds):
-        urllib.request.urlretrieve(url, filename=nhits_file)
-        nhits = hp.ud_grade(hp.read_map(nhits_file), meta.nside, power=-2)
-        hp.write_map(meta.hitmap_file, nhits, overwrite=True)
+
+    with urllib.request.urlopen(url, timeout=timeout_seconds) as response:
+        with open("temp.fits", 'w+b') as f:
+            f.write(response.read())
+    nhits_nominal = hp.ud_grade(hp.read_map("temp.fits"), meta.nside, power=-2)
+    os.remove("temp.fits")
+
+    # If we don't use a custom nhits map, work with the nominal nhits map.
+    if not meta.use_input_nhits:
+        print("Using nominal apodized mask for analysis")
+        nhits = nhits_nominal
+    else:
+        print("Using custom apodized mask for analysis")
+        nhits = meta.read_hitmap()
+    meta.save_hitmap(nhits)
+
+    meta.timer.stop("nhits", "Get hits map", args.verbose)
+
     if args.plots:
         plt.figure(figsize=(16, 9))
         hp.mollview(nhits, cmap=cmap, cbar=False)
         hp.graticule()
-        plt.savefig(meta.binary_mask_name.replace('.fits', '_nhits.png'))
+        nhits_save_path = os.path.join(plot_dir,
+                                       meta.masks["nhits_map"])
+        plt.savefig(nhits_save_path.replace('.fits', '.png'))
 
     # Generate binary survey mask from the hits map
-    meta.timer.start("Computing binary mask")
-    nhits = hp.read_map(nhits_file)
+    meta.timer.start("binary")
     binary_mask = get_binary_mask_from_nhits(nhits, meta.nside,
                                              zero_threshold=1e-3)
     meta.save_mask("binary", binary_mask, overwrite=True)
-    meta.timer.stop("Computing binary mask", args.verbose)
+    meta.timer.stop("binary", "Computing binary mask", args.verbose)
 
     if args.plots:
         plt.figure(figsize=(16, 9))
         hp.mollview(binary_mask, cmap=cmap, cbar=False)
         hp.graticule()
-        plt.savefig(meta.binary_mask_name.replace('.fits', '.png'))
+        plt.savefig(os.path.join(plot_dir,
+                                 meta.masks["binary_mask"]).replace('.fits',
+                                                                    '.png'))
 
-    if not args.self_assemble:
-        # Download SAT apodized mask used in the SO BB
-        # pipeline paper (https://arxiv.org/abs/2302.04276)
-        # and use as analysis mask
-        print("Download and save SAT apodized mask ...")
-        sat_apo_file = meta._get_analysis_mask_name()
-        urlpref = "https://portal.nersc.gov/cfs/sobs/users/so_bb/"
-        url = f"{urlpref}apodized_mask_bbpipe_paper.fits"
-        with urllib.request.urlopen(url, timeout=timeout_seconds):
-            urllib.request.urlretrieve(url, filename=sat_apo_file)
-            sat_apo_mask = hp.read_map(sat_apo_file, field=0)
-            sat_apo_mask = hp.ud_grade(sat_apo_mask, meta.nside)
-            meta.save_mask("analysis", sat_apo_mask, overwrite=True)
+    # Make nominal apodized mask from the nominal hits map
+    meta.timer.start("apodized")
+    nominal_mask = get_apodized_mask_from_nhits(
+        nhits_nominal, meta.nside,
+        galactic_mask=None,
+        point_source_mask=None,
+        zero_threshold=1e-3, apod_radius=10.0,
+        apod_radius_point_source=4.0,
+        apod_type="C1"
+    )
+    first_nom, second_nom = get_spin_derivatives(nominal_mask)
+    meta.timer.stop("apodized", "Computing nominal apodized mask",
+                    args.verbose)
+
+    if not meta.use_input_nhits:
+        final_mask = nominal_mask
+        first = first_nom
+        second = second_nom
+
     else:
-        # Assemble custom analysis mask from hits map, Galactic mask and
-        # point source mask
+        # Assemble custom analysis mask from hits map and point source mask
+        # stored at disk, and Planck Galactic masks downloaded in-place.
 
-        # Download galactic mask
+        # Download Galactic mask
         if "galactic" in meta.masks["include_in_mask"]:
             print("Download and save planck galactic masks ...")
             mask_p15_file = f"{mask_dir}/mask_planck2015.fits"
@@ -109,25 +133,41 @@ def mask_handler(args):
                     plt.figure(figsize=(16, 9))
                     hp.mollview(gal_mask_p15, cmap=cmap, cbar=False)
                     hp.graticule()
-                    plt.savefig(fname.replace("fits", "png"))
+                    plt.savefig(
+                        os.path.join(plot_dir,
+                                     fname.split("/")[-1].replace('.fits',
+                                                                  '.png'))
+                    )
 
-        # Generate mock point source mask
+        # Get point source mask
         if "point_source" in meta.masks["include_in_mask"]:
             meta.timer.start("ps_mask")
-            nsrcs = meta.mock_nsrcs
-            mask_radius_arcmin = meta.mock_srcs_hole_radius
-            ps_mask = random_src_mask(binary_mask, nsrcs,
-                                      mask_radius_arcmin)
-            meta.save_mask("point_source", ps_mask, overwrite=True)
-            meta.timer.stop("ps_mask",
-                            "Generate mock point source mask", args.verbose)
+            ps_fname = meta.point_source_mask_name
+            # Load from disk if file exists
+            if os.path.isfile(ps_fname):
+                ps_mask = binary_mask * hp.ud_grade(hp.read_map(ps_fname),
+                                                    meta.nside)
+                meta.timer.stop("ps_mask", "Load point source mask from disk",
+                                args.verbose)
+            # Otherwise, generate random point source mask
+            else:
+                nsrcs = meta.mock_nsrcs
+                mask_radius_arcmin = meta.mock_srcs_hole_radius
+                ps_mask = random_src_mask(binary_mask, nsrcs,
+                                          mask_radius_arcmin)
+                meta.save_mask("point_source", ps_mask, overwrite=True)
+                meta.timer.stop("ps_mask", "Generate mock point source mask",
+                                args.verbose)
 
             if args.plots:
                 plt.figure(figsize=(16, 9))
                 hp.mollview(ps_mask, cmap=cmap, cbar=False)
                 hp.graticule()
-                plt.savefig(meta.point_source_mask_name.replace(".fits",
-                                                                ".png"))
+                plt.savefig(
+                    os.path.join(plot_dir,
+                                 ps_fname.split("/")[-1].replace('.fits',
+                                                                 '.png'))
+                )
 
         # Add the masks
         meta.timer.start("final_mask")
@@ -145,28 +185,82 @@ def mask_handler(args):
             point_source_mask=point_source_mask,
             zero_threshold=1e-3, apod_radius=meta.masks["apod_radius"],
             apod_radius_point_source=meta.masks["apod_radius_point_source"],
-            apod_type="C1"
+            apod_type=meta.masks["apod_type"]
         )
 
-        meta.save_mask("analysis", final_mask, overwrite=True)
-        meta.timer.stop("final_mask", "Compute and save final analysis mask",
+        # Make sure first two spin derivatives are bounded below twice the
+        # respective global maximum values of the nominal analysis mask.
+        # If not, issue warning.
+        first, second = get_spin_derivatives(final_mask)
+
+        if args.verbose:
+            print("---------------------------------------------------------")
+            print("Using custom mask. "
+                  "Its spin derivatives have global min and max of:")
+            print("first:     ", np.amin(first), np.amax(first),
+                  "\nsecond:    ", np.amin(second), np.amax(second))
+            print("\nFor comparison, the nominal mask has:")
+            print("first_nom: ", np.amin(first_nom), np.amax(first_nom),
+                  "\nsecond_nom:", np.amin(second_nom), np.amax(second_nom))
+            print("---------------------------------------------------------")
+
+        first_is_bounded = (np.amax(first) < 2*np.amax(first_nom)
+                            and np.amin(first) > 2*np.amin(first_nom))
+        second_is_bounded = (np.amax(second) < 2*np.amax(second_nom)
+                             and np.amin(second) > 2*np.amin(second_nom))
+
+        if not (first_is_bounded and second_is_bounded):
+            print("WARNING: Your analysis mask may not be smooth enough, "
+                  "so B-mode purification could induce biases.")
+        meta.timer.stop("final_mask", "Assembling final analysis mask",
                         args.verbose)
 
+    # Save analysis mask
+    meta.save_mask("analysis", final_mask, overwrite=True)
+
     if args.plots:
+        # Plot analysis mask
         plt.figure(figsize=(16, 9))
-        hp.mollview(meta.read_mask("analysis"), cmap=cmap, cbar=False)
+        hp.mollview(final_mask, cmap=cmap, cbar=False)
         hp.graticule()
-        plt.savefig(meta.analysis_mask_name.replace(".fits", ".png"))
+        plt.savefig(
+            os.path.join(plot_dir,
+                         meta.masks["analysis_mask"]).replace('.fits',
+                                                              '.png')
+        )
+        plt.clf()
+
+        # Plot first spin derivative of analysis mask
+        plt.figure(figsize=(16, 9))
+        hp.mollview(first, title="First spin derivative", cmap=cmap,
+                    cbar=True)
+        hp.graticule()
+        plt.savefig(
+            os.path.join(plot_dir,
+                         meta.masks["analysis_mask"]).replace('.fits',
+                                                              '_first.png')
+        )
+        plt.clf()
+
+        # Plot second spin derivative of analysis mask
+        plt.figure(figsize=(16, 9))
+        hp.mollview(second, title="Second spin derivative", cmap=cmap,
+                    cbar=True)
+        hp.graticule()
+        plt.savefig(
+            os.path.join(plot_dir,
+                         meta.masks["analysis_mask"]).replace('.fits',
+                                                              '_second.png')
+        )
+        plt.clf()
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser(description='simplistic simulator')
     parser.add_argument("--globals", type=str,
                         help="Path to yaml with global parameters")
     parser.add_argument("--plots", action="store_true")
     parser.add_argument("--verbose", action="store_true")
-    parser.add_argument("--self_assemble", action="store_true")
     args = parser.parse_args()
 
     mask_handler(args)

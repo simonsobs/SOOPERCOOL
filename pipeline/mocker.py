@@ -66,7 +66,15 @@ def mocker(args):
     Nsims = meta.num_sims if args.sims else 1
 
     for id_sim in range(Nsims):
-        cmb_map = hp.synfast([ps_th[k] for k in hp_ordering], meta.nside)
+        alms_T, alms_E, alms_B = hp.synalm([ps_th[k] for k in hp_ordering],
+                                           lmax=lmax_sim)
+        if meta.null_e_modes:
+            cmb_map = hp.alm2map([alms_T, alms_E*0, alms_B],
+                                 meta.nside, lmax=lmax_sim)
+        else:
+            cmb_map = hp.alm2map([alms_T, alms_E, alms_B],
+                                 meta.nside, lmax=lmax_sim)
+
         for map_set in meta.map_sets_list:
 
             meta.timer.start(f"Generate map set {map_set} split maps")

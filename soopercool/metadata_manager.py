@@ -58,12 +58,16 @@ class BBmeta(object):
         self.map_sets_list = self._get_map_sets_list()
         self.maps_list = self._get_map_list()
 
+        # Determine if input hit counts map exists
+        self.use_input_nhits = (self.masks["input_nhits_path"] is not None)
+
         # Initialize masks file_names
-        for mask_type in ["binary", "galactic", "point_source", "analysis"]:
+        for mask_type in ["binary_mask", "galactic_mask", "point_source_mask",
+                          "analysis_mask", "nhits_map"]:
             setattr(
                 self,
-                f"{mask_type}_mask_name",
-                getattr(self, f"_get_{mask_type}_mask_name")()
+                f"{mask_type}_name",
+                getattr(self, f"_get_{mask_type}_name")()
             )
 
         # Simulation
@@ -111,6 +115,10 @@ class BBmeta(object):
         """
         for key, value in self.general_pars.items():
             setattr(self, key, value)
+        # If "tf_est_pure_B" is left unspecified, use B-mode purification
+        # on the TF estimation sims only if data is also B-purified.
+        if "tf_est_pure_B" not in self.general_pars:
+            setattr(self, "tf_est_pure_B", self.pure_B)
 
     def _get_map_sets_list(self):
         """
@@ -171,6 +179,17 @@ class BBmeta(object):
         """
         return os.path.join(self.mask_directory, self.masks["analysis_mask"])
 
+    def _get_nhits_map_name(self):
+        """
+        Get the name of the hits counts map.
+        """
+        if not self.use_input_nhits:
+            # Not using custom nhits map
+            return os.path.join(self.mask_directory, self.masks["nhits_map"])
+        else:
+            # Using custom nhits map
+            return self.masks["input_nhits_path"]
+
     def read_mask(self, mask_type):
         """
         Read the mask given a mask type.
@@ -201,15 +220,29 @@ class BBmeta(object):
             Overwrite the mask if it already exists.
         """
         return hp.write_map(getattr(self, f"{mask_type}_mask_name"), mask,
-                            overwrite=overwrite)
+                            overwrite=overwrite, dtype=np.float32)
 
     def read_hitmap(self):
         """
         Read the hitmap. For now, we assume that all tags
         share the same hitmap.
         """
-        hitmap = hp.read_map(self.hitmap_file)
+        hitmap = hp.read_map(self.nhits_map_name)
         return hp.ud_grade(hitmap, self.nside, power=-2)
+
+    def save_hitmap(self, map, overwrite=True):
+        """
+        Save the hitmap to disk.
+
+        Parameters
+        ----------
+        map : array-like
+            Mask to save.
+        """
+        hp.write_map(
+            os.path.join(self.mask_directory, self.masks["nhits_map"]),
+            map, dtype=np.float32, overwrite=overwrite
+        )
 
     def read_nmt_binning(self):
         """
@@ -247,8 +280,7 @@ class BBmeta(object):
         Loop over the simulation parameters and set them as attributes.
         """
         for name in ["num_sims", "cosmology", "anisotropic_noise",
-                     "mock_nsrcs", "mock_srcs_hole_radius",
-                     "hitmap_file"]:
+                     "null_e_modes", "mock_nsrcs", "mock_srcs_hole_radius"]:
             setattr(self, name, self.sim_pars[name])
 
     def _init_tf_estimation_params(self):

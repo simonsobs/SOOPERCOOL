@@ -1,8 +1,4 @@
-paramfile='/global/homes/k/kwolz/bbdev/SOOPERCOOL/paramfiles/paramfile_mcut_kevin.yaml'
-
-# Load the environment module
-module use --append /pscratch/sd/s/susannaz/conda_envs/master_env/modulefiles
-module load master_env/0.0.3
+paramfile='../paramfiles/paramfile_SAT.yaml'
 
 echo "Running pipeline with paramfile: ${paramfile}"
 
@@ -13,7 +9,7 @@ echo "------------------------------------------------------------"
 echo "Pre-processing data..."
 echo "-------------------"
 python pre_processer.py --globals ${paramfile} --sims
-python mask_handler.py --globals ${paramfile} --self_assemble
+python mask_handler.py --globals ${paramfile} --plots
 
 echo "Running mock stage for data..."
 echo "------------------------------"
@@ -54,9 +50,6 @@ echo "------------------------------------------------------------"
 echo "|                 COMPUTING POWER SPECTRA                  |"
 echo "------------------------------------------------------------"
 
-# echo "Switching to environment with NaMaster"
-# micromamba deactivate; micromamba activate <namaster_env>
-
 echo "Running cl estimation for tf estimation"
 echo "---------------------------------------"
 python pcler.py --globals ${paramfile} --tf_est
@@ -73,6 +66,7 @@ echo "Transfer validation"
 echo "---------------------"
 python transfer_validator.py --globals ${paramfile}
 
+
 echo "Running pcler on data"
 echo "---------------------"
 python pcler.py --globals ${paramfile} --data --plots
@@ -81,13 +75,10 @@ echo "Running pcler on sims"
 echo "---------------------"
 python pcler.py --globals ${paramfile} --sims
 
+
 echo "Running coadder on data"
 echo "---------------------"
 python coadder.py --globals ${paramfile} --data --plots
-
-echo "Running coadder on sims"
-echo "---------------------"
-python coadder.py --globals ${paramfile} --sims
 
 echo "Running coadder on sims"
 echo "---------------------"
