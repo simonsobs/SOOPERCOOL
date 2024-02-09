@@ -395,7 +395,7 @@ def pcler(args):
                     field = {
                         "spin0": nmt.NmtField(mask, map[:1]),
                         "spin2": nmt.NmtField(mask, map[1:],
-                                              purify_b=meta.pure_B)
+                                              purify_b=meta.tf_est_pure_B)
                     }
 
                     pcls = get_coupled_pseudo_cls(field, field, nmt_binning)
