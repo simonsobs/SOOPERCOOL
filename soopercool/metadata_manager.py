@@ -83,6 +83,7 @@ class BBmeta(object):
         self.cosmo_cls_file = f"{self.pre_process_directory}/cosmo_cls.npz"
         self.tf_est_cls_file = f"{self.pre_process_directory}/tf_est_cls.npz"
         self.tf_val_cls_file = f"{self.pre_process_directory}/tf_val_cls.npz"
+        self.noise_cls_file = f"{self.pre_process_directory}/noise_cls.npz"
 
         # Initialize a timer
         self.timer = Timer()
@@ -279,7 +280,7 @@ class BBmeta(object):
         """
         Loop over the simulation parameters and set them as attributes.
         """
-        for name in ["num_sims", "cosmology", "anisotropic_noise",
+        for name in ["num_sims", "cosmology", "noise", "anisotropic_noise",
                      "null_e_modes", "mock_nsrcs", "mock_srcs_hole_radius"]:
             setattr(self, name, self.sim_pars[name])
 
@@ -302,7 +303,7 @@ class BBmeta(object):
             Dictionnary with the power spectra.
         cl_type : str
             Type of power spectra.
-            Can be "cosmo", "tf_est" or "tf_val".
+            Can be "cosmo", "tf_est", "tf_val" or "noise".
         """
         fname = getattr(self, f"{cl_type}_cls_file")
         np.savez(fname, l=ell, **cl_dict)
@@ -316,7 +317,7 @@ class BBmeta(object):
         ----------
         cl_type : str
             Type of power spectra.
-            Can be "cosmo", "tf_est" or "tf_val".
+            Can be "cosmo", "tf_est", "tf_val" or "noise".
         """
         fname = getattr(self, f"{cl_type}_cls_file")
         return np.load(fname)

@@ -29,24 +29,45 @@ def pre_processer(args):
 
     lmax_sim = 3*meta.nside-1
 
-    # Create the CMB fiducial cl
     meta.timer.start("Computing fiducial cls")
-    lth, psth = utils.theory_cls(
+
+    # Create the CMB fiducial cl
+    lth, clth = utils.get_theory_cls(
         meta.cosmology,
         lmax=lmax_sim  # ensure cl accuracy up to lmax
     )
-    cl_cosmo_fname = meta.save_fiducial_cl(lth, psth, cl_type="cosmo")
+    cl_cosmo_fname = meta.save_fiducial_cl(lth, clth, cl_type="cosmo")
 
     if args.plots:
         for field_pair in ["TT", "TE", "TB", "EE", "EB", "BB"]:
             plt.figure(figsize=(8, 6))
-            dlth = lth*(lth + 1) / 2. / np.pi * psth[field_pair]
+            dlth = lth*(lth + 1) / 2. / np.pi * clth[field_pair]
             plt.loglog(lth, dlth, c='b')
             plt.loglog(lth[dlth < 0], -dlth[dlth < 0], ls='--', c='b')
             plt.xlabel(r'$\ell$', fontsize=14)
             plt.ylabel(r'$\ell(\ell+1)\, C_\ell/(2\pi)$', fontsize=14)
             plt.title(f'cosmo_cls_{field_pair}')
             plt.savefig(cl_cosmo_fname.replace('.npz', f'_{field_pair}.png'))
+
+    # Create the fiducial noise cl
+    lth, nlth = utils.get_noise_cls(
+        meta.noise,
+        lmax=lmax_sim,
+        fsky=meta.noise["fsky"],
+        is_beam_deconvolved=True
+    )
+    cl_noise_fname = meta.save_fiducial_cl(lth, nlth, cl_type="noise")
+
+    if args.plots:
+        for field_pair in ["TT", "BB"]:
+            plt.figure(figsize=(8, 6))
+            dlth = lth*(lth + 1) / 2. / np.pi * nlth[field_pair]
+            plt.loglog(lth, dlth, c='b')
+            plt.loglog(lth[dlth < 0], -dlth[dlth < 0], ls='--', c='b')
+            plt.xlabel(r'$\ell$', fontsize=14)
+            plt.ylabel(r'$\ell(\ell+1)\, C_\ell/(2\pi)$', fontsize=14)
+            plt.title(f'noise_cls_{field_pair}')
+            plt.savefig(cl_noise_fname.replace('.npz', f'_{field_pair}.png'))
 
     # Create the fiducial power law spectra
     # Let's start with the power law used to compute

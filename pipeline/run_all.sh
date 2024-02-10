@@ -73,12 +73,12 @@ python pcler.py --globals ${paramfile} --data --plots
 
 echo "Running pcler on sims"
 echo "---------------------"
-python pcler.py --globals ${paramfile} --sims
+python pcler.py --globals ${paramfile} --sims --plots
 
 
 echo "Running coadder on data"
 echo "---------------------"
-python coadder.py --globals ${paramfile} --data --plots
+python coadder.py --globals ${paramfile} --data
 
 echo "Running coadder on sims"
 echo "---------------------"

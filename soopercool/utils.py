@@ -61,22 +61,24 @@ def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
     s.save_fits(fname_out, overwrite=True)
 
 
-def theory_cls(cosmo_params, lmax, lmin=0):
+def get_theory_cls(cosmo_params, lmax, lmin=0):
     """
     """
     params = camb.set_params(**cosmo_params)
     results = camb.get_results(params)
     powers = results.get_cmb_power_spectra(params, CMB_unit='muK', raw_cl=True)
-    ell = np.arange(lmin, lmax+1)
-    out_ps = {
+    lth = np.arange(lmin, lmax+1)
+
+    cl_th = {
         "TT": powers["total"][:, 0][lmin:lmax+1],
         "EE": powers["total"][:, 1][lmin:lmax+1],
         "TE": powers["total"][:, 3][lmin:lmax+1],
         "BB": powers["total"][:, 2][lmin:lmax+1]
     }
     for spec in ["EB", "TB"]:
-        out_ps[spec] = np.zeros_like(ell)
-    return ell, out_ps
+        cl_th[spec] = np.zeros_like(lth)
+
+    return lth, cl_th
 
 
 def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
@@ -100,15 +102,21 @@ def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
     return out_map
 
 
-def get_noise_cls(fsky, lmax, lmin=0, sensitivity_mode='baseline',
-                  oof_mode='optimistic', is_beam_deconvolved=True):
+def get_noise_cls(noise_params, lmax, lmin=0, fsky=0.1,
+                  is_beam_deconvolved=True):
     """
     """
+    oof_dict = {"pessimistic": 0, "optimistic": 1}
+
     # Load noise curves
-    noise_model = noise_calc.SOSatV3point1(sensitivity_mode=sensitivity_mode)
+    noise_model = noise_calc.SOSatV3point1(
+        survey_years=noise_params["survey_years"],
+        sensitivity_mode=noise_params["sensitivity_mode"],
+        one_over_f_mode=oof_dict[noise_params["one_over_f_mode"]]
+    )
     lth, _, nlth_P = noise_model.get_noise_curves(
         fsky,
-        lmax+1,
+        lmax + 1,
         delta_ell=1,
         deconv_beam=is_beam_deconvolved
     )
@@ -116,14 +124,17 @@ def get_noise_cls(fsky, lmax, lmin=0, sensitivity_mode='baseline',
     nlth_P = np.array(
         [np.concatenate(([0, 0], nl))[lmin:] for nl in nlth_P]
     )
-    # Only support polarization noise at the moment
-    nlth_dict = {
-        "T": {freq_band: nlth_P[i]/2
-              for i, freq_band in enumerate(noise_model.get_bands())},
-        "P": {freq_band: nlth_P[i]
-              for i, freq_band in enumerate(noise_model.get_bands())}
+    # Assume polarization noise level for PP auto and TP cross
+    freq_bands = noise_model.get_bands()
+    nl_th = {
+        pq: np.array([nlth_P[i] for i in range(len(freq_bands))])
+        for pq in ["TE", "TB", "EE", "EB", "BE", "BB"]
     }
-    return lth, nlth_dict
+    # Assume temperature noise variance is half that of polarization
+    nl_th["TT"] = np.array([nlth_P[i] for i in range(len(freq_bands))])
+    nl_th["freq_bands"] = freq_bands
+
+    return lth, nl_th
 
 
 def generate_noise_map(nl_T, nl_P, hitmap, n_splits, is_anisotropic=True):
