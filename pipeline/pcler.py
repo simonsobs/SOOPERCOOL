@@ -1,12 +1,9 @@
 import argparse
 import healpy as hp
 import numpy as np
-import os
 from soopercool import BBmeta
-from soopercool.utils import get_noise_cls, theory_cls
 import pymaster as nmt
 from itertools import product
-import matplotlib.pyplot as plt
 import warnings
 
 
@@ -127,6 +124,30 @@ def get_pcls_mat_transfer(fields, nmt_binning):
             "spin2xspin2": pcls_mat_22}
 
 
+def get_binned_cls(bp_win_dict, cls_dict_unbinned):
+    """
+    """
+    nl = np.shape(list(bp_win_dict.values())[0])[-1]
+    cls_dict_binned = {}
+
+    for spin_comb in ["spin0xspin0", "spin0xspin2", "spin2xspin2"]:
+        bpw_mat = bp_win_dict[f"bp_win_{spin_comb}"]
+        if spin_comb == "spin0xspin0":
+            cls_vec = np.array([cls_dict_unbinned["TT"][:nl]]).reshape(1, nl)
+        elif spin_comb == "spin0xspin2":
+            cls_vec = np.array([cls_dict_unbinned["TE"][:nl],
+                                cls_dict_unbinned["TB"][:nl]])
+        elif spin_comb == "spin2xspin2":
+            cls_vec = np.array([cls_dict_unbinned["EE"][:nl],
+                                cls_dict_unbinned["EB"][:nl],
+                                cls_dict_unbinned["EB"][:nl],
+                                cls_dict_unbinned["BB"][:nl]])
+
+        cls_dict_binned[spin_comb] = np.einsum("ijkl,kl", bpw_mat, cls_vec)
+
+    return field_pairs_from_spins(cls_dict_binned)
+
+
 def pcler(args):
     """
     Compute all decoupled binned pseudo-C_ell estimates needed for
@@ -145,8 +166,6 @@ def pcler(args):
     mask = meta.read_mask("analysis")
     nmt_binning = meta.read_nmt_binning()
     n_bins = nmt_binning.get_n_bands()
-    binary_mask = meta.read_mask("binary")
-    fsky = np.mean(binary_mask)
 
     field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
 
@@ -157,6 +176,7 @@ def pcler(args):
     if args.sims:
         cl_dir = meta.cell_sims_directory
     if args.data or args.sims:
+        meta.timer.start("couplings")
         # Set the number of sims to loop over
         Nsims = meta.num_sims if args.sims else 1
 
@@ -178,9 +198,16 @@ def pcler(args):
             if map_set1 != map_set2:
                 # the only map set dependence is on the beam
                 inv_couplings[map_set2, map_set1] = coupling_dict
+        meta.timer.stop(
+            "couplings",
+            text_to_output="Load inverse coupling matrix for mock data",
+            verbose=args.verbose
+        )
 
         for id_sim in range(Nsims):
+            meta.timer.start("pcler")
             fields = {}
+
             # Load namaster fields that will be used
             for map_name in meta.maps_list:
                 map_set, id_split = map_name.split("__")
@@ -207,11 +234,9 @@ def pcler(args):
                                                                coadd=False):
                 map_set1, id_split1 = map_name1.split("__")
                 map_set2, id_split2 = map_name2.split("__")
-                pcls = get_coupled_pseudo_cls(
-                    fields[map_set1, id_split1],
-                    fields[map_set2, id_split2],
-                    nmt_binning
-                )
+                pcls = get_coupled_pseudo_cls(fields[map_set1, id_split1],
+                                              fields[map_set2, id_split2],
+                                              nmt_binning)
 
                 decoupled_pcls = decouple_pseudo_cls(
                     pcls, inv_couplings[map_set1, map_set2]
@@ -220,17 +245,20 @@ def pcler(args):
                 sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
                 np.savez(f"{cl_dir}/decoupled_pcls_nobeam_{map_name1}_{map_name2}{sim_label}.npz",  # noqa
                          **decoupled_pcls, lb=nmt_binning.get_effective_ells())
-
-                if args.plots:
-                    split_label = f"split{id_split1}_x_split{id_split2}"
-
-                    for f1, f2 in field_pairs:
-                        plot_label = f"{map_set1}__{map_set2}"
-                        clp = cells_plots[plot_label][f"{f1}{f2}"][split_label]
-                        clp[id_sim] = decoupled_pcls[f"{f1}{f2}"]
+            meta.timer.stop(
+                "pcler",
+                text_to_output=f"Compute mock data C_ell #{id_sim}",
+                verbose=args.verbose
+            )
 
         if args.plots:
+            meta.timer.start("plots")
+            import matplotlib.pyplot as plt
+
+            type = "sims" if args.sims else "data"
             lb = nmt_binning.get_effective_ells()
+            nl = nmt_binning.lmax + 1
+            ell = np.arange(nl)
             cls_dict = {}
             map_split_pairs_list = []
 
@@ -246,10 +274,10 @@ def pcler(args):
                     cls_dict[map_pair, fp, split_pair] = []
                 for id_sim in range(Nsims):
                     sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
-                    cls = np.load(f"{cl_dir}/decoupled_pcls_nobeam_{map_name1}_{map_name2}{sim_label}.npz"),  # noqa
+                    cls = np.load(f"{cl_dir}/decoupled_pcls_nobeam_{map_name1}_{map_name2}{sim_label}.npz")  # noqa
                     for fp in field_pairs:
                         cls_dict[map_pair, fp, split_pair] += [cls[fp]]
-                
+
             # Compute mean and std
             cls_mean_dict = {
                 (map_pair, field_pair, split_pair):
@@ -262,55 +290,78 @@ def pcler(args):
                 for (map_pair, field_pair, split_pair) in cls_dict
             }
 
-            # Load theory spectra
-            el_th, cl_th_dict = theory_cls(meta.cosmology,
-                                           meta.lmax, lmin=meta.lmin)
-            _, nl_th_beam_dict = get_noise_cls(fsky, meta.lmax, lmin=meta.lmin,
-                                               sensitivity_mode='baseline',
-                                               oof_mode='optimistic',
-                                               is_beam_deconvolved=True)
+            # Load and bin theory spectra
+            bp_win = np.load(
+                f"{meta.coupling_directory}/couplings_unfiltered.npz"
+            )
+            cls_theory_unbinned = meta.load_fiducial_cl("cosmo")
+            cls_theory_binned = get_binned_cls(bp_win, cls_theory_unbinned)
+            nls_theory_unbinned = meta.load_fiducial_cl("noise")
+            freq_bands = nls_theory_unbinned["freq_bands"]
 
-            plot_dir_rel = meta.sims_directory_rel if Nsims > 1 \
-                else meta.map_directory_rel # TODO: make cells plot directory
+            ch_idx = {}
+            for i, f in enumerate(freq_bands):
+                for map_set in meta.map_sets:
+                    if f"f{str(int(f)).zfill(3)}" in map_set:
+                        ch_idx[map_set] = i
+
+            # Plot power spectra
+            plot_dir_rel = getattr(meta, f"cell_{type}_directory_rel")
             plot_dir = meta.plot_dir_from_output_dir(plot_dir_rel)
 
             for map_pair, split_pair in map_split_pairs_list:
                 plt.figure(figsize=(16, 16))
                 grid = plt.GridSpec(9, 3, hspace=0.3, wspace=0.3)
 
-                for id1, f1 in enumerate("TEB"):
-                    for id2, f2 in enumerate("TEB"):
-                        # Define subplots
-                        main = plt.subplot(grid[3*id1:3*(id1 + 1) - 1, id2])
-                        sub = plt.subplot(grid[3*(id1 + 1) - 1, id2])
+                # Plot noise for auto-spectra only
+                map_set_1, map_set_2 = map_pair.split("__")
+                split_1, split_2 = split_pair.split("_x_")
+                auto = map_set_1 == map_set_2 and split_1 == split_2
 
-                        spec = f2 + f1 if id1 > id2 else f1 + f2
-                        no_e = meta.null_e_modes and "E" in spec
+                for i1, i2 in [(i, j) for i in range(3) for j in range(3)]:
+                    # Define subplots
+                    main = plt.subplot(grid[3*i1:3*(i1 + 1) - 1, i2])
+                    sub = plt.subplot(grid[3*(i1 + 1) - 1, i2])
 
-                        # Plot theory
-                        cl_th = cl_th_dict[f"{f1}{f2}"]
-                        rescaling = 0. if no_e else el_th*(el_th + 1)/(2*np.pi)
-                        main.plot(el_th, rescaling*cl_th[spec], color="k")
+                    f1, f2 = "TEB"[i1], "TEB"[i2]
+                    spec = f2 + f1 if i1 > i2 else f1 + f2
+                    no_e = 0. if meta.null_e_modes and "E" in spec else 1.
+                    n_splits = meta.n_splits_from_map_set(map_set_1)
 
-                        offset = 0.5
-                        rescaling = 0 if no_e else lb*(lb + 1)/(2*np.pi)
+                    # Plot fiducial theory and noise spectra
+                    cl_th = no_e * cls_theory_unbinned[spec]
+                    nl_th = (
+                        (n_splits
+                         * nls_theory_unbinned[spec][ch_idx[map_set_1]])
+                        if auto else 0.
+                    )
 
-                        # Plot split combinations (decoupled)
-                        main.errorbar(
-                            lb - offset, 
-                            rescaling*cls_mean_dict[map_pair, spec, 
-                                                    split_pair],
-                            rescaling*cls_std_dict[map_pair, spec, split_pair],
-                            color="navy", marker=".", markerfacecolor="white",
-                            label=split_pair, ls="None"
-                        )
+                    rescaling = ell*(ell + 1)/(2*np.pi)
+                    main.plot(ell, rescaling*cl_th, "k-",
+                              label="theory signal")
+                    if auto:
+                        main.plot(ell, rescaling*(nl_th + cl_th), "k:",
+                                  label="theory isotropic noise")
 
-                        if f1 == f2:
-                            main.set_yscale("log")
+                    # Plot split combinations (decoupled)
+                    offset = 0.5
+                    rescaling = lb*(lb + 1.)/(2*np.pi)
 
+                    main.errorbar(
+                        lb - offset,
+                        rescaling*cls_mean_dict[map_pair, spec, split_pair],
+                        rescaling*cls_std_dict[map_pair, spec, split_pair],
+                        color="navy", marker=".", markerfacecolor="white",
+                        label=f"{map_pair}\n{split_pair}", ls="None"
+                    )
+
+                    if f1 == f2:
+                        main.set_yscale("log")
+
+                    if type == "sims":
                         # Plot residuals
                         residual = ((cls_mean_dict[map_pair, spec, split_pair]
-                                     - cl_th_dict[spec]) 
+                                    - cls_theory_binned[spec])
                                     / cls_std_dict[map_pair, spec, split_pair])
 
                         sub.axhspan(-2, 2, color="gray", alpha=0.2)
@@ -322,38 +373,45 @@ def pcler(args):
                                  color="navy", marker=".",
                                  markerfacecolor="white", ls="None")
 
-                        # Multipole range
-                        main.set_xlim(2, meta.lmax)
-                        sub.set_xlim(*main.get_xlim())
+                    # Multipole range
+                    main.set_xlim(2, meta.lmax)
+                    sub.set_xlim(*main.get_xlim())
 
-                        # Suplot y range
-                        sub.set_ylim((-5., 5.))
+                    # Suplot y range
+                    sub.set_ylim((-5., 5.))
 
-                        # Cosmetix
-                        main.set_title(f1+f2, fontsize=14)
-                        if spec == "TT":
-                            main.legend(fontsize=13)
-                        main.set_xticklabels([])
-                        if id1 != 2:
-                            sub.set_xticklabels([])
+                    # Cosmetix
+                    main.set_title(f1 + f2, fontsize=14)
+                    if spec == "TT":
+                        main.legend(fontsize=13)
+                    main.set_xticklabels([])
+                    if i1 != 2:
+                        sub.set_xticklabels([])
+                    else:
+                        sub.set_xlabel(r"$\ell$", fontsize=13)
+
+                    if i2 == 0:
+                        if isinstance(rescaling, float):
+                            main.set_ylabel(r"$C_\ell$", fontsize=13)
                         else:
-                            sub.set_xlabel(r"$\ell$", fontsize=13)
+                            main.set_ylabel(r"$\ell(\ell+1)C_\ell/2\pi$",
+                                            fontsize=13)
+                        sub.set_ylabel(
+                            r"$\Delta C_\ell / (\sigma/\sqrt{N_\mathrm{sims}})$",  # noqa
+                            fontsize=13
+                        )
 
-                        if id2 == 0:
-                            if isinstance(rescaling, float):
-                                main.set_ylabel(r"$C_\ell$", fontsize=13)
-                            else:
-                                main.set_ylabel(r"$\ell(\ell+1)C_\ell/2\pi$",
-                                                fontsize=13)
-                            sub.set_ylabel(r"$\Delta C_\ell / (\sigma/\sqrt{N_\mathrm{sims}})$",  # noqa
-                                        fontsize=13)
-
-                type = "sims" if args.sims else "data"
-                plt.savefig(f"{plot_dir}/cells_{type}_{map_pair}.pdf",
+                plt.savefig(f"{plot_dir}/decoupled_pcls_nobeam_{type}_{map_pair}_{split_pair}.pdf", # noqa
                             bbox_inches="tight")
+            meta.timer.stop(
+                "plots",
+                text_to_output="Plot decoupled C_ells for mock data",
+                verbose=args.verbose
+            )
 
     if args.tf_est:
         for id_sim in range(meta.tf_est_num_sims):
+            meta.timer.start("pcler_tf_est")
             fields = {"filtered": {}, "unfiltered": {}}
             for pure_type in ["pureE", "pureB"]:
                 map_file = meta.get_map_filename_transfer2(
@@ -390,8 +448,14 @@ def pcler(args):
                      **pcls_mat_filtered)
             np.savez(f"{cl_dir}/pcls_mat_tf_est_unfiltered_{id_sim:04d}.npz",
                      **pcls_mat_unfiltered)
+            meta.timer.stop(
+                "pcler_tf_est",
+                text_to_output=f"Compute C_ell #{id_sim} for TF estimation",
+                verbose=args.verbose
+            )
 
     if args.tf_val:
+        meta.timer.start("couplings_tf_val")
         inv_couplings = {}
         for filter_flag in ["filtered", "unfiltered"]:
             pure_str = "_pure" if meta.tf_est_pure_B else ""
@@ -405,8 +469,14 @@ def pcler(args):
                                         "spin0xspin2", "spin2xspin2"],
                                        [1, 2, 2, 4])
             }
+        meta.timer.stop(
+            "couplings_tf_val",
+            text_to_output="Loading inverse coupling matrix for TF estimation",
+            verbose=args.verbose
+        )
 
         for id_sim in range(meta.tf_est_num_sims):
+            meta.timer.start("pcler_tf_val")
             for cl_type in ["tf_val", "cosmo"]:
                 for filter_flag in ["filtered", "unfiltered"]:
                     map_file = meta.get_map_filename_transfer2(id_sim,
@@ -429,6 +499,11 @@ def pcler(args):
 
                     np.savez(f"{cl_dir}/pcls_{cl_type}_{id_sim:04d}_{filter_flag}.npz",  # noqa
                              **decoupled_pcls)
+            meta.timer.stop(
+                "pcler_tf_val",
+                text_to_output=f"Compute C_ell #{id_sim} for TF validation",
+                verbose=args.verbose
+            )
 
 
 if __name__ == "__main__":
@@ -436,6 +511,7 @@ if __name__ == "__main__":
     parser.add_argument("--globals", type=str, help="Path to the yaml file")
     parser.add_argument("--plots", action="store_true",
                         help="Plot the generated power spectra if True.")
+    parser.add_argument("--verbose", action="store_true")
 
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--data", action="store_true")
