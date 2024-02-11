@@ -33,7 +33,7 @@ def mcmer(args):
     # in either case we will need a purified mode coupling matrix.
     if meta.pure_B or meta.tf_est_pure_B:
         field_spin2_pure = nmt.NmtField(mask, None, spin=2,
-                                        purify_b=meta.pure_B)
+                                        purify_b=True)
 
     # Binning scheme is irrelevant for us, but NaMaster needs one.
     nmt_bins = meta.read_nmt_binning()
