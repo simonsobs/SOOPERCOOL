@@ -4,127 +4,10 @@ import numpy as np
 import os
 from soopercool import BBmeta
 from soopercool.utils import get_noise_cls, theory_cls
+from soopercool import ps_utils
 import pymaster as nmt
-from itertools import product
 import matplotlib.pyplot as plt
 import warnings
-
-
-def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
-    """
-    Compute the binned coupled pseudo-C_ell estimates from two
-    (spin-0 or spin-2) NaMaster fields and a multipole binning scheme.
-    Parameters
-    ----------
-    fields1, fields2 : NmtField
-        Spin-0 or spin-2 fields to correlate.
-    nmt_binning : NmtBin
-        Multipole binning scheme.
-    """
-    spins = list(fields1.keys())
-
-    pcls = {}
-    for spin1 in spins:
-        for spin2 in spins:
-
-            f1 = fields1[spin1]
-            f2 = fields2[spin2]
-
-            coupled_cell = nmt.compute_coupled_cell(f1, f2)
-            coupled_cell = coupled_cell[:, :nmt_binning.lmax+1]
-
-            pcls[f"{spin1}x{spin2}"] = nmt_binning.bin_cell(coupled_cell)
-    return pcls
-
-
-def decouple_pseudo_cls(coupled_pseudo_cells, coupling_inv):
-    """
-    Decouples the coupled pseudo-C_ell estimators computed between two fields
-    of spin 0 or 2. Returns decoupled binned power spectra labeled by field
-    pairs (e.g. 'TT', 'TE', 'EE', 'EB', 'BB' etc.).
-    Parameters
-    ----------
-    coupled_pseudo_cells : dict with keys f"spin{s1}xspin{s2}",
-        items array-like. Coupled pseudo-C_ell estimators.
-    coupling_inv : array-like
-        Inverse binned bandpower coupling matrix.
-    """
-    decoupled_pcls = {}
-    for spin_comb, coupled_pcl in coupled_pseudo_cells.items():
-        n_bins = coupled_pcl.shape[-1]
-        decoupled_pcl = coupling_inv[spin_comb] @ coupled_pcl.flatten()
-        if spin_comb == "spin0xspin0":
-            size = 1
-        elif spin_comb in ["spin0xspin2", "spin2xspin0"]:
-            size = 2
-        elif spin_comb == "spin2xspin2":
-            size = 4
-        decoupled_pcl = decoupled_pcl.reshape((size, n_bins))
-
-        decoupled_pcls[spin_comb] = decoupled_pcl
-
-    decoupled_pcls = field_pairs_from_spins(decoupled_pcls)
-
-    return decoupled_pcls
-
-
-def field_pairs_from_spins(cls_in_dict):
-    """
-    Reorders power spectrum dictionary with a given input spin
-    pair into pairs of output (pseudo-)scalar fields on the sky
-    (T, E, or B).
-
-    Parameters
-    ----------
-    cls_in_dict: dictionary
-    """
-    cls_out_dict = {}
-
-    field_spin_mapping = {
-        "spin0xspin0": ["TT"],
-        "spin0xspin2": ["TE", "TB"],
-        "spin2xspin0": ["ET", "BT"],
-        "spin2xspin2": ["EE", "EB", "BE", "BB"]
-    }
-
-    for spin_pair in cls_in_dict:
-        for index, field_pair in enumerate(field_spin_mapping[spin_pair]):
-
-            cls_out_dict[field_pair] = cls_in_dict[spin_pair][index]
-
-    return cls_out_dict
-
-
-def get_pcls_mat_transfer(fields, nmt_binning):
-    """
-    Compute coupled binned pseudo-C_ell estimates from
-    pure-E and pure-B transfer function estimation simulations,
-    and cast them into matrix shape.
-
-    Parameters
-    ----------
-    fields: dictionary of NmtField objects (keys "pureE", "pureB")
-    nmt_binning: NmtBin object
-    """
-    n_bins = nmt_binning.get_n_bands()
-    pcls_mat_00 = np.zeros((1, 1, n_bins))
-    pcls_mat_02 = np.zeros((2, 2, n_bins))
-    pcls_mat_22 = np.zeros((4, 4, n_bins))
-
-    index = 0
-    cases = ["pureE", "pureB"]
-    for index, (pure_type1, pure_type2) in enumerate(product(cases, cases)):
-        pcls = get_coupled_pseudo_cls(fields[pure_type1],
-                                      fields[pure_type2],
-                                      nmt_binning)
-        pcls_mat_22[index] = pcls["spin2xspin2"]
-        pcls_mat_02[cases.index(pure_type2)] = pcls["spin0xspin2"]
-
-    pcls_mat_00[0] = pcls["spin0xspin0"]
-
-    return {"spin0xspin0": pcls_mat_00,
-            "spin0xspin2": pcls_mat_02,
-            "spin2xspin2": pcls_mat_22}
 
 
 def pcler(args):
@@ -228,13 +111,13 @@ def pcler(args):
                                                                coadd=False):
                 map_set1, id_split1 = map_name1.split("__")
                 map_set2, id_split2 = map_name2.split("__")
-                pcls = get_coupled_pseudo_cls(
+                pcls = ps_utils.get_coupled_pseudo_cls(
                     fields[map_set1, id_split1],
                     fields[map_set2, id_split2],
                     nmt_binning
                 )
 
-                decoupled_pcls = decouple_pseudo_cls(
+                decoupled_pcls = ps_utils.decouple_pseudo_cls(
                     pcls, inv_couplings[map_set1, map_set2]
                 )
 
@@ -357,10 +240,14 @@ def pcler(args):
                 fields["unfiltered"][pure_type] = field
                 fields["filtered"][pure_type] = field_filtered
 
-            pcls_mat_filtered = get_pcls_mat_transfer(fields["filtered"],
-                                                      nmt_binning)
-            pcls_mat_unfiltered = get_pcls_mat_transfer(fields["unfiltered"],
-                                                        nmt_binning)
+            pcls_mat_filtered = ps_utils.get_pcls_mat_transfer(
+                fields["filtered"],
+                nmt_binning
+            )
+            pcls_mat_unfiltered = ps_utils.get_pcls_mat_transfer(
+                fields["unfiltered"],
+                nmt_binning
+            )
 
             np.savez(f"{cl_dir}/pcls_mat_tf_est_filtered_{id_sim:04d}.npz",
                      **pcls_mat_filtered)
@@ -398,9 +285,10 @@ def pcler(args):
                                               purify_b=meta.tf_est_pure_B)
                     }
 
-                    pcls = get_coupled_pseudo_cls(field, field, nmt_binning)
+                    pcls = ps_utils.get_coupled_pseudo_cls(field, field,
+                                                           nmt_binning)
 
-                    decoupled_pcls = decouple_pseudo_cls(
+                    decoupled_pcls = ps_utils.decouple_pseudo_cls(
                         pcls, inv_couplings[filter_flag])
 
                     np.savez(f"{cl_dir}/pcls_{cl_type}_{id_sim:04d}_{filter_flag}.npz",  # noqa
