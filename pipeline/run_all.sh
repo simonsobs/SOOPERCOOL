@@ -8,16 +8,16 @@ echo "------------------------------------------------------------"
 
 echo "Pre-processing data..."
 echo "-------------------"
-python pre_processer.py --globals ${paramfile} --sims
-python mask_handler.py --globals ${paramfile} --plots
+python pre_processer.py --globals ${paramfile} --sims --verbose
+python mask_handler.py --globals ${paramfile} --plots --verbose
 
 echo "Running mock stage for data..."
 echo "------------------------------"
-python mocker.py --globals ${paramfile} 
+python mocker.py --globals ${paramfile} --verbose
 
 echo "Running mock stage for sims..."
 echo "------------------------------"
-python mocker.py --globals ${paramfile} --sims
+python mocker.py --globals ${paramfile} --sims --verbose
 
 echo "Running mcm..."
 echo "--------------"
@@ -52,7 +52,7 @@ echo "------------------------------------------------------------"
 
 echo "Running cl estimation for tf estimation"
 echo "---------------------------------------"
-python pcler.py --globals ${paramfile} --tf_est
+python pcler.py --globals ${paramfile} --tf_est --verbose
 
 echo "Running transfer estimation"
 echo "---------------------------"
@@ -60,7 +60,7 @@ python transfer.py --globals ${paramfile}
 
 echo "Running cl estimation for validation"
 echo "------------------------------------"
-python pcler.py --globals ${paramfile} --tf_val
+python pcler.py --globals ${paramfile} --tf_val --verbose
 
 echo "Transfer validation"
 echo "---------------------"

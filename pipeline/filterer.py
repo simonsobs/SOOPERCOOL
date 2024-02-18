@@ -17,6 +17,8 @@ def filter(args):
     meta = BBmeta(args.globals)
     filter_map = meta.get_filter_function()
 
+    map_sets = meta.map_sets_list if meta.validate_beam else [None]
+
     # Read the mask
     mask = meta.read_mask("binary")
 
@@ -26,11 +28,12 @@ def filter(args):
             cases_list = ["pureE", "pureB"] if cl_type == "tf_est" else [None]
             for id_sim in range(meta.tf_est_num_sims):
                 for case in cases_list:
-                    map_file = meta.get_map_filename_transfer2(id_sim,
-                                                               cl_type,
-                                                               pure_type=case)
-                    map = hp.read_map(map_file, field=[0, 1, 2])
-                    filter_map(map, map_file, mask)
+                    for map_set in map_sets:
+                        map_file = meta.get_map_filename_transfer2(
+                            id_sim, cl_type, pure_type=case, map_set=map_set
+                        )
+                        map = hp.read_map(map_file, field=[0, 1, 2])
+                        filter_map(map, map_file, mask)
     meta.timer.stop(f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
                     verbose=True)
 
