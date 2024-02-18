@@ -148,6 +148,58 @@ def get_binned_cls(bp_win_dict, cls_dict_unbinned):
     return field_pairs_from_spins(cls_dict_binned)
 
 
+def get_validation_power_spectra(meta, id_sim, mask, nmt_binning,
+                                 inv_couplings):
+    """
+    This function computes transfer validation power spectra given an
+    input simulation ID, mask and binning scheme, and stores them to disk.
+    """
+    map_set_pairs = (meta.get_ps_names_list(type="all", coadd=True)
+                     if meta.validate_beam else [(None, None)])
+    filter_flags = (["filtered"] if meta.validate_beam
+                    else ["filtered", "unfiltered"])
+
+    for cl_type in ["tf_val", "cosmo"]:
+        for filter_flag in filter_flags:
+            for map_sets in map_set_pairs:
+                map_files = [
+                    meta.get_map_filename_transfer2(
+                        id_sim, cl_type=cl_type, map_set=ms
+                    ) for ms in map_sets
+                ]
+
+                if filter_flag == "filtered":
+                    map_files = [mf.replace(".fits", "_filtered.fits")
+                                 for mf in map_files]
+
+                maps = [hp.read_map(m, field=[0, 1, 2])
+                        for m in map_files]
+
+                field = [{
+                    "spin0": nmt.NmtField(mask, map[:1]),
+                    "spin2": nmt.NmtField(mask, map[1:],
+                                          purify_b=meta.tf_est_pure_B)
+                } for map in maps]
+
+                pcls = get_coupled_pseudo_cls(field[0], field[1], nmt_binning)
+
+                if meta.validate_beam:
+                    decoupled_pcls = decouple_pseudo_cls(
+                        pcls, inv_couplings[map_sets[0], map_sets[1]]
+                    )
+                else:
+                    decoupled_pcls = decouple_pseudo_cls(
+                        pcls, inv_couplings[filter_flag]
+                    )
+                cl_prefix = f"pcls_{cl_type}_{id_sim:04d}"
+                cl_suffix = (f"_{map_sets[0]}_{map_sets[1]}"
+                             if meta.validate_beam else f"_{filter_flag}")
+                cl_name = cl_prefix + cl_suffix
+
+                np.savez(f"{meta.cell_transfer_directory}/{cl_name}.npz",
+                         **decoupled_pcls)
+
+
 def pcler(args):
     """
     Compute all decoupled binned pseudo-C_ell estimates needed for
@@ -165,7 +217,6 @@ def pcler(args):
     meta = BBmeta(args.globals)
     mask = meta.read_mask("analysis")
     nmt_binning = meta.read_nmt_binning()
-    n_bins = nmt_binning.get_n_bands()
 
     field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
 
@@ -176,33 +227,17 @@ def pcler(args):
     if args.sims:
         cl_dir = meta.cell_sims_directory
     if args.data or args.sims:
-        meta.timer.start("couplings")
-        # Set the number of sims to loop over
-        Nsims = meta.num_sims if args.sims else 1
-
         # Load the inverse coupling matrix
-        inv_couplings = {}
-        for map_set1, map_set2 in meta.get_ps_names_list(type="all",
-                                                         coadd=True):
-            couplings = np.load(f"{meta.coupling_directory}/couplings_{map_set1}_{map_set2}.npz")  # noqa
-            coupling_dict = {
-                k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
-                                                             ncl*n_bins])
-                for k1, k2, ncl in zip(["spin0xspin0", "spin0xspin2",
-                                        "spin2xspin0", "spin2xspin2"],
-                                       ["spin0xspin0", "spin0xspin2",
-                                        "spin0xspin2", "spin2xspin2"],
-                                       [1, 2, 2, 4])
-            }
-            inv_couplings[map_set1, map_set2] = coupling_dict
-            if map_set1 != map_set2:
-                # the only map set dependence is on the beam
-                inv_couplings[map_set2, map_set1] = coupling_dict
+        meta.timer.start("couplings")
+        inv_couplings_beamed = meta.get_inverse_couplings(beamed=True)
         meta.timer.stop(
             "couplings",
-            text_to_output="Load inverse coupling matrix for mock data",
+            text_to_output="Load inverse coupling matrix for beamed sims",
             verbose=args.verbose
         )
+    if args.data or args.sims:
+        # Set the number of sims to loop over
+        Nsims = meta.num_sims if args.sims else 1
 
         for id_sim in range(Nsims):
             meta.timer.start("pcler")
@@ -239,7 +274,7 @@ def pcler(args):
                                               nmt_binning)
 
                 decoupled_pcls = decouple_pseudo_cls(
-                    pcls, inv_couplings[map_set1, map_set2]
+                    pcls, inv_couplings_beamed[map_set1, map_set2]
                 )
 
                 sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
@@ -456,49 +491,20 @@ def pcler(args):
 
     if args.tf_val:
         meta.timer.start("couplings_tf_val")
-        inv_couplings = {}
-        for filter_flag in ["filtered", "unfiltered"]:
-            pure_str = "_pure" if meta.tf_est_pure_B else ""
-            couplings = np.load(f"{meta.coupling_directory}/couplings_{filter_flag}{pure_str}.npz")  # noqa
-            inv_couplings[filter_flag] = {
-                k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
-                                                             ncl*n_bins])
-                for k1, k2, ncl in zip(["spin0xspin0", "spin0xspin2",
-                                        "spin2xspin0", "spin2xspin2"],
-                                       ["spin0xspin0", "spin0xspin2",
-                                        "spin0xspin2", "spin2xspin2"],
-                                       [1, 2, 2, 4])
-            }
+        inv_couplings = meta.get_inverse_couplings(beamed=meta.validate_beam)
         meta.timer.stop(
             "couplings_tf_val",
-            text_to_output="Loading inverse coupling matrix for TF estimation",
+            text_to_output="Loading inverse coupling matrix for validation",
             verbose=args.verbose
         )
 
         for id_sim in range(meta.tf_est_num_sims):
             meta.timer.start("pcler_tf_val")
-            for cl_type in ["tf_val", "cosmo"]:
-                for filter_flag in ["filtered", "unfiltered"]:
-                    map_file = meta.get_map_filename_transfer2(id_sim,
-                                                               cl_type=cl_type)
-                    if filter_flag == "filtered":
-                        map_file = map_file.replace(".fits", "_filtered.fits")
 
-                    map = hp.read_map(map_file, field=[0, 1, 2])
+            get_validation_power_spectra(
+                meta, id_sim, mask, nmt_binning, inv_couplings=inv_couplings
+            )
 
-                    field = {
-                        "spin0": nmt.NmtField(mask, map[:1]),
-                        "spin2": nmt.NmtField(mask, map[1:],
-                                              purify_b=meta.tf_est_pure_B)
-                    }
-
-                    pcls = get_coupled_pseudo_cls(field, field, nmt_binning)
-
-                    decoupled_pcls = decouple_pseudo_cls(
-                        pcls, inv_couplings[filter_flag])
-
-                    np.savez(f"{cl_dir}/pcls_{cl_type}_{id_sim:04d}_{filter_flag}.npz",  # noqa
-                             **decoupled_pcls)
             meta.timer.stop(
                 "pcler_tf_val",
                 text_to_output=f"Compute C_ell #{id_sim} for TF validation",

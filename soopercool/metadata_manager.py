@@ -416,13 +416,26 @@ class BBmeta(object):
 
         return filter_operation
 
-    def get_map_filename_transfer2(self, id_sim, cl_type, pure_type=None):
+    def get_map_filename_transfer2(self, id_sim, cl_type, pure_type=None,
+                                   map_set=None):
         """
         """
         path_to_maps = getattr(self, f"{cl_type}_sims_dir")
 
-        pure_label = f"_{pure_type}" if pure_type else ""
-        file_name = f"TQU{pure_label}_noiseless_nside{self.nside}_lmax{self.lmax}_{id_sim:04d}.fits"  # noqa
+        if cl_type == "tf_est":
+            if pure_type is not None:
+                map_label = f"_{pure_type}"
+            else:
+                raise ValueError("Must provide pure_type.")
+        else:
+            if map_set is not None and self.validate_beam:
+                map_label = f"_{map_set}"
+            elif map_set is None and not self.validate_beam:
+                map_label = ""
+            else:
+                raise ValueError("Invalid choice of map_set.")
+
+        file_name = f"TQU{map_label}_noiseless_nside{self.nside}_lmax{self.lmax}_{id_sim:04d}.fits"  # noqa
 
         return f"{path_to_maps}/{file_name}"
 
@@ -587,6 +600,42 @@ class BBmeta(object):
             raise ValueError("You selected an invalid type. "
                              "Options are 'cross', 'auto', and 'all'.")
         return n_pairs
+
+    def get_inverse_couplings(self, beamed=False):
+        """
+        This function outputs a dictionary with the inverse mode coupling
+        matrices
+        """
+        nmt_binning = self.read_nmt_binning()
+        n_bins = nmt_binning.get_n_bands()
+        pure_string = "_pure" if self.tf_est_pure_B and not beamed else ""
+        filter_flags = [""] if beamed else ["filtered", "unfiltered"]
+        map_set_pairs = (self.get_ps_names_list(type="all", coadd=True)
+                         if beamed else [("", "")])
+        inv_couplings = {}
+
+        for ms1, ms2 in map_set_pairs:
+            for filter_flag in filter_flags:
+                map_label = f"{ms1}_{ms2}" if beamed else ""
+                fname = f"couplings_{map_label}{filter_flag}{pure_string}"
+                couplings = np.load(f"{self.coupling_directory}/{fname}.npz")
+                coupling_dict = {
+                    k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
+                                                                ncl*n_bins])
+                    for k1, k2, ncl in zip(["spin0xspin0", "spin0xspin2",
+                                            "spin2xspin0", "spin2xspin2"],
+                                           ["spin0xspin0", "spin0xspin2",
+                                            "spin0xspin2", "spin2xspin2"],
+                                           [1, 2, 2, 4])
+                }
+                if beamed:
+                    inv_couplings[ms1, ms2] = coupling_dict
+                    if ms1 != ms2:
+                        inv_couplings[ms2, ms1] = coupling_dict
+                else:
+                    inv_couplings[filter_flag] = coupling_dict
+
+        return inv_couplings
 
 
 class Timer:

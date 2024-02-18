@@ -10,6 +10,34 @@ import sacc
 import camb
 
 
+def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
+    """
+    Compute the binned coupled pseudo-C_ell estimates from two
+    (spin-0 or spin-2) NaMaster fields and a multipole binning scheme.
+    Parameters
+    ----------
+    fields1, fields2 : NmtField
+        Spin-0 or spin-2 fields to correlate.
+    nmt_binning : NmtBin
+        Multipole binning scheme.
+    """
+    import pymaster as nmt
+    spins = list(fields1.keys())
+
+    pcls = {}
+    for spin1 in spins:
+        for spin2 in spins:
+
+            f1 = fields1[spin1]
+            f2 = fields2[spin2]
+
+            coupled_cell = nmt.compute_coupled_cell(f1, f2)
+            coupled_cell = coupled_cell[:, :nmt_binning.lmax+1]
+
+            pcls[f"{spin1}x{spin2}"] = nmt_binning.bin_cell(coupled_cell)
+    return pcls
+
+
 def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
     """
     man -> pipeline manager
@@ -103,7 +131,7 @@ def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
 
 
 def get_noise_cls(noise_params, lmax, lmin=0, fsky=0.1,
-                  is_beam_deconvolved=True):
+                  is_beam_deconvolved=False):
     """
     """
     oof_dict = {"pessimistic": 0, "optimistic": 1}
@@ -125,14 +153,13 @@ def get_noise_cls(noise_params, lmax, lmin=0, fsky=0.1,
         [np.concatenate(([0, 0], nl))[lmin:] for nl in nlth_P]
     )
     # Assume polarization noise level for PP auto and TP cross
-    freq_bands = noise_model.get_bands()
+    freq_tags = [int(f) for f in noise_model.get_bands()]
     nl_th = {
-        pq: np.array([nlth_P[i] for i in range(len(freq_bands))])
+        pq: {f: nlth_P[i] for i, f in enumerate(freq_tags)}
         for pq in ["TE", "TB", "EE", "EB", "BE", "BB"]
     }
     # Assume temperature noise variance is half that of polarization
-    nl_th["TT"] = np.array([nlth_P[i] for i in range(len(freq_bands))])
-    nl_th["freq_bands"] = freq_bands
+    nl_th["TT"] = {f: nlth_P[i]/2. for i, f in enumerate(freq_tags)}
 
     return lth, nl_th
 
@@ -166,6 +193,32 @@ def random_src_mask(mask, nsrcs, mask_radius_arcmin):
                              np.deg2rad(mask_radius_arcmin / 60))
         ps_mask[disc] = 0
     return ps_mask
+
+
+def get_beam_windows(meta):
+    """
+    Compute and save dictionary with beam window functions for each map set.
+    """
+    oof_dict = {"pessimistic": 0, "optimistic": 1}
+
+    noise_model = noise_calc.SOSatV3point1(
+        survey_years=meta.noise["survey_years"],
+        sensitivity_mode=meta.noise["sensitivity_mode"],
+        one_over_f_mode=oof_dict[meta.noise["one_over_f_mode"]]
+    )
+
+    lth = np.arange(3*meta.nside)
+    beam_arcmin = {int(freq_band): beam_arcmin
+                   for freq_band, beam_arcmin in zip(noise_model.get_bands(),
+                                                     noise_model.get_beams())}
+    beams_dict = {}
+    for map_set in meta.map_sets_list:
+        freq_tag = meta.freq_tag_from_map_set(map_set)
+        beams_dict[map_set] = beam_gaussian(lth, beam_arcmin[freq_tag])
+        file_root = meta.file_root_from_map_set(map_set)
+        if not os.path.exists(file_root):
+            np.savetxt(f"{meta.beam_directory}/beam_{file_root}.dat",
+                       np.transpose([lth, beams_dict[map_set]]))
 
 
 def beam_gaussian(ll, fwhm_amin):
@@ -413,6 +466,270 @@ def plot_map(map, fname, vrange_T=300, vrange_P=10, title=None, TQU=True):
                     cmap=cm.coolwarm, min=-vrange, max=vrange)
         hp.graticule()
         plt.savefig(f"{fname}_{m}.png", bbox_inches="tight")
+
+
+def generate_simulated_maps(meta, id_sim, cl_type, alms_T, alms_E, alms_B,
+                            make_plots=False):
+    if cl_type == "tf_est":
+        for case in ["pureE", "pureB"]:
+            if case == "pureE":
+                sim = hp.alm2map([alms_T, alms_E, alms_B*0.],
+                                 meta.nside, lmax=3*meta.nside - 1)
+            elif case == "pureB":
+                sim = hp.alm2map([alms_T, alms_E*0., alms_B],
+                                 meta.nside, lmax=3*meta.nside - 1)
+            map_file = meta.get_map_filename_transfer2(
+                id_sim, cl_type, pure_type=case
+            )
+            hp.write_map(map_file, sim, overwrite=True, dtype=np.float32)
+
+            if make_plots:
+                fname = map_file.replace('.fits', '')
+                title = map_file.split('/')[-1].replace('.fits', '')
+                amp = meta.power_law_pars_tf_est['amp']
+                delta_ell = meta.power_law_pars_tf_est['delta_ell']
+                pl_index = meta.power_law_pars_tf_est['power_law_index']
+                ell0 = 0 if pl_index > 0 else 2 * meta.nside
+                var = amp / (ell0 + delta_ell)**pl_index
+                plot_map(sim, fname, vrange_T=10*var**0.5,
+                         vrange_P=10*var**0.5, title=title,
+                         TQU=True)
+
+    else:
+        sim = hp.alm2map([alms_T, alms_E, alms_B],
+                         meta.nside, lmax=3*meta.nside - 1)
+        if not meta.validate_beam:
+            map_file = meta.get_map_filename_transfer2(id_sim, cl_type)
+            hp.write_map(map_file, sim, overwrite=True, dtype=np.float32)
+        else:
+            for map_set in meta.map_sets_list:
+                _, beam = meta.read_beam(map_set)
+                sim_beamed = hp.sphtfunc.smoothing(sim, beam_window=beam)
+                map_file = meta.get_map_filename_transfer2(id_sim, cl_type,
+                                                           map_set=map_set)
+                hp.write_map(map_file, sim_beamed, overwrite=True,
+                             dtype=np.float32)
+
+            if make_plots:
+                fname = map_file.replace('.fits', '')
+                title = map_file.split('/')[-1].replace('.fits', '')
+                if cl_type == "tf_val":
+                    amp_T = meta.power_law_pars_tf_val['amp']['TT']
+                    amp_E = meta.power_law_pars_tf_val['amp']['EE']
+                    delta_ell = meta.power_law_pars_tf_val['delta_ell']
+                    pl_index = meta.power_law_pars_tf_val['power_law_index']
+                    ell0 = 0 if pl_index > 0 else 2 * meta.nside
+                    var_T = amp_T / (ell0 + delta_ell)**pl_index
+                    var_P = amp_E / (ell0 + delta_ell)**pl_index
+                    plot_map(sim, fname, vrange_T=100*var_T**0.5,
+                             vrange_P=100*var_P**0.5,
+                             title=title, TQU=True)
+                elif cl_type == "cosmo":
+                    plot_map(sim, fname, title=title, TQU=True)
+
+
+def bin_validation_power_spectra(cls_dict, nmt_binning,
+                                 bandpower_window_function):
+    """
+    Bin multipoles of transfer function validation power spectra into
+    binned bandpowers.
+    """
+    nl = nmt_binning.lmax + 1
+    cls_binned_dict = {}
+
+    for spin_comb in ["spin0xspin0", "spin0xspin2", "spin2xspin2"]:
+        bpw_mat = bandpower_window_function[f"bp_win_{spin_comb}"]
+
+        for val_type in ["tf_val", "cosmo"]:
+            if spin_comb == "spin0xspin0":
+                cls_vec = np.array([cls_dict[val_type]["TT"][:nl]])
+                cls_vec = cls_vec.reshape(1, nl)
+            elif spin_comb == "spin0xspin2":
+                cls_vec = np.array([cls_dict[val_type]["TE"][:nl],
+                                    cls_dict[val_type]["TB"][:nl]])
+            elif spin_comb == "spin2xspin2":
+                cls_vec = np.array([cls_dict[val_type]["EE"][:nl],
+                                    cls_dict[val_type]["EB"][:nl],
+                                    cls_dict[val_type]["EB"][:nl],
+                                    cls_dict[val_type]["BB"][:nl]])
+
+            cls_vec_binned = np.einsum("ijkl,kl", bpw_mat, cls_vec)
+
+            if spin_comb == "spin0xspin0":
+                cls_binned_dict[val_type, "TT"] = cls_vec_binned[0]
+            elif spin_comb == "spin0xspin2":
+                cls_binned_dict[val_type, "TE"] = cls_vec_binned[0]
+                cls_binned_dict[val_type, "TB"] = cls_vec_binned[1]
+            elif spin_comb == "spin2xspin2":
+                cls_binned_dict[val_type, "EE"] = cls_vec_binned[0]
+                cls_binned_dict[val_type, "EB"] = cls_vec_binned[1]
+                cls_binned_dict[val_type, "BE"] = cls_vec_binned[2]
+                cls_binned_dict[val_type, "BB"] = cls_vec_binned[3]
+
+    return cls_binned_dict
+
+
+def plot_transfer_function(meta, tf_dict):
+    """
+    Plot the transfer function given an input dictionary.
+    """
+    nmt_binning = meta.read_nmt_binning()
+    lb = nmt_binning.get_effective_ells()
+
+    fields = ["TT", "TE", "TB", "EE", "EB", "BE", "BB"]
+    plt.figure(figsize=(20, 20))
+    grid = plt.GridSpec(7, 7, hspace=0.3, wspace=0.3)
+
+    for id1, f1 in enumerate(fields):
+        for id2, f2 in enumerate(fields):
+            ax = plt.subplot(grid[id1, id2])
+
+            if f1 == "TT" and f2 != "TT":
+                ax.axis("off")
+                continue
+            if f1 in ["TE", "TB"] and f2 not in ["TE", "TB"]:
+                ax.axis("off")
+                continue
+            if f1 in ["EE", "EB", "BE", "BB"] \
+                    and f2 not in ["EE", "EB", "BE", "BB"]:
+                ax.axis("off")
+                continue
+
+            ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
+
+            ax.errorbar(
+                lb, tf_dict[f1, f2], tf_dict[f1, f2, "std"],
+                marker=".", markerfacecolor="white",
+                color="navy")
+
+            if not ([id1, id2] in [[0, 0], [2, 1],
+                                   [2, 2], [6, 3],
+                                   [6, 4], [6, 5],
+                                   [6, 6]]):
+                ax.set_xticks([])
+            else:
+                ax.set_xlabel(r"$\ell$", fontsize=14)
+
+            if f1 == f2:
+                ax.axhline(1., color="k", ls="--")
+            else:
+                ax.axhline(0, color="k", ls="--")
+
+            ax.set_xlim(meta.lmin, meta.lmax)
+
+    plot_dir = meta.plot_dir_from_output_dir(meta.coupling_directory)
+    plt.savefig(f"{plot_dir}/transfer.pdf", bbox_inches="tight")
+
+
+def plot_transfer_validation(meta, map_set_1, map_set_2,
+                             cls_theory, cls_theory_binned,
+                             cls_mean_dict, cls_std_dict):
+    """
+    Plot the transfer function validation power spectra and save to disk.
+    """
+    nmt_binning = meta.read_nmt_binning()
+    lb = nmt_binning.get_effective_ells()
+
+    for val_type in ["tf_val", "cosmo"]:
+        plt.figure(figsize=(16, 16))
+        grid = plt.GridSpec(9, 3, hspace=0.3, wspace=0.3)
+
+        for id1, id2 in [(i, j) for i in range(3) for j in range(3)]:
+            f1, f2 = "TEB"[id1], "TEB"[id2]
+            spec = f2 + f1 if id1 > id2 else f1 + f2
+
+            main = plt.subplot(grid[3*id1:3*(id1+1)-1, id2])
+            sub = plt.subplot(grid[3*(id1+1)-1, id2])
+
+            # Plot theory
+            ell = cls_theory[val_type]["l"]
+            rescaling = 1 if val_type == "tf_val" \
+                else ell * (ell + 1) / (2*np.pi)
+            main.plot(ell, rescaling*cls_theory[val_type][spec], color="k")
+
+            offset = 0.5
+            rescaling = 1 if val_type == "tf_val" else lb*(lb + 1) / (2*np.pi)
+
+            # Plot filtered & unfiltered (decoupled)
+            if not meta.validate_beam:
+                main.errorbar(
+                    lb - offset, rescaling*cls_mean_dict[val_type,
+                                                         "unfiltered",
+                                                         spec],
+                    rescaling*cls_std_dict[val_type, "unfiltered", spec],
+                    color="navy", marker=".", markerfacecolor="white",
+                    label=r"Unfiltered decoupled $C_\ell$", ls="None"
+                )
+            main.errorbar(
+                lb + offset, rescaling*cls_mean_dict[val_type,
+                                                     "filtered",
+                                                     spec],
+                rescaling*cls_std_dict[val_type, "filtered", spec],
+                color="darkorange", marker=".", markerfacecolor="white",
+                label=r"Filtered decoupled $C_\ell$", ls="None"
+            )
+
+            if f1 == f2:
+                main.set_yscale("log")
+
+            # Plot residuals
+            sub.axhspan(-2, 2, color="gray", alpha=0.2)
+            sub.axhspan(-1, 1, color="gray", alpha=0.7)
+            sub.axhline(0, color="k")
+
+            if not meta.validate_beam:
+                residual_unfiltered = (
+                    (cls_mean_dict[val_type, "unfiltered", spec]
+                     - cls_theory_binned[val_type, spec])
+                    / cls_std_dict[val_type, "unfiltered", spec]
+                )
+                sub.plot(
+                    lb - offset,
+                    residual_unfiltered * np.sqrt(meta.tf_est_num_sims),
+                    color="navy", marker=".", markerfacecolor="white",
+                    ls="None"
+                )
+            residual_filtered = (
+                (cls_mean_dict[val_type, "filtered", spec]
+                 - cls_theory_binned[val_type, spec])
+                / cls_std_dict[val_type, "filtered", spec]
+            )
+            sub.plot(lb + offset,
+                     residual_filtered * np.sqrt(meta.tf_est_num_sims),
+                     color="darkorange", marker=".",
+                     markerfacecolor="white", ls="None")
+
+            # Multipole range
+            main.set_xlim(2, meta.lmax)
+            sub.set_xlim(*main.get_xlim())
+
+            # Suplot y range
+            sub.set_ylim((-5., 5.))
+
+            # Cosmetix
+            main.set_title(f1+f2, fontsize=14)
+            if spec == "TT":
+                main.legend(fontsize=13)
+            main.set_xticklabels([])
+            if id1 != 2:
+                sub.set_xticklabels([])
+            else:
+                sub.set_xlabel(r"$\ell$", fontsize=13)
+
+            if id2 == 0:
+                if isinstance(rescaling, float):
+                    main.set_ylabel(r"$C_\ell$", fontsize=13)
+                else:
+                    main.set_ylabel(r"$\ell(\ell+1)C_\ell/2\pi$",
+                                    fontsize=13)
+                sub.set_ylabel(r"$\Delta C_\ell / (\sigma/\sqrt{N_\mathrm{sims}})$",  # noqa
+                               fontsize=13)
+
+        plot_dir = meta.plot_dir_from_output_dir(meta.coupling_directory)
+        plot_suffix = (f"__{map_set_1}_{map_set_2}" if meta.validate_beam
+                       else "")
+        plt.savefig(f"{plot_dir}/decoupled_{val_type}{plot_suffix}.pdf",
+                    bbox_inches="tight")
 
 
 class PipelineManager(object):
