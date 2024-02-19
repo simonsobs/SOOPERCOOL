@@ -1,4 +1,4 @@
-paramfile='../paramfiles/paramfile_SAT.yaml'
+paramfile='../paramfiles/paramfile_SAT_256_clean.yaml'
 
 echo "Running pipeline with paramfile: ${paramfile}"
 
@@ -69,7 +69,7 @@ python transfer_validator.py --globals ${paramfile}
 
 echo "Running pcler on data"
 echo "---------------------"
-python pcler.py --globals ${paramfile} --data --plots
+python pcler.py --globals ${paramfile} --data 
 
 echo "Running pcler on sims"
 echo "---------------------"
@@ -78,8 +78,22 @@ python pcler.py --globals ${paramfile} --sims
 
 echo "Running coadder on data"
 echo "---------------------"
-python coadder.py --globals ${paramfile} --data --plots
+python coadder.py --globals ${paramfile} --data 
 
 echo "Running coadder on sims"
 echo "---------------------"
 python coadder.py --globals ${paramfile} --sims
+
+echo "Running covariance estimation"
+echo "-----------------------------"
+python covfefe.py --globals ${paramfile}
+
+echo "Create sacc files for sims and data"
+echo "-----------------------------------"
+python saccer.py --globals ${paramfile} --data
+python saccer.py --globals ${paramfile} --sims
+
+echo "Plot sacc files content"
+echo "-----------------------"
+python sacc_plotter.py --globals ${paramfile} --data
+python sacc_plotter.py --globals ${paramfile} --sims
