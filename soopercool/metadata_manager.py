@@ -319,7 +319,18 @@ class BBmeta(object):
             Can be "cosmo", "tf_est" or "tf_val".
         """
         fname = getattr(self, f"{cl_type}_cls_file")
-        return np.load(fname)
+        data = np.load(fname)
+        data = dict(data)
+
+        to_update = []
+        for k, v in data.items():
+            if not (k[::-1] in data):
+                to_update.append((k[::-1], v))
+
+        for k, v in to_update:
+            data[k] = v
+
+        return data
 
     def plot_dir_from_output_dir(self, out_dir):
         """
