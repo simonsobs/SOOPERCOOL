@@ -105,7 +105,10 @@ def get_noise_cls(fsky, lmax, lmin=0, sensitivity_mode='baseline',
     """
     """
     # Load noise curves
-    noise_model = noise_calc.SOSatV3point1(sensitivity_mode=sensitivity_mode)
+    noise_model = noise_calc.SOSatV3point1(
+        sensitivity_mode=sensitivity_mode,
+        N_tubes=[1., 1., 1.]
+    )
     lth, _, nlth_P = noise_model.get_noise_curves(
         fsky,
         lmax+1,
