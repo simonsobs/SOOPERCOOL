@@ -117,6 +117,9 @@ def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
 
 def sacc_plotter(args):
     """
+    This script will read the spectra and covariance
+    stored in the `sacc` files and plot the power
+    spectra.
     """
     meta = BBmeta(args.globals)
     sacc_dir = meta.sacc_directory
