@@ -102,9 +102,6 @@ def coadder(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pseudo-Cl calculator")
     parser.add_argument("--globals", type=str, help="Path to the yaml file")
-    parser.add_argument("--plots", action="store_true",
-                        help="Plot the generated power spectra if True.")
-
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--data", action="store_true")
     mode.add_argument("--sims", action="store_true")
