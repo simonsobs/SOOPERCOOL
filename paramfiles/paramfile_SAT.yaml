@@ -20,6 +20,7 @@ output_dirs:
   cell_sims_directory: "cells_sims"
   coupling_directory: "couplings"
   covmat_directory: "covariances"
+  sacc_directory: "sacc_files"
 
 ##################################
 #    Metadata related to maps    #
