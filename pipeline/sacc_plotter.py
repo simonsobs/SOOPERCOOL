@@ -64,7 +64,8 @@ def multipole_min_from_tf(tf_file, snr_cut=3.):
 
 
 def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
-                  add_theory=False, lth=None, clth=None, cbth=None):
+                  add_theory=False, lth=None, clth=None,
+                  cbth=None, save_file=None):
     """
     """
     plt.figure(figsize=(8, 6))
@@ -107,8 +108,11 @@ def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
         sub.set_xlim(*xlim)
         sub.set_ylim(-4.5, 4.5)
 
-    plt.tight_layout()
-    plt.show()
+    if save_file:
+        plt.savefig(save_file, bbox_inches="tight")
+    else:
+        plt.tight_layout()
+        plt.show()
 
 
 def sacc_plotter(args):
@@ -214,6 +218,11 @@ def sacc_plotter(args):
                 plot_data[ms1, ms2, fp]["title"] = f"{ms1} x {ms2} - {fp}"
                 plot_data[ms1, ms2, fp]["ylabel"] = fp
 
+    plot_dir = meta.plot_dir_from_output_dir(
+            meta.cell_sims_directory_rel if args.sims
+            else meta.cell_data_directory_rel
+    )
+
     for ms1, ms2 in ps_names:
         for fp in field_pairs:
 
@@ -221,6 +230,8 @@ def sacc_plotter(args):
                 plot_data[ms1, ms2, fp]["y"], axis=0
             )
             plot_data[ms1, ms2, fp]["err"] /= np.sqrt(Nsims)
+
+            plot_name = f"{ms1}_{ms2}_{fp}.pdf"
 
             plot_spectrum(
                 plot_data[ms1, ms2, fp]["x"],
@@ -232,7 +243,8 @@ def sacc_plotter(args):
                 add_theory=args.sims,
                 lth=plot_data[ms1, ms2, fp]["x_th"],
                 clth=plot_data[ms1, ms2, fp]["y_th"],
-                cbth=plot_data[ms1, ms2, fp]["th_binned"]
+                cbth=plot_data[ms1, ms2, fp]["th_binned"],
+                save_file=f"{plot_dir}/{plot_name}"
             )
 
 
