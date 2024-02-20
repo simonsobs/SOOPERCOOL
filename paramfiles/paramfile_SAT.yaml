@@ -93,7 +93,6 @@ sim_pars:
     tau: 0.0544
     r: 0.01
   noise:
-    fsky: 0.1
     survey_years: 5.
     sensitivity_mode: "baseline"
     one_over_f_mode: "optimistic"
@@ -129,3 +128,6 @@ tf_settings:
       EB: 0.
     delta_ell: 10
     power_law_index: 0.5
+
+  # Do we beam the TF sims and deconvolve them at the MCM level?
+  validate_beam: True
