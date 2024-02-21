@@ -1,203 +1,9 @@
 import argparse
 import healpy as hp
 import numpy as np
-from soopercool import BBmeta
+from soopercool import BBmeta, ps_utils
 import pymaster as nmt
-from itertools import product
 import warnings
-
-
-def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
-    """
-    Compute the binned coupled pseudo-C_ell estimates from two
-    (spin-0 or spin-2) NaMaster fields and a multipole binning scheme.
-    Parameters
-    ----------
-    fields1, fields2 : NmtField
-        Spin-0 or spin-2 fields to correlate.
-    nmt_binning : NmtBin
-        Multipole binning scheme.
-    """
-    spins = list(fields1.keys())
-
-    pcls = {}
-    for spin1 in spins:
-        for spin2 in spins:
-
-            f1 = fields1[spin1]
-            f2 = fields2[spin2]
-
-            coupled_cell = nmt.compute_coupled_cell(f1, f2)
-            coupled_cell = coupled_cell[:, :nmt_binning.lmax+1]
-
-            pcls[f"{spin1}x{spin2}"] = nmt_binning.bin_cell(coupled_cell)
-    return pcls
-
-
-def decouple_pseudo_cls(coupled_pseudo_cells, coupling_inv):
-    """
-    Decouples the coupled pseudo-C_ell estimators computed between two fields
-    of spin 0 or 2. Returns decoupled binned power spectra labeled by field
-    pairs (e.g. 'TT', 'TE', 'EE', 'EB', 'BB' etc.).
-    Parameters
-    ----------
-    coupled_pseudo_cells : dict with keys f"spin{s1}xspin{s2}",
-        items array-like. Coupled pseudo-C_ell estimators.
-    coupling_inv : array-like
-        Inverse binned bandpower coupling matrix.
-    """
-    decoupled_pcls = {}
-    for spin_comb, coupled_pcl in coupled_pseudo_cells.items():
-        n_bins = coupled_pcl.shape[-1]
-        decoupled_pcl = coupling_inv[spin_comb] @ coupled_pcl.flatten()
-        if spin_comb == "spin0xspin0":
-            size = 1
-        elif spin_comb in ["spin0xspin2", "spin2xspin0"]:
-            size = 2
-        elif spin_comb == "spin2xspin2":
-            size = 4
-        decoupled_pcl = decoupled_pcl.reshape((size, n_bins))
-
-        decoupled_pcls[spin_comb] = decoupled_pcl
-
-    decoupled_pcls = field_pairs_from_spins(decoupled_pcls)
-
-    return decoupled_pcls
-
-
-def field_pairs_from_spins(cls_in_dict):
-    """
-    Reorders power spectrum dictionary with a given input spin
-    pair into pairs of output (pseudo-)scalar fields on the sky
-    (T, E, or B).
-
-    Parameters
-    ----------
-    cls_in_dict: dictionary
-    """
-    cls_out_dict = {}
-
-    field_spin_mapping = {
-        "spin0xspin0": ["TT"],
-        "spin0xspin2": ["TE", "TB"],
-        "spin2xspin0": ["ET", "BT"],
-        "spin2xspin2": ["EE", "EB", "BE", "BB"]
-    }
-
-    for spin_pair in cls_in_dict:
-        for index, field_pair in enumerate(field_spin_mapping[spin_pair]):
-
-            cls_out_dict[field_pair] = cls_in_dict[spin_pair][index]
-
-    return cls_out_dict
-
-
-def get_pcls_mat_transfer(fields, nmt_binning):
-    """
-    Compute coupled binned pseudo-C_ell estimates from
-    pure-E and pure-B transfer function estimation simulations,
-    and cast them into matrix shape.
-
-    Parameters
-    ----------
-    fields: dictionary of NmtField objects (keys "pureE", "pureB")
-    nmt_binning: NmtBin object
-    """
-    n_bins = nmt_binning.get_n_bands()
-    pcls_mat_00 = np.zeros((1, 1, n_bins))
-    pcls_mat_02 = np.zeros((2, 2, n_bins))
-    pcls_mat_22 = np.zeros((4, 4, n_bins))
-
-    index = 0
-    cases = ["pureE", "pureB"]
-    for index, (pure_type1, pure_type2) in enumerate(product(cases, cases)):
-        pcls = get_coupled_pseudo_cls(fields[pure_type1],
-                                      fields[pure_type2],
-                                      nmt_binning)
-        pcls_mat_22[index] = pcls["spin2xspin2"]
-        pcls_mat_02[cases.index(pure_type2)] = pcls["spin0xspin2"]
-
-    pcls_mat_00[0] = pcls["spin0xspin0"]
-
-    return {"spin0xspin0": pcls_mat_00,
-            "spin0xspin2": pcls_mat_02,
-            "spin2xspin2": pcls_mat_22}
-
-
-def get_binned_cls(bp_win_dict, cls_dict_unbinned):
-    """
-    """
-    nl = np.shape(list(bp_win_dict.values())[0])[-1]
-    cls_dict_binned = {}
-
-    for spin_comb in ["spin0xspin0", "spin0xspin2", "spin2xspin2"]:
-        bpw_mat = bp_win_dict[f"bp_win_{spin_comb}"]
-        if spin_comb == "spin0xspin0":
-            cls_vec = np.array([cls_dict_unbinned["TT"][:nl]]).reshape(1, nl)
-        elif spin_comb == "spin0xspin2":
-            cls_vec = np.array([cls_dict_unbinned["TE"][:nl],
-                                cls_dict_unbinned["TB"][:nl]])
-        elif spin_comb == "spin2xspin2":
-            cls_vec = np.array([cls_dict_unbinned["EE"][:nl],
-                                cls_dict_unbinned["EB"][:nl],
-                                cls_dict_unbinned["EB"][:nl],
-                                cls_dict_unbinned["BB"][:nl]])
-
-        cls_dict_binned[spin_comb] = np.einsum("ijkl,kl", bpw_mat, cls_vec)
-
-    return field_pairs_from_spins(cls_dict_binned)
-
-
-def get_validation_power_spectra(meta, id_sim, mask, nmt_binning,
-                                 inv_couplings):
-    """
-    This function computes transfer validation power spectra given an
-    input simulation ID, mask and binning scheme, and stores them to disk.
-    """
-    map_set_pairs = (meta.get_ps_names_list(type="all", coadd=True)
-                     if meta.validate_beam else [(None, None)])
-    filter_flags = (["filtered"] if meta.validate_beam
-                    else ["filtered", "unfiltered"])
-
-    for cl_type in ["tf_val", "cosmo"]:
-        for filter_flag in filter_flags:
-            for map_sets in map_set_pairs:
-                map_files = [
-                    meta.get_map_filename_transfer2(
-                        id_sim, cl_type=cl_type, map_set=ms
-                    ) for ms in map_sets
-                ]
-
-                if filter_flag == "filtered":
-                    map_files = [mf.replace(".fits", "_filtered.fits")
-                                 for mf in map_files]
-
-                maps = [hp.read_map(m, field=[0, 1, 2])
-                        for m in map_files]
-
-                field = [{
-                    "spin0": nmt.NmtField(mask, map[:1]),
-                    "spin2": nmt.NmtField(mask, map[1:],
-                                          purify_b=meta.tf_est_pure_B)
-                } for map in maps]
-
-                pcls = get_coupled_pseudo_cls(field[0], field[1], nmt_binning)
-
-                if meta.validate_beam:
-                    decoupled_pcls = decouple_pseudo_cls(
-                        pcls, inv_couplings[map_sets[0], map_sets[1]]
-                    )
-                else:
-                    decoupled_pcls = decouple_pseudo_cls(
-                        pcls, inv_couplings[filter_flag]
-                    )
-                cl_prefix = f"pcls_{cl_type}_{id_sim:04d}"
-                cl_suffix = (f"_{map_sets[0]}_{map_sets[1]}"
-                             if meta.validate_beam else f"_{filter_flag}")
-                cl_name = cl_prefix + cl_suffix
-
-                np.savez(f"{meta.cell_transfer_directory}/{cl_name}.npz",
-                         **decoupled_pcls)
 
 
 def pcler(args):
@@ -269,11 +75,13 @@ def pcler(args):
                                                                coadd=False):
                 map_set1, id_split1 = map_name1.split("__")
                 map_set2, id_split2 = map_name2.split("__")
-                pcls = get_coupled_pseudo_cls(fields[map_set1, id_split1],
-                                              fields[map_set2, id_split2],
-                                              nmt_binning)
+                pcls = ps_utils.get_coupled_pseudo_cls(
+                    fields[map_set1, id_split1],
+                    fields[map_set2, id_split2],
+                    nmt_binning
+                )
 
-                decoupled_pcls = decouple_pseudo_cls(
+                decoupled_pcls = ps_utils.decouple_pseudo_cls(
                     pcls, inv_couplings_beamed[map_set1, map_set2]
                 )
 
@@ -330,15 +138,9 @@ def pcler(args):
                 f"{meta.coupling_directory}/couplings_unfiltered.npz"
             )
             cls_theory_unbinned = meta.load_fiducial_cl("cosmo")
-            cls_theory_binned = get_binned_cls(bp_win, cls_theory_unbinned)
+            cls_theory_binned = ps_utils.get_binned_cls(bp_win,
+                                                        cls_theory_unbinned)
             nls_theory_unbinned = meta.load_fiducial_cl("noise")
-            freq_bands = nls_theory_unbinned["freq_bands"]
-
-            ch_idx = {}
-            for i, f in enumerate(freq_bands):
-                for map_set in meta.map_sets:
-                    if f"f{str(int(f)).zfill(3)}" in map_set:
-                        ch_idx[map_set] = i
 
             # Plot power spectra
             plot_dir_rel = getattr(meta, f"cell_{type}_directory_rel")
@@ -367,7 +169,7 @@ def pcler(args):
                     cl_th = no_e * cls_theory_unbinned[spec]
                     nl_th = (
                         (n_splits
-                         * nls_theory_unbinned[spec][ch_idx[map_set_1]])
+                         * nls_theory_unbinned[map_set_1][spec])
                         if auto else 0.
                     )
 
@@ -474,10 +276,14 @@ def pcler(args):
                 fields["unfiltered"][pure_type] = field
                 fields["filtered"][pure_type] = field_filtered
 
-            pcls_mat_filtered = get_pcls_mat_transfer(fields["filtered"],
-                                                      nmt_binning)
-            pcls_mat_unfiltered = get_pcls_mat_transfer(fields["unfiltered"],
-                                                        nmt_binning)
+            pcls_mat_filtered = ps_utils.get_pcls_mat_transfer(
+                fields["filtered"],
+                nmt_binning
+            )
+            pcls_mat_unfiltered = ps_utils.get_pcls_mat_transfer(
+                fields["unfiltered"],
+                nmt_binning
+            )
 
             np.savez(f"{cl_dir}/pcls_mat_tf_est_filtered_{id_sim:04d}.npz",
                      **pcls_mat_filtered)
@@ -501,7 +307,7 @@ def pcler(args):
         for id_sim in range(meta.tf_est_num_sims):
             meta.timer.start("pcler_tf_val")
 
-            get_validation_power_spectra(
+            ps_utils.get_validation_power_spectra(
                 meta, id_sim, mask, nmt_binning, inv_couplings=inv_couplings
             )
 

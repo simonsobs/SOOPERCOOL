@@ -130,17 +130,18 @@ def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
     return out_map
 
 
-def get_noise_cls(noise_params, lmax, lmin=0, fsky=0.1,
+def get_noise_cls(meta, lmax, lmin=0, fsky=0.1,
                   is_beam_deconvolved=False):
     """
+    Load polarization noise from SO SAT noise model.
+    Assume polarization noise is half of that.
     """
     oof_dict = {"pessimistic": 0, "optimistic": 1}
 
-    # Load noise curves
     noise_model = noise_calc.SOSatV3point1(
-        survey_years=noise_params["survey_years"],
-        sensitivity_mode=noise_params["sensitivity_mode"],
-        one_over_f_mode=oof_dict[noise_params["one_over_f_mode"]]
+        survey_years=meta.noise["survey_years"],
+        sensitivity_mode=meta.noise["sensitivity_mode"],
+        one_over_f_mode=oof_dict[meta.noise["one_over_f_mode"]]
     )
     lth, _, nlth_P = noise_model.get_noise_curves(
         fsky,
@@ -152,14 +153,24 @@ def get_noise_cls(noise_params, lmax, lmin=0, fsky=0.1,
     nlth_P = np.array(
         [np.concatenate(([0, 0], nl))[lmin:] for nl in nlth_P]
     )
-    # Assume polarization noise level for PP auto and TP cross
+
+    # Attention: at the moment, the noise model's frequencies must match
+    # soopercool's frequency tags.
     freq_tags = [int(f) for f in noise_model.get_bands()]
-    nl_th = {
-        pq: {f: nlth_P[i] for i, f in enumerate(freq_tags)}
-        for pq in ["TE", "TB", "EE", "EB", "BE", "BB"]
-    }
-    # Assume temperature noise variance is half that of polarization
-    nl_th["TT"] = {f: nlth_P[i]/2. for i, f in enumerate(freq_tags)}
+    nl_all_frequencies = {}
+    for i_f, freq_tag in enumerate(freq_tags):
+        nl_th_dict = {pq: nlth_P[i_f]
+                      for pq in ["EE", "EB", "BE", "BB"]}
+        nl_th_dict["TT"] = 0.5*nlth_P[i_f]
+        nl_th_dict["TE"] = 0.*nlth_P[i_f]
+        nl_th_dict["TB"] = 0.*nlth_P[i_f]
+        nl_all_frequencies[freq_tag] = nl_th_dict
+
+    nl_th = {}
+    for map_set in meta.map_sets_list:
+        freq_tag = meta.freq_tag_from_map_set(map_set)
+        if freq_tag in freq_tags:
+            nl_th[map_set] = nl_all_frequencies[freq_tag]
 
     return lth, nl_th
 
@@ -195,7 +206,7 @@ def random_src_mask(mask, nsrcs, mask_radius_arcmin):
     return ps_mask
 
 
-def get_beam_windows(meta):
+def get_beam_windows(meta, plot=False, beam_floor=1.e-2):
     """
     Compute and save dictionary with beam window functions for each map set.
     """
@@ -216,9 +227,16 @@ def get_beam_windows(meta):
         freq_tag = meta.freq_tag_from_map_set(map_set)
         beams_dict[map_set] = beam_gaussian(lth, beam_arcmin[freq_tag])
         file_root = meta.file_root_from_map_set(map_set)
+
         if not os.path.exists(file_root):
             np.savetxt(f"{meta.beam_directory}/beam_{file_root}.dat",
                        np.transpose([lth, beams_dict[map_set]]))
+        if plot:
+            plt.plot(lth, beams_dict[map_set], label=map_set)
+    if plot:
+        plt.yscale("log")
+        plt.legend()
+        plt.savefig(f"{meta.beam_directory}/beams.png")
 
 
 def beam_gaussian(ll, fwhm_amin):

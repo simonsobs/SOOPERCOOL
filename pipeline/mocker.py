@@ -28,14 +28,13 @@ def mocker(args):
 
     # Create fiducial noise power spectra
     meta.timer.start("Computing noise cls")
-    _, nlth_dict = get_noise_cls(meta.noise, lmax_sim + 1, fsky=fsky)
     lth, nlth_deconvolved_dict = get_noise_cls(
-        meta.noise,
+        meta,
         lmax=lmax_sim,
         fsky=fsky,
         is_beam_deconvolved=True
     )
-    _, meta.save_fiducial_cl(lth, nlth_deconvolved_dict, cl_type="noise")
+    _ = meta.save_fiducial_cl(lth, nlth_deconvolved_dict, cl_type="noise")
     meta.timer.stop("Computing noise cls")
 
     # Load beams for each map set
@@ -64,7 +63,6 @@ def mocker(args):
         for map_set in meta.map_sets_list:
 
             meta.timer.start(f"Generate map set {map_set} split maps")
-            freq_tag = meta.freq_tag_from_map_set(map_set)
             cmb_map_beamed = hp.smoothing(
                 cmb_map, beam_window=beam_windows[map_set]
             )
@@ -72,8 +70,8 @@ def mocker(args):
 
             for id_split in range(n_splits):
                 noise_map = generate_noise_map(
-                    nlth_dict["TT"][freq_tag],
-                    nlth_dict["EE"][freq_tag],
+                    nlth_deconvolved_dict[map_set]["TT"],
+                    nlth_deconvolved_dict[map_set]["EE"],
                     hitmap,
                     n_splits,
                     is_anisotropic=meta.anisotropic_noise

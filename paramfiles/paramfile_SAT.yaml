@@ -10,7 +10,7 @@ data_dirs:
   beam_directory: "beams"
   bandpasses_directory: "bandpasses"
 ## Then directories in which we will store outputs
-output_dirs: 
+output_dirs:
   root: "../outputs"
   mask_directory: "masks"
   pre_process_directory: "pre_processing"
@@ -19,6 +19,7 @@ output_dirs:
   cell_data_directory: "cells_data"
   cell_sims_directory: "cells_sims"
   coupling_directory: "couplings"
+  covmat_directory: "covariances"
 
 ##################################
 #    Metadata related to maps    #
@@ -39,11 +40,11 @@ map_sets:
     n_splits: 4          # Number of splits
     freq_tag: 93         # Freq. tag (e.g. useful to coadd freqs)
     exp_tag: "SAT1"      # Experiment tag (useful to get noise-bias free cross-split spectra)
-  # SAT1_f145:
-  #   file_root: "cmb_sat1_f145"
-  #   n_splits: 3
-  #   freq_tag: 145
-  #   exp_tag: "SAT1"
+  SAT3_f027:
+    file_root: "cmb_sat3_f027"
+    n_splits: 3
+    freq_tag: 27
+    exp_tag: "SAT3"
 
 ####################
 # Masking metadata #
@@ -77,12 +78,14 @@ general_pars:
   deltal: 10
   binning_file: "binning.npz"
   pure_B: True
+  # Where the beam window is lower than beam_floor, set it to beam_floor
+  beam_floor: 1.e-2
 
 ## Simulation related
 sim_pars:
   anisotropic_noise: False
   null_e_modes: False
-  num_sims: 20
+  num_sims: 4
   cosmology:
     cosmomc_theta: 0.0104085
     As: 2.1e-9
@@ -111,7 +114,7 @@ tf_settings:
     thinfp: 8
     group_size: 4
 
-  tf_est_num_sims: 10
+  tf_est_num_sims: 4
 
   power_law_pars_tf_est:
     amp: 1.0

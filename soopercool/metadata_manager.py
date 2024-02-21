@@ -83,7 +83,10 @@ class BBmeta(object):
         self.cosmo_cls_file = f"{self.pre_process_directory}/cosmo_cls.npz"
         self.tf_est_cls_file = f"{self.pre_process_directory}/tf_est_cls.npz"
         self.tf_val_cls_file = f"{self.pre_process_directory}/tf_val_cls.npz"
-        self.noise_cls_file = f"{self.pre_process_directory}/noise_cls.npz"
+        self.noise_cls_file = {
+            map_set: f"{self.pre_process_directory}/noise_cls_{map_set}.npz"
+            for map_set in self.map_sets_list
+        }
 
         # Initialize a timer
         self.timer = Timer()
@@ -274,6 +277,8 @@ class BBmeta(object):
         file_root = self.file_root_from_map_set(map_set)
         beam_file = f"{self.beam_directory}/beam_{file_root}.dat"
         l, bl = np.loadtxt(beam_file, unpack=True)
+        if self.beam_floor is not None:
+            bl[bl < self.beam_floor] = self.beam_floor
         return l, bl
 
     def _init_simulation_params(self):
@@ -306,7 +311,12 @@ class BBmeta(object):
             Can be "cosmo", "tf_est", "tf_val" or "noise".
         """
         fname = getattr(self, f"{cl_type}_cls_file")
-        np.savez(fname, l=ell, **cl_dict)
+        if cl_type == "noise":
+            for map_set, fname_map_set in fname.items():
+                cl_dict_map_set = cl_dict[map_set]
+                np.savez(fname_map_set, l=ell, **cl_dict_map_set)
+        else:
+            np.savez(fname, l=ell, **cl_dict)
         return fname
 
     def load_fiducial_cl(self, cl_type):
@@ -320,7 +330,13 @@ class BBmeta(object):
             Can be "cosmo", "tf_est", "tf_val" or "noise".
         """
         fname = getattr(self, f"{cl_type}_cls_file")
-        return np.load(fname)
+        if cl_type == "noise":
+            cl_dict = {}
+            for map_set, fname_map_set in fname.items():
+                cl_dict[map_set] = np.load(fname_map_set)
+        else:
+            cl_dict = np.load(fname)
+        return cl_dict
 
     def plot_dir_from_output_dir(self, out_dir):
         """
