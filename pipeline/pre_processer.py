@@ -125,8 +125,8 @@ def pre_processer(args):
                 if cl_type == "tf_est":
                     for ftag, bl in beams:
                             
-                        sim_pureE = utils.generate_map_from_alms([alms_T, alms_E, alms_B], meta.nside, pure_E=True, bl=bl)
-                        sim_pureB = utils.generate_map_from_alms([alms_T, alms_E, alms_B], meta.nside, pure_B=True, bl=bl)
+                        sim_pureE = utils.generate_map_from_alms([alms_T, alms_E, alms_B], meta.nside, pureE=True, bl=bl)
+                        sim_pureB = utils.generate_map_from_alms([alms_T, alms_E, alms_B], meta.nside, pureB=True, bl=bl)
 
                         map_file_pureE = meta.get_map_filename_transfer(
                             id_sim, cl_type, pure_type="pureE",
