@@ -368,10 +368,8 @@ def pcler(args):
                             pcls, inv_couplings[ftype][ftag1, ftag2]
                         )
 
-                        print(decoupled_pcls["TT"])
-
-                    np.savez(f"{cl_dir}/pcls_{cl_type}_{ftag1}x{ftag2}_{id_sim:04d}_{ftype}.npz",  # noqa
-                             **decoupled_pcls)
+                        np.savez(f"{cl_dir}/pcls_{cl_type}_{ftag1}x{ftag2}_{id_sim:04d}_{ftype}.npz",  # noqa
+                                 **decoupled_pcls)
 
 
 if __name__ == "__main__":
