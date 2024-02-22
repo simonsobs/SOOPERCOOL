@@ -212,86 +212,119 @@ def pcler(args):
                     )
 
     if args.tf_est:
+
+        filtering_tags = meta.get_filtering_tags()
+        filtering_tag_pairs = meta.get_independent_filtering_pairs()
         for id_sim in range(meta.tf_est_num_sims):
-            fields = {"filtered": {}, "unfiltered": {}}
-            for pure_type in ["pureE", "pureB"]:
-                map_file = meta.get_map_filename_transfer2(
-                    id_sim,
-                    "tf_est",
-                    pure_type=pure_type
-                )
-                map_file_filtered = map_file.replace(".fits", "_filtered.fits")
 
-                map = hp.read_map(map_file, field=[0, 1, 2])
-                map_filtered = hp.read_map(map_file_filtered, field=[0, 1, 2])
-
-                # TO-DO: filter temperature only once !
-                field = {
-                    "spin0": nmt.NmtField(mask, map[:1]),
-                    "spin2": nmt.NmtField(mask, map[1:],
-                                          purify_b=meta.tf_est_pure_B)
-                }
-                field_filtered = {
-                    "spin0": nmt.NmtField(mask, map_filtered[:1]),
-                    "spin2": nmt.NmtField(mask, map_filtered[1:],
-                                          purify_b=meta.tf_est_pure_B)
-                }
-
-                fields["unfiltered"][pure_type] = field
-                fields["filtered"][pure_type] = field_filtered
-
-            pcls_mat_filtered = ps_utils.get_pcls_mat_transfer(
-                fields["filtered"],
-                nmt_binning
-            )
-            pcls_mat_unfiltered = ps_utils.get_pcls_mat_transfer(
-                fields["unfiltered"],
-                nmt_binning
-            )
-
-            np.savez(f"{cl_dir}/pcls_mat_tf_est_filtered_{id_sim:04d}.npz",
-                     **pcls_mat_filtered)
-            np.savez(f"{cl_dir}/pcls_mat_tf_est_unfiltered_{id_sim:04d}.npz",
-                     **pcls_mat_unfiltered)
-
-    if args.tf_val:
-        inv_couplings = {}
-        for filter_flag in ["filtered", "unfiltered"]:
-            pure_str = "_pure" if meta.tf_est_pure_B else ""
-            couplings = np.load(f"{meta.coupling_directory}/couplings_{filter_flag}{pure_str}.npz")  # noqa
-            inv_couplings[filter_flag] = {
-                k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
-                                                             ncl*n_bins])
-                for k1, k2, ncl in zip(["spin0xspin0", "spin0xspin2",
-                                        "spin2xspin0", "spin2xspin2"],
-                                       ["spin0xspin0", "spin0xspin2",
-                                        "spin0xspin2", "spin2xspin2"],
-                                       [1, 2, 2, 4])
+            fields = {ftag: {
+                "filtered": {},
+                "unfiltered": {}
+                } for ftag in filtering_tags
             }
 
-        for id_sim in range(meta.tf_est_num_sims):
-            for cl_type in ["tf_val", "cosmo"]:
-                for filter_flag in ["filtered", "unfiltered"]:
-                    map_file = meta.get_map_filename_transfer2(id_sim,
-                                                               cl_type=cl_type)
-                    if filter_flag == "filtered":
-                        map_file = map_file.replace(".fits", "_filtered.fits")
+            for ftag in filtering_tags:
+                for pure_type in ["pureE", "pureB"]:
+                    map_file = meta.get_map_filename_transfer(
+                        id_sim,
+                        "tf_est",
+                        pure_type=pure_type,
+                        filter_tag=ftag
+                    )
+                    map_file_filtered = map_file.replace(".fits", "_filtered.fits")
 
                     map = hp.read_map(map_file, field=[0, 1, 2])
+                    map_filtered = hp.read_map(map_file_filtered, field=[0, 1, 2])
 
+                    # TO-DO: filter temperature only once !
                     field = {
                         "spin0": nmt.NmtField(mask, map[:1]),
                         "spin2": nmt.NmtField(mask, map[1:],
                                               purify_b=meta.tf_est_pure_B)
                     }
+                    field_filtered = {
+                        "spin0": nmt.NmtField(mask, map_filtered[:1]),
+                        "spin2": nmt.NmtField(mask, map_filtered[1:],
+                                              purify_b=meta.tf_est_pure_B)
+                    }
 
-                    pcls = ps_utils.get_coupled_pseudo_cls(field, field,
-                                                           nmt_binning)
+                    fields[ftag]["unfiltered"][pure_type] = field
+                    fields[ftag]["filtered"][pure_type] = field_filtered
 
-                    decoupled_pcls = ps_utils.decouple_pseudo_cls(
-                        pcls, inv_couplings[filter_flag])
+            for ftag1, ftag2 in filtering_tag_pairs:
+                pcls_mat_filtered = ps_utils.get_pcls_mat_transfer(
+                    fields[ftag1]["filtered"],
+                    nmt_binning, fields2=fields[ftag2]["filtered"]
+                )
+                pcls_mat_unfiltered = ps_utils.get_pcls_mat_transfer(
+                    fields[ftag1]["unfiltered"],
+                    nmt_binning, fields2=fields[ftag2]["unfiltered"]
+                )
 
-                    np.savez(f"{cl_dir}/pcls_{cl_type}_{id_sim:04d}_{filter_flag}.npz",  # noqa
+                np.savez(f"{cl_dir}/pcls_mat_tf_est_{ftag1}x{ftag2}_filtered_{id_sim:04d}.npz", # noqa
+                         **pcls_mat_filtered)
+                np.savez(f"{cl_dir}/pcls_mat_tf_est_{ftag1}x{ftag2}_unfiltered_{id_sim:04d}.npz", # noqa
+                         **pcls_mat_unfiltered)
+
+    if args.tf_val:
+        filtering_tag_pairs = meta.get_independent_filtering_pairs()
+        filtering_tags = meta.get_filtering_tags()
+
+        inv_couplings = {}
+        pure_str = "_pure" if meta.tf_est_pure_B else ""
+
+        for ftype in ["filtered", "unfiltered"]:
+
+            inv_couplings[ftype] = {}
+
+            for ftag1, ftag2 in filtering_tag_pairs:
+
+                cross_name = f"{ftag1}x{ftag2}"
+                couplings = np.load(f"{meta.coupling_directory}/couplings_{cross_name}_{ftype}{pure_str}.npz")  # noqa
+                inv_couplings[ftype][ftag1, ftag2] = {
+                    k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
+                                                                ncl*n_bins])
+                    for k1, k2, ncl in zip(["spin0xspin0", "spin0xspin2",
+                                            "spin2xspin0", "spin2xspin2"],
+                                            ["spin0xspin0", "spin0xspin2",
+                                            "spin0xspin2", "spin2xspin2"],
+                                        [1, 2, 2, 4])
+                }
+
+        for id_sim in range(meta.tf_est_num_sims):
+            for cl_type in ["tf_val", "cosmo"]:
+                for ftype in ["filtered", "unfiltered"]:
+                    fields = {}
+                    for ftag in filtering_tags:
+                        map_file = meta.get_map_filename_transfer(
+                            id_sim, cl_type=cl_type,
+                            filter_tag=ftag
+                        )
+                        if ftype == "filtered":
+                            map_file = map_file.replace(".fits", "_filtered.fits")
+
+                        map = hp.read_map(map_file, field=[0, 1, 2])
+                        
+                        fields[ftag] = {
+                            "spin0": nmt.NmtField(mask, map[:1]),
+                            "spin2": nmt.NmtField(mask, map[1:],
+                                                  purify_b=meta.tf_est_pure_B)
+                        }
+
+                    for ftag1, ftag2 in filtering_tag_pairs:
+
+                        pcls = ps_utils.get_coupled_pseudo_cls(
+                            fields[ftag1], fields[ftag2],
+                            nmt_binning
+                        )
+
+                        decoupled_pcls = ps_utils.decouple_pseudo_cls(
+                            pcls, inv_couplings[ftype][ftag1, ftag2]
+                        )
+
+                        print(decoupled_pcls["TT"])
+
+                    np.savez(f"{cl_dir}/pcls_{cl_type}_{ftag1}x{ftag2}_{id_sim:04d}_{ftype}.npz",  # noqa
                              **decoupled_pcls)
 
 

@@ -3,6 +3,207 @@ import numpy as np
 from soopercool import BBmeta
 
 
+# Move everything to `coupling_utils.py`
+def get_transfer_with_error(mean_pcls_mat_filt,
+                            mean_pcls_mat_unfilt,
+                            pcls_mat_filt):
+    """
+    """
+    cct_inv = np.transpose(
+        np.linalg.inv(
+            np.transpose(
+                np.einsum('jil,jkl->ikl',
+                          mean_pcls_mat_unfilt,
+                          mean_pcls_mat_unfilt),
+                axes=[2, 0, 1]
+            )
+        ), axes=[1, 2, 0]
+    )
+
+    tf = np.einsum(
+        'ijl,jkl->kil', cct_inv,
+        np.einsum(
+            'jil,jkl->ikl',
+            mean_pcls_mat_unfilt,
+            mean_pcls_mat_filt
+        )
+    )
+
+    tferr = np.std(
+        np.array(
+            [np.einsum(
+                'ijl,jkl->kil', cct_inv,
+                np.einsum(
+                    'jil,jkl->ikl',
+                    mean_pcls_mat_unfilt,
+                    clf))
+                for clf in pcls_mat_filt]
+        ), axis=0
+    )
+
+    return tf, tferr
+
+
+def get_transfer_dict(mean_pcls_mat_filt_dict,
+                      mean_pcls_mat_unfilt_dict,
+                      pcls_mat_dict,
+                      filtering_pairs,
+                      spin_pairs):
+    """
+    """
+    tf_dict = {(ftag1, ftag2): {} for ftag1, ftag2 in filtering_pairs}
+    tf_std_dict = {(ftag1, ftag2): {} for ftag1, ftag2 in filtering_pairs}
+    for ftag1, ftag2 in filtering_pairs:
+        for spin_pair in spin_pairs:
+
+            mean_pcls_mat_filt = mean_pcls_mat_filt_dict[ftag1, ftag2][spin_pair]
+            mean_pcls_mat_unfilt = mean_pcls_mat_unfilt_dict[ftag1, ftag2][spin_pair]
+            pcls_mat_filt = pcls_mat_dict[ftag1, ftag2][spin_pair]["filtered"]
+
+            tf, tferr = get_transfer_with_error(mean_pcls_mat_filt,
+                                                mean_pcls_mat_unfilt,
+                                                pcls_mat_filt)
+
+            tf_dict[ftag1, ftag2][spin_pair] = tf
+            tf_std_dict[ftag1, ftag2][spin_pair] = tferr
+    return tf_dict, tf_std_dict
+
+
+def read_pcls_matrices(pcls_mat_dir, filtering_pairs, spin_pairs, Nsims):
+    """
+    """
+    pcls_mat_dict = {
+        (ftag1, ftag2): {
+            spin_pair: {
+                "filtered": [],
+                "unfiltered": []
+            } for spin_pair in spin_pairs
+        } for ftag1, ftag2 in filtering_pairs
+    }
+
+    # Load the pseudo-cl matrices for each simulation
+    # Should be (n_comb_pure, n_comb_mode, n_bins)
+    for id_sim in range(Nsims):
+        for label in ["filtered", "unfiltered"]:
+            for ftag1, ftag2 in filtering_pairs:
+                pcls_mat = np.load(
+                    f"{pcls_mat_dir}/pcls_mat_tf_est_{ftag1}x{ftag2}_{label}_{id_sim:04d}.npz")
+                for spin_pair in spin_pairs:
+                    pcls_mat_dict[ftag1, ftag2][spin_pair][label] += [pcls_mat[spin_pair]]
+
+    return pcls_mat_dict
+
+
+def load_mcms(coupling_dir, spin_pairs, ps_names=None, B_pure=False):
+    """
+    """
+
+    file_root = "mcm" if not B_pure else "mcm_pure"
+    mcms_dict = {}
+
+    if ps_names is None:
+        mcm_file = f"{coupling_dir}/{file_root}.npz"
+        mcm = np.load(mcm_file)
+        for spin_pair in spin_pairs:
+            mcms_dict[spin_pair] = mcm[f"{spin_pair}_binned"]
+    else:
+        for ms1, ms2 in ps_names:
+            mcm_file = f"{coupling_dir}/{file_root}_{ms1}_{ms2}.npz"
+            mcm = np.load(mcm_file)
+            mcms_dict[ms1, ms2] = {}
+            for spin_pair in spin_pairs:
+                mcms_dict[ms1, ms2][spin_pair] = mcm[f"{spin_pair}_binned"]
+    return mcms_dict
+
+
+def average_pcls_matrices(pcls_mat_dict, filtering_pairs, spin_pairs, filtered):
+    """
+    """
+    label = "filtered" if filtered else "unfiltered"
+    pcls_mat_mean = {
+        (ftag1, ftag2): {
+            spin_pair: np.mean(pcls_mat_dict[ftag1, ftag2][spin_pair][label], axis=0)
+            for spin_pair in spin_pairs
+        } for ftag1, ftag2 in filtering_pairs
+    }
+
+    return pcls_mat_mean
+
+
+def compute_couplings(mcm, nmt_binning, transfer=None):
+    """
+    """
+
+    size, n_bins, _, nl = mcm.shape
+    if transfer is not None:
+        tmcm = np.einsum('ijk,jklm->iklm',
+                         transfer,
+                         mcm)
+    else:
+        tmcm = mcm
+
+    btmcm = np.transpose(
+        np.array([
+            np.sum(tmcm[:, :, :, nmt_binning.get_ell_list(i)],
+                   axis=-1)
+            for i in range(n_bins)
+        ]), axes=[1, 2, 3, 0]
+    )
+
+    inv_btmcm = np.linalg.inv(
+        btmcm.reshape([size*n_bins, size*n_bins])
+    )
+    winflat = np.dot(inv_btmcm, tmcm.reshape([size*n_bins, size*nl]))
+    inv_coupling = inv_btmcm.reshape([size, n_bins, size, n_bins])
+    bpw_windows = winflat.reshape([size, n_bins, size, nl])
+
+    return bpw_windows, inv_coupling
+
+
+def get_couplings_dict(mcm_dict, nmt_binning, spin_pairs,
+                       transfer_dict=None,
+                       ps_names_and_ftags=None,
+                       filtering_pairs=None):
+    """
+    """
+    couplings = {}
+
+    if ps_names_and_ftags is not None:
+        for (ms1, ms2), (ftag1, ftag2) in ps_names_and_ftags.items():
+
+            couplings[ms1, ms2] = {}
+
+            for spin_pair in spin_pairs:
+                mcm = mcm_dict[ms1, ms2][spin_pair]
+                if transfer_dict is not None:
+                    transfer = transfer_dict[ftag1, ftag2][spin_pair]
+                else:
+                    transfer = None
+
+                bpw_win, inv_coupling = compute_couplings(
+                    mcm, nmt_binning, transfer
+                )
+                couplings[ms1, ms2][f"bp_win_{spin_pair}"] = bpw_win
+                couplings[ms1, ms2][f"inv_coupling_{spin_pair}"] = inv_coupling 
+
+    else:
+        for ftag1, ftag2 in filtering_pairs:
+            couplings[ftag1, ftag2] = {}
+            for spin_pair in spin_pairs:
+                mcm = mcm_dict[ftag1, ftag2][spin_pair]
+                if transfer_dict is not None:
+                    transfer = transfer_dict[ftag1, ftag2][spin_pair]
+                else:
+                    transfer = None
+
+                bpw_win, inv_coupling = compute_couplings(
+                    mcm, nmt_binning, transfer
+                )
+                couplings[ftag1, ftag2][f"bp_win_{spin_pair}"] = bpw_win
+                couplings[ftag1, ftag2][f"inv_coupling_{spin_pair}"] = inv_coupling
+
+    return couplings
+
 def transfer(args):
     """
     """
@@ -14,200 +215,120 @@ def transfer(args):
         "spin2xspin2"
     ]
 
-    pcls_mat_dict = {
-        spin_pair: {
-            "filtered": [],
-            "unfiltered": []
-        } for spin_pair in spin_pairs
-    }
+    filtering_pairs = meta.get_independent_filtering_pairs()
 
     cl_dir = meta.cell_transfer_directory
     coupling_dir = meta.coupling_directory
 
     nmt_binning = meta.read_nmt_binning()
-    n_bins = nmt_binning.get_n_bands()
-    nl = 3*meta.nside
 
-    # Load the pseudo-cl matrices for each simulation
-    # Should be (n_comb_pure, n_comb_mode, n_bins)
     meta.timer.start("Mean sims")
-    for id_sim in range(meta.tf_est_num_sims):
-        for spin_pair in spin_pairs:
-            for label in ["filtered", "unfiltered"]:
-                pcls_mat = np.load(f"{cl_dir}/pcls_mat_tf_est_{label}_{id_sim:04d}.npz")  # noqa
-                pcls_mat_dict[spin_pair][label] += [pcls_mat[spin_pair]]
+    pcls_mat_dict = read_pcls_matrices(cl_dir, filtering_pairs, spin_pairs, meta.tf_est_num_sims)
 
     # Average the pseudo-cl matrices
-    pcls_mat_filtered_mean = {
-        spin_pair: np.mean(pcls_mat_dict[spin_pair]["filtered"], axis=0)
-        for spin_pair in spin_pairs}
-    pcls_mat_unfiltered_mean = {
-        spin_pair: np.mean(pcls_mat_dict[spin_pair]["unfiltered"], axis=0)
-        for spin_pair in spin_pairs}
+    pcls_mat_filtered_mean = average_pcls_matrices(pcls_mat_dict, filtering_pairs, spin_pairs, filtered=True)
+    pcls_mat_unfiltered_mean = average_pcls_matrices(pcls_mat_dict, filtering_pairs, spin_pairs, filtered=False)
     meta.timer.stop("Mean sims")
 
     meta.timer.start("Load mode-coupling matrices")
     # Load the beam corrected mode coupling matrices
-    mcms_dict = {}
-    for map_set1, map_set2 in meta.get_ps_names_list("all", coadd=True):
-        mcms = np.load(f"{coupling_dir}/mcm_{map_set1}_{map_set2}.npz")
-        mcms_dict[map_set1, map_set2] = {
-            spin_pair: mcms[f"{spin_pair}_binned"] for spin_pair in spin_pairs
-        }
+    ps_names = meta.get_ps_names_list("all", coadd=True)
+    mcms_dict = load_mcms(coupling_dir, spin_pairs, ps_names=ps_names)
 
     # Load the un-beamed mode coupling matrix
-    mcm = np.load(f"{coupling_dir}/mcm.npz")
-    mcms_dict_nobeam = {
-        spin_pair: mcm[f"{spin_pair}_binned"] for spin_pair in spin_pairs
-    }
+    mcms_dict_val = load_mcms(coupling_dir, spin_pairs, ps_names=filtering_pairs)
 
     # If we B-purify for transfer function estimation, load the un-beamed
     # purified mode coupling matrix
     if meta.tf_est_pure_B:
-        mcm_pure = np.load(f"{coupling_dir}/mcm_pure.npz")
-        mcms_dict_nobeam_pure = {
-            spin_pair: mcm_pure[f"{spin_pair}_binned"] for spin_pair in spin_pairs  # noqa
-        }
-
+        mcms_dict_val_pure = load_mcms(coupling_dir, spin_pairs, ps_names=filtering_pairs, B_pure=True)
     meta.timer.stop("Load mode-coupling matrices", verbose=True)
 
-    meta.timer.start("Inverse the unfiltered pcls matrix")
-    # Is there a better way to formulate this ?
-    cct_invs = {
-        spin_pair: np.transpose(
-            np.linalg.inv(
-                np.transpose(
-                    np.einsum('jil,jkl->ikl',
-                              pcls_mat_unfiltered_mean[spin_pair],
-                              pcls_mat_unfiltered_mean[spin_pair]),
-                    axes=[2, 0, 1]
-                )
-            ), axes=[1, 2, 0]
-        ) for spin_pair in spin_pairs
+    # Compute and save the transfer functions
+    trans, etrans = get_transfer_dict(
+        pcls_mat_filtered_mean,
+        pcls_mat_unfiltered_mean,
+        pcls_mat_dict,
+        filtering_pairs,
+        spin_pairs
+    )
+    for ftag1, ftag2 in filtering_pairs:
+        tf = trans[ftag1, ftag2]
+        tferr = etrans[ftag1, ftag2]
+        np.savez(
+            f"{coupling_dir}/transfer_function_{ftag1}x{ftag2}.npz",
+            tf_spin0xspin0=tf["spin0xspin0"],
+            tf_spin0xspin2=tf["spin0xspin2"],
+            tf_spin2xspin2=tf["spin2xspin2"],
+            tf_std_spin0xspin0=tferr["spin0xspin0"],
+            tf_std_spin0xspin2=tferr["spin0xspin2"],
+            tf_std_spin2xspin2=tferr["spin2xspin2"]
+        )
+
+    # Compute and save couplings for different cases
+    meta.timer.start("Compute full coupling")
+    ## First for the data (i.e. including beams, tf, and mcm)
+    ps_names_and_ftags = {
+        (ms1, ms2): (meta.filtering_tag_from_map_set(ms1), 
+                     meta.filtering_tag_from_map_set(ms2))
+        for ms1, ms2 in ps_names
     }
-    meta.timer.stop("Inverse the unfiltered pcls matrix", verbose=True)
-
-    meta.timer.start("Compute transfer function")
-    # Same comment as above
-    trans = {
-        spin_pair: np.einsum('ijl,jkl->kil', cct_invs[spin_pair],
-                             np.einsum('jil,jkl->ikl',
-                                       pcls_mat_unfiltered_mean[spin_pair],
-                                       pcls_mat_filtered_mean[spin_pair]))
-        for spin_pair in spin_pairs
-    }
-    meta.timer.stop("Compute transfer function", verbose=True)
-
-    # Same comment as above
-    etrans = {
-        spin_pair: np.std(
-            np.array([np.einsum('ijl,jkl->kil', cct_invs[spin_pair],
-                                np.einsum('jil,jkl->ikl',
-                                          pcls_mat_unfiltered_mean[spin_pair],
-                                          clf))
-                      for clf in pcls_mat_dict[spin_pair]["filtered"]]),
-            axis=0)
-        for spin_pair in spin_pairs}
-
-    np.savez(
-        f"{coupling_dir}/transfer_function.npz",
-        tf_spin0xspin0=trans["spin0xspin0"],
-        tf_spin0xspin2=trans["spin0xspin2"],
-        tf_spin2xspin2=trans["spin2xspin2"],
-        tf_std_spin0xspin0=etrans["spin0xspin0"],
-        tf_std_spin0xspin2=etrans["spin0xspin2"],
-        tf_std_spin2xspin2=etrans["spin2xspin2"]
+    couplings = get_couplings_dict(
+        mcms_dict, nmt_binning, spin_pairs,
+        transfer_dict=trans,
+        ps_names_and_ftags=ps_names_and_ftags
     )
 
-    meta.timer.start("Compute full coupling")
-    for (map_set1, map_set2), mcm in mcms_dict.items():
-
-        couplings = {}
-        for spin_pair in spin_pairs:
-            # Binned mask MCM times transfer function
-            tbmcm = np.einsum('ijk,jklm->iklm', trans[spin_pair],
-                              mcm[spin_pair])
-
-            # Fully binned coupling matrix (including filtering)
-            btbmcm = np.transpose(
-                np.array([np.sum(tbmcm[:, :, :, nmt_binning.get_ell_list(i)],
-                                 axis=-1)
-                          for i in range(n_bins)]),
-                axes=[1, 2, 3, 0])
-
-            # Invert and multiply by tbmcm to get final bandpower
-            # window functions.
-            if spin_pair == "spin0xspin0":
-                size = 1
-            elif spin_pair == "spin0xspin2":
-                size = 2
-            elif spin_pair == "spin2xspin2":
-                size = 4
-            ibtbmcm = np.linalg.inv(btbmcm.reshape([size*n_bins, size*n_bins]))
-            winflat = np.dot(ibtbmcm, tbmcm.reshape([size*n_bins, size*nl]))
-            wcal_inv = ibtbmcm.reshape([size, n_bins, size, n_bins])
-            bpw_windows = winflat.reshape([size, n_bins, size, nl])
-
-            couplings[f"bp_win_{spin_pair}"] = bpw_windows
-            couplings[f"inv_coupling_{spin_pair}"] = wcal_inv
-
+    for ms1, ms2 in ps_names:
         np.savez(
-            f"{coupling_dir}/couplings_{map_set1}_{map_set2}.npz",
-            **couplings
+            f"{coupling_dir}/couplings_{ms1}_{ms2}.npz",
+            **couplings[ms1, ms2]
         )
 
-    for filter_tag in ["filtered", "unfiltered"]:
-        couplings_nobeam = {}
-        couplings_list = [couplings_nobeam]
-        mcms_list = [mcms_dict_nobeam]
+    ## Then for validation simulations (i.e. no beams, with/without tf)
 
-        if meta.tf_est_pure_B:
-            couplings_nobeam_pure = {}
-            couplings_list.append(couplings_nobeam_pure)
-            mcms_list.append(mcms_dict_nobeam_pure)
+    couplings_no_beam_with_tf = get_couplings_dict( #val not no_beam
+        mcms_dict_val, nmt_binning, spin_pairs,
+        transfer_dict=trans,
+        filtering_pairs=filtering_pairs
+    )
+    couplings_no_beam_without_tf = get_couplings_dict(
+        mcms_dict_val, nmt_binning, spin_pairs,
+        filtering_pairs=filtering_pairs
+    )
 
-        for couplings, mcms_dict in zip(couplings_list, mcms_list):
-            for spin_pair in spin_pairs:
-                if filter_tag == "filtered":
-                    tbmcm = np.einsum('ijk,jklm->iklm', trans[spin_pair],
-                                      mcms_dict[spin_pair])
-                else:
-                    tbmcm = mcms_dict[spin_pair]
-                btbmcm = np.transpose(
-                    np.array([np.sum(
-                        tbmcm[:, :, :, nmt_binning.get_ell_list(i)], axis=-1)
-                            for i in range(n_bins)]),
-                    axes=[1, 2, 3, 0])
-                # Invert and multiply by tbmcm to get final bandpower
-                # window functions.
-                if spin_pair == "spin0xspin0":
-                    size = 1
-                elif spin_pair == "spin0xspin2":
-                    size = 2
-                elif spin_pair == "spin2xspin2":
-                    size = 4
-                ibtbmcm = np.linalg.inv(btbmcm.reshape([size*n_bins,
-                                                        size*n_bins]))
-                winflat = np.dot(ibtbmcm, tbmcm.reshape([size*n_bins,
-                                                         size*nl]))
-                wcal_inv = ibtbmcm.reshape([size, n_bins, size, n_bins])
-                bpw_windows = winflat.reshape([size, n_bins, size, nl])
-
-                couplings[f"bp_win_{spin_pair}"] = bpw_windows
-                couplings[f"inv_coupling_{spin_pair}"] = wcal_inv
-
+    for ftag1, ftag2 in filtering_pairs:
         np.savez(
-            f"{coupling_dir}/couplings_{filter_tag}.npz",
-            **couplings_nobeam
+            f"{coupling_dir}/couplings_{ftag1}x{ftag2}_filtered.npz",
+            **couplings_no_beam_with_tf[ftag1, ftag2]
         )
-        if meta.tf_est_pure_B:
+        np.savez(
+            f"{coupling_dir}/couplings_{ftag1}x{ftag2}_unfiltered.npz",
+            **couplings_no_beam_without_tf[ftag1, ftag2]
+        )
+
+    ## Finally an optional case for pure B tf estimation
+    if meta.tf_est_pure_B:
+        couplings_no_beam_with_tf_pure = get_couplings_dict(
+            mcms_dict_val_pure, nmt_binning, spin_pairs,
+            transfer_dict=trans,
+            filtering_pairs=filtering_pairs
+        )
+        couplings_no_beam_without_tf_pure = get_couplings_dict(
+            mcms_dict_val_pure, nmt_binning, spin_pairs,
+            filtering_pairs=filtering_pairs
+        )
+
+        for ftag1, ftag2 in filtering_pairs:
             np.savez(
-                f"{coupling_dir}/couplings_{filter_tag}_pure.npz",
-                **couplings_nobeam_pure
+                f"{coupling_dir}/couplings_{ftag1}x{ftag2}_filtered_pure.npz",
+                **couplings_no_beam_with_tf_pure[ftag1, ftag2]
             )
-
+            np.savez(
+                f"{coupling_dir}/couplings_{ftag1}x{ftag2}_unfiltered_pure.npz",
+                **couplings_no_beam_without_tf_pure
+            )
     meta.timer.stop("Compute full coupling", verbose=True)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Transfer function stage")
