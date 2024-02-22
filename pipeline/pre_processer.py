@@ -99,14 +99,14 @@ def pre_processer(args):
         hp_ordering = ["TT", "TE", "TB", "EE", "EB", "BB"]
 
         filtering_tags = meta.get_filtering_tags()
-        beams = []
+        beams = {}
         for ftag in filtering_tags:
             which_beam = meta.tags_settings[ftag]["beam"]
             if which_beam is not None:
                 _, bl = meta.read_beam(which_beam)
             else:
                 bl = None
-            beams.append((ftag, bl))
+            beams[ftag] = bl
 
         meta.timer.start("Generating simulations for transfer")
         for id_sim in range(meta.tf_est_num_sims):
@@ -123,10 +123,23 @@ def pre_processer(args):
                 )
 
                 if cl_type == "tf_est":
-                    for ftag, bl in beams:
-                            
-                        sim_pureE = utils.generate_map_from_alms([alms_T, alms_E, alms_B], meta.nside, pureE=True, bl=bl)
-                        sim_pureB = utils.generate_map_from_alms([alms_T, alms_E, alms_B], meta.nside, pureB=True, bl=bl)
+                    for ftag, bl in beams.items():
+
+                        if meta.tags_settings["do_not_beam_est_sims"]:
+                            bl = None
+
+                        sim_pureE = utils.generate_map_from_alms(
+                            [alms_T, alms_E, alms_B],
+                            meta.nside,
+                            pureE=True,
+                            bl=bl
+                        )
+                        sim_pureB = utils.generate_map_from_alms(
+                            [alms_T, alms_E, alms_B],
+                            meta.nside,
+                            pureB=True,
+                            bl=bl
+                        )
 
                         map_file_pureE = meta.get_map_filename_transfer(
                             id_sim, cl_type, pure_type="pureE",
@@ -143,24 +156,28 @@ def pre_processer(args):
                                      dtype=np.float32)
 
                         if args.plots:
-                            fname = map_file.replace('.fits', '')
-                            title = map_file.split('/')[-1].replace('.fits',
-                                                                        '')
+                            fname = map_file_pureE.replace('.fits', '')
+                            title = map_file_pureE.split('/')[-1]
+                            title = title.replace('.fits', '')
                             amp = meta.power_law_pars_tf_est['amp']
                             delta_ell = meta.power_law_pars_tf_est['delta_ell']
                             pl_index = meta.power_law_pars_tf_est['power_law_index'] # noqa
                             ell0 = 0 if pl_index > 0 else 2 * meta.nside
                             var = amp / (ell0 + delta_ell)**pl_index
                             utils.plot_map(
-                                sim, fname, vrange_T=10*var**0.5,
+                                sim_pureE, fname, vrange_T=10*var**0.5,
                                 vrange_P=10*var**0.5, title=title,
                                 TQU=True
                             )
 
                 else:
-                    for ftag, bl in beams:
+                    for ftag, bl in beams.items():
                         
-                        sim = utils.generate_map_from_alms([alms_T, alms_E, alms_B], meta.nside, bl=bl)
+                        sim = utils.generate_map_from_alms(
+                            [alms_T, alms_E, alms_B],
+                            meta.nside,
+                            bl=bl
+                        )
                         map_file = meta.get_map_filename_transfer(
                             id_sim, cl_type,
                             filter_tag=ftag
@@ -169,11 +186,12 @@ def pre_processer(args):
                                      dtype=np.float32)
                         if args.plots:
                             fname = map_file.replace('.fits', '')
-                            title = map_file.split('/')[-1].replace('.fits', '')
+                            title = map_file.split('/')[-1]
+                            title = title.replace('.fits', '')
                             if cl_type == "tf_val":
                                 amp_T = meta.power_law_pars_tf_val['amp']['TT']
                                 amp_E = meta.power_law_pars_tf_val['amp']['EE']
-                                delta_ell = meta.power_law_pars_tf_val['delta_ell']
+                                delta_ell = meta.power_law_pars_tf_val['delta_ell'] # noqa
                                 pl_index = meta.power_law_pars_tf_val['power_law_index'] # noqa
                                 ell0 = 0 if pl_index > 0 else 2 * meta.nside
                                 var_T = amp_T / (ell0 + delta_ell)**pl_index
@@ -184,7 +202,10 @@ def pre_processer(args):
                                     title=title, TQU=True
                                 )
                             elif cl_type == "cosmo":
-                                utils.plot_map(sim, fname, title=title, TQU=True)
+                                utils.plot_map(
+                                    sim, fname,
+                                    title=title, TQU=True
+                                )
 
             meta.timer.stop("Generate `cosmo` and `power_law` simulation "
                             f"n° {id_sim:04d}")

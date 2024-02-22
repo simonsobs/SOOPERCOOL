@@ -56,9 +56,12 @@ def get_transfer_dict(mean_pcls_mat_filt_dict,
     for ftag1, ftag2 in filtering_pairs:
         for spin_pair in spin_pairs:
 
-            mean_pcls_mat_filt = mean_pcls_mat_filt_dict[ftag1, ftag2][spin_pair]
-            mean_pcls_mat_unfilt = mean_pcls_mat_unfilt_dict[ftag1, ftag2][spin_pair]
-            pcls_mat_filt = pcls_mat_dict[ftag1, ftag2][spin_pair]["filtered"]
+            mean_pcls_mat_filt = \
+                mean_pcls_mat_filt_dict[ftag1, ftag2][spin_pair]
+            mean_pcls_mat_unfilt = \
+                mean_pcls_mat_unfilt_dict[ftag1, ftag2][spin_pair]
+            pcls_mat_filt = \
+                pcls_mat_dict[ftag1, ftag2][spin_pair]["filtered"]
 
             tf, tferr = get_transfer_with_error(mean_pcls_mat_filt,
                                                 mean_pcls_mat_unfilt,
@@ -86,10 +89,12 @@ def read_pcls_matrices(pcls_mat_dir, filtering_pairs, spin_pairs, Nsims):
     for id_sim in range(Nsims):
         for label in ["filtered", "unfiltered"]:
             for ftag1, ftag2 in filtering_pairs:
+                suffix = f"{ftag1}x{ftag2}_{label}_{id_sim:04d}"
                 pcls_mat = np.load(
-                    f"{pcls_mat_dir}/pcls_mat_tf_est_{ftag1}x{ftag2}_{label}_{id_sim:04d}.npz")
+                    f"{pcls_mat_dir}/pcls_mat_tf_est_{suffix}.npz")
                 for spin_pair in spin_pairs:
-                    pcls_mat_dict[ftag1, ftag2][spin_pair][label] += [pcls_mat[spin_pair]]
+                    pcls_mat_dict[ftag1, ftag2][spin_pair][label] += \
+                        [pcls_mat[spin_pair]]
 
     return pcls_mat_dict
 
@@ -116,13 +121,17 @@ def load_mcms(coupling_dir, spin_pairs, ps_names=None, B_pure=False):
     return mcms_dict
 
 
-def average_pcls_matrices(pcls_mat_dict, filtering_pairs, spin_pairs, filtered):
+def average_pcls_matrices(pcls_mat_dict, filtering_pairs,
+                          spin_pairs, filtered):
     """
     """
     label = "filtered" if filtered else "unfiltered"
     pcls_mat_mean = {
         (ftag1, ftag2): {
-            spin_pair: np.mean(pcls_mat_dict[ftag1, ftag2][spin_pair][label], axis=0)
+            spin_pair: np.mean(
+                pcls_mat_dict[ftag1, ftag2][spin_pair][label],
+                axis=0
+            )
             for spin_pair in spin_pairs
         } for ftag1, ftag2 in filtering_pairs
     }
@@ -184,7 +193,7 @@ def get_couplings_dict(mcm_dict, nmt_binning, spin_pairs,
                     mcm, nmt_binning, transfer
                 )
                 couplings[ms1, ms2][f"bp_win_{spin_pair}"] = bpw_win
-                couplings[ms1, ms2][f"inv_coupling_{spin_pair}"] = inv_coupling 
+                couplings[ms1, ms2][f"inv_coupling_{spin_pair}"] = inv_coupling
 
     else:
         for ftag1, ftag2 in filtering_pairs:
@@ -200,9 +209,11 @@ def get_couplings_dict(mcm_dict, nmt_binning, spin_pairs,
                     mcm, nmt_binning, transfer
                 )
                 couplings[ftag1, ftag2][f"bp_win_{spin_pair}"] = bpw_win
-                couplings[ftag1, ftag2][f"inv_coupling_{spin_pair}"] = inv_coupling
+                couplings[ftag1, ftag2][
+                    f"inv_coupling_{spin_pair}"] = inv_coupling
 
     return couplings
+
 
 def transfer(args):
     """
@@ -223,11 +234,22 @@ def transfer(args):
     nmt_binning = meta.read_nmt_binning()
 
     meta.timer.start("Mean sims")
-    pcls_mat_dict = read_pcls_matrices(cl_dir, filtering_pairs, spin_pairs, meta.tf_est_num_sims)
+    pcls_mat_dict = read_pcls_matrices(cl_dir, filtering_pairs,
+                                       spin_pairs, meta.tf_est_num_sims)
 
     # Average the pseudo-cl matrices
-    pcls_mat_filtered_mean = average_pcls_matrices(pcls_mat_dict, filtering_pairs, spin_pairs, filtered=True)
-    pcls_mat_unfiltered_mean = average_pcls_matrices(pcls_mat_dict, filtering_pairs, spin_pairs, filtered=False)
+    pcls_mat_filtered_mean = average_pcls_matrices(
+        pcls_mat_dict,
+        filtering_pairs,
+        spin_pairs,
+        filtered=True
+    )
+    pcls_mat_unfiltered_mean = average_pcls_matrices(
+        pcls_mat_dict,
+        filtering_pairs,
+        spin_pairs,
+        filtered=False
+    )
     meta.timer.stop("Mean sims")
 
     meta.timer.start("Load mode-coupling matrices")
@@ -236,12 +258,17 @@ def transfer(args):
     mcms_dict = load_mcms(coupling_dir, spin_pairs, ps_names=ps_names)
 
     # Load the un-beamed mode coupling matrix
-    mcms_dict_val = load_mcms(coupling_dir, spin_pairs, ps_names=filtering_pairs)
+    mcms_dict_val = load_mcms(coupling_dir,
+                              spin_pairs,
+                              ps_names=filtering_pairs)
 
     # If we B-purify for transfer function estimation, load the un-beamed
     # purified mode coupling matrix
     if meta.tf_est_pure_B:
-        mcms_dict_val_pure = load_mcms(coupling_dir, spin_pairs, ps_names=filtering_pairs, B_pure=True)
+        mcms_dict_val_pure = load_mcms(coupling_dir,
+                                       spin_pairs,
+                                       ps_names=filtering_pairs,
+                                       B_pure=True)
     meta.timer.stop("Load mode-coupling matrices", verbose=True)
 
     # Compute and save the transfer functions
@@ -267,9 +294,9 @@ def transfer(args):
 
     # Compute and save couplings for different cases
     meta.timer.start("Compute full coupling")
-    ## First for the data (i.e. including beams, tf, and mcm)
+    # First for the data (i.e. including beams, tf, and mcm)
     ps_names_and_ftags = {
-        (ms1, ms2): (meta.filtering_tag_from_map_set(ms1), 
+        (ms1, ms2): (meta.filtering_tag_from_map_set(ms1),
                      meta.filtering_tag_from_map_set(ms2))
         for ms1, ms2 in ps_names
     }
@@ -285,14 +312,14 @@ def transfer(args):
             **couplings[ms1, ms2]
         )
 
-    ## Then for validation simulations (i.e. no beams, with/without tf)
+    # Then for validation simulations (i.e. no beams, with/without tf)
 
-    couplings_no_beam_with_tf = get_couplings_dict( #val not no_beam
+    couplings_val_with_tf = get_couplings_dict(
         mcms_dict_val, nmt_binning, spin_pairs,
         transfer_dict=trans,
         filtering_pairs=filtering_pairs
     )
-    couplings_no_beam_without_tf = get_couplings_dict(
+    couplings_val_without_tf = get_couplings_dict(
         mcms_dict_val, nmt_binning, spin_pairs,
         filtering_pairs=filtering_pairs
     )
@@ -300,35 +327,37 @@ def transfer(args):
     for ftag1, ftag2 in filtering_pairs:
         np.savez(
             f"{coupling_dir}/couplings_{ftag1}x{ftag2}_filtered.npz",
-            **couplings_no_beam_with_tf[ftag1, ftag2]
+            **couplings_val_with_tf[ftag1, ftag2]
         )
         np.savez(
             f"{coupling_dir}/couplings_{ftag1}x{ftag2}_unfiltered.npz",
-            **couplings_no_beam_without_tf[ftag1, ftag2]
+            **couplings_val_without_tf[ftag1, ftag2]
         )
 
-    ## Finally an optional case for pure B tf estimation
+    # Finally an optional case for pure B tf estimation
     if meta.tf_est_pure_B:
-        couplings_no_beam_with_tf_pure = get_couplings_dict(
+        couplings_val_with_tf_pure = get_couplings_dict(
             mcms_dict_val_pure, nmt_binning, spin_pairs,
             transfer_dict=trans,
             filtering_pairs=filtering_pairs
         )
-        couplings_no_beam_without_tf_pure = get_couplings_dict(
+        couplings_val_without_tf_pure = get_couplings_dict(
             mcms_dict_val_pure, nmt_binning, spin_pairs,
             filtering_pairs=filtering_pairs
         )
 
         for ftag1, ftag2 in filtering_pairs:
+            ftag_label = f"{ftag1}x{ftag2}"
             np.savez(
-                f"{coupling_dir}/couplings_{ftag1}x{ftag2}_filtered_pure.npz",
-                **couplings_no_beam_with_tf_pure[ftag1, ftag2]
+                f"{coupling_dir}/couplings_{ftag_label}_filtered_pure.npz",
+                **couplings_val_with_tf_pure[ftag1, ftag2]
             )
             np.savez(
-                f"{coupling_dir}/couplings_{ftag1}x{ftag2}_unfiltered_pure.npz",
-                **couplings_no_beam_without_tf_pure
+                f"{coupling_dir}/couplings_{ftag_label}_unfiltered_pure.npz",
+                **couplings_val_without_tf_pure
             )
     meta.timer.stop("Compute full coupling", verbose=True)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Transfer function stage")

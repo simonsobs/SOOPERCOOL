@@ -268,10 +268,12 @@ def pcler(args):
                         pure_type=pure_type,
                         filter_tag=ftag
                     )
-                    map_file_filtered = map_file.replace(".fits", "_filtered.fits")
+                    map_file_filtered = map_file.replace(".fits",
+                                                         "_filtered.fits")
 
                     map = hp.read_map(map_file, field=[0, 1, 2])
-                    map_filtered = hp.read_map(map_file_filtered, field=[0, 1, 2])
+                    map_filtered = hp.read_map(map_file_filtered,
+                                               field=[0, 1, 2])
 
                     # TO-DO: filter temperature only once !
                     field = {
@@ -328,9 +330,9 @@ def pcler(args):
                                                                 ncl*n_bins])
                     for k1, k2, ncl in zip(["spin0xspin0", "spin0xspin2",
                                             "spin2xspin0", "spin2xspin2"],
-                                            ["spin0xspin0", "spin0xspin2",
+                                           ["spin0xspin0", "spin0xspin2",
                                             "spin0xspin2", "spin2xspin2"],
-                                        [1, 2, 2, 4])
+                                           [1, 2, 2, 4])
                 }
         meta.timer.stop(
             "couplings_tf_val",
@@ -347,10 +349,11 @@ def pcler(args):
                             filter_tag=ftag
                         )
                         if ftype == "filtered":
-                            map_file = map_file.replace(".fits", "_filtered.fits")
+                            map_file = map_file.replace(".fits",
+                                                        "_filtered.fits")
 
                         map = hp.read_map(map_file, field=[0, 1, 2])
-                        
+
                         fields[ftag] = {
                             "spin0": nmt.NmtField(mask, map[:1]),
                             "spin2": nmt.NmtField(mask, map[1:],

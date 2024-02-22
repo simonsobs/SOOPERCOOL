@@ -416,7 +416,6 @@ class BBmeta(object):
     def get_filter_function(self, filter_tag):
         from soopercool.utils import m_filter_map, toast_filter_map
 
-       
         tag_settings = self.tags_settings[filter_tag]
         filtering_type = tag_settings["filtering_type"]
 

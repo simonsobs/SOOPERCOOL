@@ -23,7 +23,10 @@ def filter(args):
     if args.transfer:
 
         filtering_tags = meta.get_filtering_tags()
-        filter_funcs = {ftag: meta.get_filter_function(ftag) for ftag in filtering_tags}
+        filter_funcs = {
+            ftag: meta.get_filter_function(ftag)
+            for ftag in filtering_tags
+        }
 
         for cl_type in ["cosmo", "tf_est", "tf_val"]:
             cases_list = ["pureE", "pureB"] if cl_type == "tf_est" else [None]
