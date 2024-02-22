@@ -88,7 +88,7 @@ def field_pairs_from_spins(cls_in_dict):
     return cls_out_dict
 
 
-def get_pcls_mat_transfer(fields, nmt_binning):
+def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
     """
     Compute coupled binned pseudo-C_ell estimates from
     pure-E and pure-B transfer function estimation simulations,
@@ -98,7 +98,14 @@ def get_pcls_mat_transfer(fields, nmt_binning):
     ----------
     fields: dictionary of NmtField objects (keys "pureE", "pureB")
     nmt_binning: NmtBin object
+    fields2: dict, optional
+        If not None, compute the pseudo-C_ell estimators
+        from the cross-correlation of the fields in `fields`
+        and `fields2`.
     """
+    if fields2 is None:
+        fields2 = fields
+
     n_bins = nmt_binning.get_n_bands()
     pcls_mat_00 = np.zeros((1, 1, n_bins))
     pcls_mat_02 = np.zeros((2, 2, n_bins))
@@ -108,7 +115,7 @@ def get_pcls_mat_transfer(fields, nmt_binning):
     cases = ["pureE", "pureB"]
     for index, (pure_type1, pure_type2) in enumerate(product(cases, cases)):
         pcls = get_coupled_pseudo_cls(fields[pure_type1],
-                                      fields[pure_type2],
+                                      fields2[pure_type2],
                                       nmt_binning)
         pcls_mat_22[index] = pcls["spin2xspin2"]
         pcls_mat_02[cases.index(pure_type2)] = pcls["spin0xspin2"]
