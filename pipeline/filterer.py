@@ -15,22 +15,31 @@ def filter(args):
         Arguments from the command line.
     """
     meta = BBmeta(args.globals)
-    filter_map = meta.get_filter_function()
 
     # Read the mask
     mask = meta.read_mask("binary")
 
     meta.timer.start(f"Filter {meta.tf_est_num_sims} sims for TF estimation.")
     if args.transfer:
+
+        filtering_tags = meta.get_filtering_tags()
+        filter_funcs = {ftag: meta.get_filter_function(ftag) for ftag in filtering_tags}
+
         for cl_type in ["cosmo", "tf_est", "tf_val"]:
             cases_list = ["pureE", "pureB"] if cl_type == "tf_est" else [None]
             for id_sim in range(meta.tf_est_num_sims):
                 for case in cases_list:
-                    map_file = meta.get_map_filename_transfer2(id_sim,
-                                                               cl_type,
-                                                               pure_type=case)
-                    map = hp.read_map(map_file, field=[0, 1, 2])
-                    filter_map(map, map_file, mask)
+
+                    for ftag in filtering_tags:
+                        map_file = meta.get_map_filename_transfer(
+                            id_sim,
+                            cl_type,
+                            pure_type=case,
+                            filter_tag=ftag
+                        )
+                        map = hp.read_map(map_file, field=[0, 1, 2])
+                        filter_map = filter_funcs[ftag]
+                        filter_map(map, map_file, mask)
     meta.timer.stop(f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
                     verbose=True)
 
