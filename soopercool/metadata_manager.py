@@ -83,6 +83,10 @@ class BBmeta(object):
         self.cosmo_cls_file = f"{self.pre_process_directory}/cosmo_cls.npz"
         self.tf_est_cls_file = f"{self.pre_process_directory}/tf_est_cls.npz"
         self.tf_val_cls_file = f"{self.pre_process_directory}/tf_val_cls.npz"
+        self.noise_cls_file = {
+            map_set: f"{self.pre_process_directory}/noise_cls_{map_set}.npz"
+            for map_set in self.map_sets_list
+        }
 
         # Initialize a timer
         self.timer = Timer()
@@ -273,13 +277,15 @@ class BBmeta(object):
         file_root = self.file_root_from_map_set(map_set)
         beam_file = f"{self.beam_directory}/beam_{file_root}.dat"
         l, bl = np.loadtxt(beam_file, unpack=True)
+        if self.beam_floor is not None:
+            bl[bl < self.beam_floor] = self.beam_floor
         return l, bl
 
     def _init_simulation_params(self):
         """
         Loop over the simulation parameters and set them as attributes.
         """
-        for name in ["num_sims", "cosmology", "anisotropic_noise",
+        for name in ["num_sims", "cosmology", "noise", "anisotropic_noise",
                      "null_e_modes", "mock_nsrcs", "mock_srcs_hole_radius"]:
             setattr(self, name, self.sim_pars[name])
 
@@ -302,10 +308,15 @@ class BBmeta(object):
             Dictionnary with the power spectra.
         cl_type : str
             Type of power spectra.
-            Can be "cosmo", "tf_est" or "tf_val".
+            Can be "cosmo", "tf_est", "tf_val" or "noise".
         """
         fname = getattr(self, f"{cl_type}_cls_file")
-        np.savez(fname, l=ell, **cl_dict)
+        if cl_type == "noise":
+            for map_set, fname_map_set in fname.items():
+                cl_dict_map_set = cl_dict[map_set]
+                np.savez(fname_map_set, l=ell, **cl_dict_map_set)
+        else:
+            np.savez(fname, l=ell, **cl_dict)
         return fname
 
     def load_fiducial_cl(self, cl_type):
@@ -316,7 +327,7 @@ class BBmeta(object):
         ----------
         cl_type : str
             Type of power spectra.
-            Can be "cosmo", "tf_est" or "tf_val".
+            Can be "cosmo", "tf_est", "tf_val" or "noise".
         """
         fname = getattr(self, f"{cl_type}_cls_file")
         data = np.load(fname)
@@ -626,6 +637,42 @@ class BBmeta(object):
             fp2 = self.filtering_tag_from_map_set(ms2)
             filtering_pairs.append((fp1, fp2))
         return list(set(filtering_pairs))
+
+    def get_inverse_couplings(self, beamed=False):
+        """
+        This function outputs a dictionary with the inverse mode coupling
+        matrices
+        """
+        nmt_binning = self.read_nmt_binning()
+        n_bins = nmt_binning.get_n_bands()
+        pure_string = "_pure" if self.tf_est_pure_B and not beamed else ""
+        filter_flags = [""] if beamed else ["filtered", "unfiltered"]
+        map_set_pairs = (self.get_ps_names_list(type="all", coadd=True)
+                         if beamed else [("", "")])
+        inv_couplings = {}
+
+        for ms1, ms2 in map_set_pairs:
+            for filter_flag in filter_flags:
+                map_label = f"{ms1}_{ms2}" if beamed else ""
+                fname = f"couplings_{map_label}{filter_flag}{pure_string}"
+                couplings = np.load(f"{self.coupling_directory}/{fname}.npz")
+                coupling_dict = {
+                    k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
+                                                                ncl*n_bins])
+                    for k1, k2, ncl in zip(["spin0xspin0", "spin0xspin2",
+                                            "spin2xspin0", "spin2xspin2"],
+                                           ["spin0xspin0", "spin0xspin2",
+                                            "spin0xspin2", "spin2xspin2"],
+                                           [1, 2, 2, 4])
+                }
+                if beamed:
+                    inv_couplings[ms1, ms2] = coupling_dict
+                    if ms1 != ms2:
+                        inv_couplings[ms2, ms1] = coupling_dict
+                else:
+                    inv_couplings[filter_flag] = coupling_dict
+
+        return inv_couplings
 
 
 class Timer:

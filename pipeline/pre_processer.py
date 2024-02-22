@@ -11,7 +11,12 @@ def pre_processer(args):
     """
     meta = BBmeta(args.globals)
 
-    # First step : create bandpower edges / binning_file
+    # Create beams for each map set
+    meta.timer.start("Generating beams")
+    utils.get_beam_windows(meta)
+    meta.timer.stop("Generating beams")
+
+    # Create bandpower edges / binning_file
     bin_low, bin_high, bin_center = utils.create_binning(meta.nside,
                                                          meta.deltal)
     np.savez(meta.path_to_binning, bin_low=bin_low, bin_high=bin_high,
@@ -27,20 +32,21 @@ def pre_processer(args):
         plt.title('Binning', fontsize=14)
         plt.savefig(meta.path_to_binning.replace('.npz', '.png'))
 
-    lmax_sim = 3*meta.nside-1
+    lmax_sim = 3*meta.nside - 1
+
+    meta.timer.start("Computing fiducial cls")
 
     # Create the CMB fiducial cl
-    meta.timer.start("Computing fiducial cls")
-    lth, psth = utils.theory_cls(
+    lth, clth = utils.get_theory_cls(
         meta.cosmology,
         lmax=lmax_sim  # ensure cl accuracy up to lmax
     )
-    cl_cosmo_fname = meta.save_fiducial_cl(lth, psth, cl_type="cosmo")
+    cl_cosmo_fname = meta.save_fiducial_cl(lth, clth, cl_type="cosmo")
 
     if args.plots:
         for field_pair in ["TT", "TE", "TB", "EE", "EB", "BB"]:
             plt.figure(figsize=(8, 6))
-            dlth = lth*(lth + 1) / 2. / np.pi * psth[field_pair]
+            dlth = lth*(lth + 1) / 2. / np.pi * clth[field_pair]
             plt.loglog(lth, dlth, c='b')
             plt.loglog(lth[dlth < 0], -dlth[dlth < 0], ls='--', c='b')
             plt.xlabel(r'$\ell$', fontsize=14)
@@ -85,7 +91,7 @@ def pre_processer(args):
             plt.title(f'tf_validation_{field_pair}')
             plt.savefig(cl_tf_val_fname.replace('.npz',
                                                 f'_{field_pair}.png'))
-    meta.timer.stop("Computing fiducial cls", args.verbose)
+    meta.timer.stop("Computing fiducial cls")
 
     if args.sims:
         # Now we iterate over the number of simulations
@@ -118,55 +124,43 @@ def pre_processer(args):
 
                 if cl_type == "tf_est":
                     for ftag, bl in beams:
+                            
+                        sim_pureE = utils.generate_map_from_alms([alms_T, alms_E, alms_B], meta.nside, pure_E=True, bl=bl)
+                        sim_pureB = utils.generate_map_from_alms([alms_T, alms_E, alms_B], meta.nside, pure_B=True, bl=bl)
 
-                        if bl is not None:
-                            Tlm = hp.almxfl(alms_T, bl)
-                            Elm = hp.almxfl(alms_E, bl)
-                            Blm = hp.almxfl(alms_B, bl)
-                        else:
-                            Tlm, Elm, Blm = alms_T, alms_E, alms_B
+                        map_file_pureE = meta.get_map_filename_transfer(
+                            id_sim, cl_type, pure_type="pureE",
+                            filter_tag=ftag
+                        )
+                        map_file_pureB = meta.get_map_filename_transfer(
+                            id_sim, cl_type, pure_type="pureB",
+                            filter_tag=ftag
+                        )
 
-                        for case in ["pureE", "pureB"]:
-                            if case == "pureE":
-                                sim = hp.alm2map([Tlm, Elm, Blm*0.],
-                                                 meta.nside, lmax=lmax_sim)
-                            elif case == "pureB":
-                                sim = hp.alm2map([Tlm, Elm*0., Blm],
-                                                 meta.nside, lmax=lmax_sim)
-                            map_file = meta.get_map_filename_transfer(
-                                id_sim, cl_type, pure_type=case,
-                                filter_tag=ftag
-                            )
-                            hp.write_map(map_file, sim, overwrite=True,
-                                         dtype=np.float32)
+                        hp.write_map(map_file_pureE, sim_pureE, overwrite=True,
+                                     dtype=np.float32)
+                        hp.write_map(map_file_pureB, sim_pureB, overwrite=True,
+                                     dtype=np.float32)
 
-                            if args.plots:
-                                fname = map_file.replace('.fits', '')
-                                title = map_file.split('/')[-1].replace('.fits',
+                        if args.plots:
+                            fname = map_file.replace('.fits', '')
+                            title = map_file.split('/')[-1].replace('.fits',
                                                                         '')
-                                amp = meta.power_law_pars_tf_est['amp']
-                                delta_ell = meta.power_law_pars_tf_est['delta_ell']
-                                pl_index = meta.power_law_pars_tf_est['power_law_index'] # noqa
-                                ell0 = 0 if pl_index > 0 else 2 * meta.nside
-                                var = amp / (ell0 + delta_ell)**pl_index
-                                utils.plot_map(
-                                    sim, fname, vrange_T=10*var**0.5,
-                                    vrange_P=10*var**0.5, title=title,
-                                    TQU=True
-                                )
+                            amp = meta.power_law_pars_tf_est['amp']
+                            delta_ell = meta.power_law_pars_tf_est['delta_ell']
+                            pl_index = meta.power_law_pars_tf_est['power_law_index'] # noqa
+                            ell0 = 0 if pl_index > 0 else 2 * meta.nside
+                            var = amp / (ell0 + delta_ell)**pl_index
+                            utils.plot_map(
+                                sim, fname, vrange_T=10*var**0.5,
+                                vrange_P=10*var**0.5, title=title,
+                                TQU=True
+                            )
 
                 else:
                     for ftag, bl in beams:
                         
-                        if bl is not None:
-                            Tlm = hp.almxfl(alms_T, bl)
-                            Elm = hp.almxfl(alms_E, bl)
-                            Blm = hp.almxfl(alms_B, bl)
-                        else:
-                            Tlm, Elm, Blm = alms_T, alms_E, alms_B
-
-                        sim = hp.alm2map([Tlm, Elm, Blm],
-                                         meta.nside, lmax=lmax_sim)
+                        sim = utils.generate_map_from_alms([alms_T, alms_E, alms_B], meta.nside, bl=bl)
                         map_file = meta.get_map_filename_transfer(
                             id_sim, cl_type,
                             filter_tag=ftag
@@ -193,8 +187,8 @@ def pre_processer(args):
                                 utils.plot_map(sim, fname, title=title, TQU=True)
 
             meta.timer.stop("Generate `cosmo` and `power_law` simulation "
-                            f"n° {id_sim:04d}", args.verbose)
-        meta.timer.stop("Generating simulations for transfer", args.verbose)
+                            f"n° {id_sim:04d}")
+        meta.timer.stop("Generating simulations for transfer")
 
 
 if __name__ == "__main__":

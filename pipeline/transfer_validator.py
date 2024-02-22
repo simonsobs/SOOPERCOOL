@@ -1,7 +1,9 @@
 import argparse
 import numpy as np
-import matplotlib.pyplot as plt
 from soopercool import BBmeta
+from soopercool.utils import (bin_validation_power_spectra,
+                              plot_transfer_function,
+                              plot_transfer_validation)
 
 
 def read_transfer(transfer_file):
@@ -88,8 +90,7 @@ def transfer_validator(args):
         plt.savefig(f"{plot_dir}/transfer_{ftag1}x{ftag2}.pdf", bbox_inches="tight")
 
     # Then we read the decoupled spectra
-    # both for the filtered and unfiltered
-    # cases
+    # both for the filtered and unfiltered cases
     cl_dir = meta.cell_transfer_directory
     cross_fields = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
     val_types = ["tf_val", "cosmo"]

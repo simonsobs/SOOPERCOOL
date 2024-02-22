@@ -1,6 +1,83 @@
 from itertools import product
 import pymaster as nmt
 import numpy as np
+import healpy as hp
+
+
+def get_validation_power_spectra(meta, id_sim, mask, nmt_binning,
+                                 inv_couplings):
+    """
+    This function computes transfer validation power spectra given an
+    input simulation ID, mask and binning scheme, and stores them to disk.
+    """
+    map_set_pairs = (meta.get_ps_names_list(type="all", coadd=True)
+                     if meta.validate_beam else [(None, None)])
+    filter_flags = (["filtered"] if meta.validate_beam
+                    else ["filtered", "unfiltered"])
+
+    for cl_type in ["tf_val", "cosmo"]:
+        for filter_flag in filter_flags:
+            for map_sets in map_set_pairs:
+                map_files = [
+                    meta.get_map_filename_transfer2(
+                        id_sim, cl_type=cl_type, map_set=ms
+                    ) for ms in map_sets
+                ]
+
+                if filter_flag == "filtered":
+                    map_files = [mf.replace(".fits", "_filtered.fits")
+                                 for mf in map_files]
+
+                maps = [hp.read_map(m, field=[0, 1, 2])
+                        for m in map_files]
+
+                field = [{
+                    "spin0": nmt.NmtField(mask, map[:1]),
+                    "spin2": nmt.NmtField(mask, map[1:],
+                                          purify_b=meta.tf_est_pure_B)
+                } for map in maps]
+
+                pcls = get_coupled_pseudo_cls(field[0], field[1], nmt_binning)
+
+                if meta.validate_beam:
+                    decoupled_pcls = decouple_pseudo_cls(
+                        pcls, inv_couplings[map_sets[0], map_sets[1]]
+                    )
+                else:
+                    decoupled_pcls = decouple_pseudo_cls(
+                        pcls, inv_couplings[filter_flag]
+                    )
+                cl_prefix = f"pcls_{cl_type}_{id_sim:04d}"
+                cl_suffix = (f"_{map_sets[0]}_{map_sets[1]}"
+                             if meta.validate_beam else f"_{filter_flag}")
+                cl_name = cl_prefix + cl_suffix
+
+                np.savez(f"{meta.cell_transfer_directory}/{cl_name}.npz",
+                         **decoupled_pcls)
+
+
+def get_binned_cls(bp_win_dict, cls_dict_unbinned):
+    """
+    """
+    nl = np.shape(list(bp_win_dict.values())[0])[-1]
+    cls_dict_binned = {}
+
+    for spin_comb in ["spin0xspin0", "spin0xspin2", "spin2xspin2"]:
+        bpw_mat = bp_win_dict[f"bp_win_{spin_comb}"]
+        if spin_comb == "spin0xspin0":
+            cls_vec = np.array([cls_dict_unbinned["TT"][:nl]]).reshape(1, nl)
+        elif spin_comb == "spin0xspin2":
+            cls_vec = np.array([cls_dict_unbinned["TE"][:nl],
+                                cls_dict_unbinned["TB"][:nl]])
+        elif spin_comb == "spin2xspin2":
+            cls_vec = np.array([cls_dict_unbinned["EE"][:nl],
+                                cls_dict_unbinned["EB"][:nl],
+                                cls_dict_unbinned["EB"][:nl],
+                                cls_dict_unbinned["BB"][:nl]])
+
+        cls_dict_binned[spin_comb] = np.einsum("ijkl,kl", bpw_mat, cls_vec)
+
+    return field_pairs_from_spins(cls_dict_binned)
 
 
 def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):

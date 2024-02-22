@@ -1,9 +1,7 @@
 import argparse
 import healpy as hp
-from soopercool.utils import get_noise_cls, beam_gaussian, generate_noise_map
+from soopercool.utils import (get_noise_cls, generate_noise_map)
 import numpy as np
-import os
-import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 from soopercool import BBmeta, utils
 import warnings
 
@@ -21,45 +19,32 @@ def mocker(args):
     """
     meta = BBmeta(args.globals)
 
-    map_dir = meta.map_directory
-    beam_dir = meta.beam_directory
-
-    os.makedirs(map_dir, exist_ok=True)
-    os.makedirs(beam_dir, exist_ok=True)
-
     ps_th = meta.load_fiducial_cl(cl_type="cosmo")
 
     # Load binary mask
     binary_mask = meta.read_mask("binary")
     fsky = np.mean(binary_mask)
-    lmax_sim = 3 * meta.nside - 1
+    lmax_sim = 3*meta.nside - 1
 
-    # Load noise curves
+    # Create fiducial noise power spectra
     meta.timer.start("Computing noise cls")
-    noise_model = noise_calc.SOSatV3point1(sensitivity_mode='baseline')
-    lth, nlth_dict = get_noise_cls(fsky, lmax_sim+1, is_beam_deconvolved=False)
+    lth, nlth_deconvolved_dict = get_noise_cls(
+        meta,
+        lmax=lmax_sim,
+        fsky=fsky,
+        is_beam_deconvolved=True
+    )
+    _ = meta.save_fiducial_cl(lth, nlth_deconvolved_dict, cl_type="noise")
     meta.timer.stop("Computing noise cls")
+
+    # Load beams for each map set
+    beam_windows = {
+        map_set: meta.read_beam(map_set)[1]
+        for map_set in meta.map_sets_list
+    }
 
     # Load hitmap
     hitmap = meta.read_hitmap()
-
-    # Load and save beams
-    meta.timer.start("Generating beams")
-
-    beam_arcmin = {freq_band: beam_arcmin
-                   for freq_band, beam_arcmin in zip(noise_model.get_bands(),
-                                                     noise_model.get_beams())}
-    beams = {}
-    for map_set in meta.map_sets_list:
-        freq_tag = meta.freq_tag_from_map_set(map_set)
-        beams[map_set] = beam_gaussian(lth, beam_arcmin[freq_tag])
-
-        # Save beams
-        file_root = meta.file_root_from_map_set(map_set)
-        if not os.path.exists(file_root):
-            np.savetxt(f"{beam_dir}/beam_{file_root}.dat",
-                       np.transpose([lth, beams[map_set]]))
-    meta.timer.stop("Generating beams")
 
     hp_ordering = ["TT", "TE", "TB", "EE", "EB", "BB"]
 
@@ -78,16 +63,15 @@ def mocker(args):
         for map_set in meta.map_sets_list:
 
             meta.timer.start(f"Generate map set {map_set} split maps")
-            freq_tag = meta.freq_tag_from_map_set(map_set)
-            cmb_map_beamed = hp.sphtfunc.smoothing(
-                cmb_map, fwhm=np.deg2rad(beam_arcmin[freq_tag] / 60))
-
+            cmb_map_beamed = hp.smoothing(
+                cmb_map, beam_window=beam_windows[map_set]
+            )
             n_splits = meta.n_splits_from_map_set(map_set)
-            file_root = meta.file_root_from_map_set(map_set)
+
             for id_split in range(n_splits):
                 noise_map = generate_noise_map(
-                    nlth_dict["T"][freq_tag],
-                    nlth_dict["P"][freq_tag],
+                    nlth_deconvolved_dict[map_set]["TT"],
+                    nlth_deconvolved_dict[map_set]["EE"],
                     hitmap,
                     n_splits,
                     is_anisotropic=meta.anisotropic_noise

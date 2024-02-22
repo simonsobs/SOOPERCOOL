@@ -10,7 +10,7 @@ data_dirs:
   beam_directory: "beams"
   bandpasses_directory: "bandpasses"
 ## Then directories in which we will store outputs
-output_dirs: 
+output_dirs:
   root: "../outputs"
   mask_directory: "masks"
   pre_process_directory: "pre_processing"
@@ -38,6 +38,7 @@ output_dirs:
 map_sets:
   SAT1_f093:
     file_root: "cmb_sat1_f093"
+    n_splits: 4          # Number of splits
     n_splits: 4          # Number of splits
     freq_tag: 93         # Freq. tag (e.g. useful to coadd freqs)
     exp_tag: "SAT1"      # Experiment tag (useful to get noise-bias free cross-split spectra)
@@ -81,6 +82,8 @@ general_pars:
   deltal: 10
   binning_file: "binning.npz"
   pure_B: True
+  # Where the beam window is lower than beam_floor, set it to beam_floor
+  beam_floor: 1.e-2
 
 ## Simulation related
 sim_pars:
@@ -96,6 +99,11 @@ sim_pars:
     Alens: 1.0
     tau: 0.0544
     r: 0.01
+  noise:
+    survey_years: 5.
+    sensitivity_mode: "baseline"
+    one_over_f_mode: "optimistic"
+
   mock_nsrcs: 80
   mock_srcs_hole_radius: 40  
 
@@ -103,6 +111,10 @@ sim_pars:
 tf_settings:
 
   tags_settings:
+
+    # If true, beams will be applied only on the validation simulations. By default (false), beam are applied to both the estimation and validation sims,
+    # to account for potential effect of the beam on the TF (e.g. commutativity)
+    do_not_beam_est_sims: False
 
     mcut30:
       filtering_type: "m_filterer"
