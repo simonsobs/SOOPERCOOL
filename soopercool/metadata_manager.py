@@ -402,37 +402,47 @@ class BBmeta(object):
         return os.path.join(path_to_maps,
                             f"{map_set_root}_split_{id_split}.fits")
 
-    def get_filter_function(self):
+    def get_filter_function(self, filter_tag):
         from soopercool.utils import m_filter_map, toast_filter_map
 
-        if self.filtering_type == "m_filterer":
-            kwargs = {"m_cut": self.m_cut}
+       
+        tag_settings = self.tags_settings[filter_tag]
+        filtering_type = tag_settings["filtering_type"]
+
+        if filtering_type == "m_filterer":
+            kwargs = {"m_cut": tag_settings["m_cut"]}
             filter_function = m_filter_map
 
-        elif self.filtering_type == "toast":
-            kwargs = {"schedule": self.toast['schedule'],
-                      "thinfp": self.toast['thinfp'],
-                      "instrument": self.toast['instrument'],
-                      "band": self.toast['band'],
-                      "group_size": self.toast['group_size'],
-                      "nside": self.nside}
+        elif filtering_type == "toast":
+            kwargs = {
+                "schedule": tag_settings["schedule"],
+                "thinfp": tag_settings["thinfp"],
+                "instrument": tag_settings["instrument"],
+                "band": tag_settings["band"],
+                "group_size": tag_settings["group_size"],
+                "nside": self.nside
+            }
             filter_function = toast_filter_map
         else:
-            raise NotImplementedError(f"Filterer type {self.filtering_type} "
-                                      "not implemented")
+            raise NotImplementedError(
+                f"Filterer type {self.filtering_type} "
+                "not implemented"
+            )
 
         def filter_operation(map, map_file, mask):
             return filter_function(map, map_file, mask, **kwargs)
 
         return filter_operation
 
-    def get_map_filename_transfer2(self, id_sim, cl_type, pure_type=None):
+    def get_map_filename_transfer(self, id_sim, cl_type,
+                                  pure_type=None, filter_tag=None):
         """
         """
         path_to_maps = getattr(self, f"{cl_type}_sims_dir")
 
+        beam_label = f"_{filter_tag}" if filter_tag else ""
         pure_label = f"_{pure_type}" if pure_type else ""
-        file_name = f"TQU{pure_label}_noiseless_nside{self.nside}_lmax{self.lmax}_{id_sim:04d}.fits"  # noqa
+        file_name = f"TQU{pure_label}{beam_label}_noiseless_nside{self.nside}_lmax{self.lmax}_{id_sim:04d}.fits"  # noqa
 
         return f"{path_to_maps}/{file_name}"
 
@@ -597,6 +607,25 @@ class BBmeta(object):
             raise ValueError("You selected an invalid type. "
                              "Options are 'cross', 'auto', and 'all'.")
         return n_pairs
+
+    def get_filtering_tags(self):
+        """
+        """
+        return list(set(
+            [self.filtering_tag_from_map_set(ms)
+             for ms in self.map_sets_list]
+        ))
+
+    def get_independent_filtering_pairs(self):
+        """
+        """
+        cross_ps_names = self.get_ps_names_list(coadd=True)
+        filtering_pairs = []
+        for ms1, ms2 in cross_ps_names:
+            fp1 = self.filtering_tag_from_map_set(ms1)
+            fp2 = self.filtering_tag_from_map_set(ms2)
+            filtering_pairs.append((fp1, fp2))
+        return list(set(filtering_pairs))
 
 
 class Timer:
