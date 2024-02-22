@@ -38,14 +38,16 @@ output_dirs:
 map_sets:
   SAT1_f093:
     file_root: "cmb_sat1_f093"
-    n_splits: 3          # Number of splits
+    n_splits: 4          # Number of splits
     freq_tag: 93         # Freq. tag (e.g. useful to coadd freqs)
     exp_tag: "SAT1"      # Experiment tag (useful to get noise-bias free cross-split spectra)
+    filtering_tag: "mcut30"
   SAT1_f145:
     file_root: "cmb_sat1_f145"
-    n_splits: 3
+    n_splits: 4
     freq_tag: 145
     exp_tag: "SAT1"
+    filtering_tag: "mcut30"
 
 ####################
 # Masking metadata #
@@ -84,7 +86,7 @@ general_pars:
 sim_pars:
   anisotropic_noise: False
   null_e_modes: False
-  num_sims: 3
+  num_sims: 10
   cosmology:
     cosmomc_theta: 0.0104085
     As: 2.1e-9
@@ -99,16 +101,24 @@ sim_pars:
 
 ## Filtering transfer function related parameters
 tf_settings:
-  filtering_type: "m_filterer"  # "m_filterer" or "toast"
-  m_cut: 30  # necessary only if `filtering_type` is set to "m_filterer"
-  toast:  # necessary only if `filtering_type` is set to "toast"
-    schedule: "../outputs/schedules/schedule_sat.txt"
-    instrument: "SAT1"
-    band: "SAT_f090"
-    thinfp: 8
-    group_size: 4
 
-  tf_est_num_sims: 4
+  tags_settings:
+
+    mcut30:
+      filtering_type: "m_filterer"
+      m_cut: 30
+      beam: null
+
+    toast:
+      filtering_type: "toast"
+      schedule: "../outputs/schedules/schedule_sat.txt"
+      instrument: "SAT1"
+      band: "SAT_f090"
+      thinfp: 8
+      group_size: 4
+      beam: null
+
+  tf_est_num_sims: 10
 
   power_law_pars_tf_est:
     amp: 1.0
