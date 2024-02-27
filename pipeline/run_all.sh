@@ -1,4 +1,6 @@
-paramfile='../paramfiles/paramfile_SAT_256_clean.yaml'
+#!/usr/bin/env bash
+
+paramfile='../paramfiles/paramfile_SAT.yaml'
 
 echo "Running pipeline with paramfile: ${paramfile}"
 
@@ -13,7 +15,7 @@ python mask_handler.py --globals ${paramfile} --plots --verbose
 
 echo "Running mock stage for data..."
 echo "------------------------------"
-python mocker.py --globals ${paramfile} --verbose
+python mocker.py --globals ${paramfile}
 
 echo "Running mock stage for sims..."
 echo "------------------------------"
@@ -22,7 +24,6 @@ python mocker.py --globals ${paramfile} --sims --verbose
 echo "Running mcm..."
 echo "--------------"
 python mcmer.py --globals ${paramfile} --plot
-
 
 echo "------------------------------------------------------------"
 echo "|             FILTERING SIMULATIONS AND DATA               |"
@@ -39,7 +40,7 @@ python filterer.py --globals ${paramfile} --sims
 echo "Running filterer for data"
 echo "-------------------------"
 python filterer.py --globals ${paramfile} --data
-
+#OMP_NUM_THREADS=2 mpirun -n 4 python filterer.py --globals ${paramfile} --data
 
 echo "------------------------------------------------------------"
 echo "|                 COMPUTING POWER SPECTRA                  |"
@@ -61,15 +62,13 @@ echo "Transfer validation"
 echo "---------------------"
 python transfer_validator.py --globals ${paramfile}
 
-
 echo "Running pcler on data"
 echo "---------------------"
 python pcler.py --globals ${paramfile} --data 
 
 echo "Running pcler on sims"
 echo "---------------------"
-python pcler.py --globals ${paramfile} --sims --plots
-
+python pcler.py --globals ${paramfile} --sims
 
 echo "Running coadder on data"
 echo "---------------------"
