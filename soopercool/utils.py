@@ -56,7 +56,9 @@ def get_noise_cls(noise_kwargs, lmax, lmin=0, fsky=0.1,
     """
     oof_dict = {"pessimistic": 0, "optimistic": 1}
     oof_mode = noise_kwargs["one_over_f_mode"]
-    sensitivity_mode = oof_dict[noise_kwargs["sensitivity_mode"]]
+    oof_mode = oof_dict[oof_mode]
+
+    sensitivity_mode = noise_kwargs["sensitivity_mode"]
 
     noise_model = noise_calc.SOSatV3point1(
         sensitivity_mode=sensitivity_mode,

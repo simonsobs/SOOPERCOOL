@@ -9,6 +9,7 @@ data_dirs:
   map_directory: "maps"
   beam_directory: "beams"
   bandpasses_directory: "bandpasses"
+  mock_dir: "mock_data"
 ## Then directories in which we will store outputs
 output_dirs:
   root: "../outputs"

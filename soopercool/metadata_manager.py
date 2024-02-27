@@ -311,13 +311,7 @@ class BBmeta(object):
             Can be "cosmo", "tf_est", "tf_val" or "noise".
         """
         fname = getattr(self, f"{cl_type}_cls_file")
-        if cl_type == "noise":
-            for map_set, fname_map_set in fname.items():
-                cl_dict_map_set = cl_dict[map_set]
-                np.savez(fname_map_set, l=ell, **cl_dict_map_set)
-        else:
-            np.savez(fname, l=ell, **cl_dict)
-        return fname
+        np.savez(fname, l=ell, **cl_dict)
 
     def load_fiducial_cl(self, cl_type):
         """
