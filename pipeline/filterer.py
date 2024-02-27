@@ -51,6 +51,8 @@ def filter(args):
         meta.timer.start(f"Filter {Nsims} sims.")
         for map_name in meta.maps_list:
             map_set, id_split = map_name.split("__")
+
+            filter_map = meta.get_filter_function(meta.filtering_tag_from_map_set(map_set))
             for id_sim in range(Nsims):
                 map_file = meta.get_map_filename(
                     map_set,
