@@ -145,21 +145,30 @@ def sacc_plotter(args):
             ps_th[field_pair] = psth[field_pair[::-1]]
 
     # Transfer function
-    idx_bad_tf = multipole_min_from_tf(
-        f"{coupling_dir}/transfer_function.npz",
-        snr_cut=3
-    )
+    idx_bad_tf = {}
+    bpw_mats = {}
+
+    for ftag1, ftag2 in meta.get_independent_filtering_pairs():
+        idx = multipole_min_from_tf(
+            f"{coupling_dir}/transfer_function_{ftag1}x{ftag2}.npz",
+            snr_cut=3
+        )
+        idx_bad_tf[ftag1, ftag2] = idx
+
+        bpw_file = f"couplings_{ftag1}x{ftag2}_unfiltered.npz"
+        bpw_mats[ftag1, ftag2] = load_bpwins(f"{coupling_dir}/{bpw_file}")
 
     # Bandpower window functions
-    bpw_mat = load_bpwins(f"{coupling_dir}/couplings_unfiltered.npz")
-
     fields_to_spin = {
         "T": "spin0",
         "E": "spin2",
         "B": "spin2"
     }
 
-    clth_binned = binned_theory_from_unbinned(ps_th, bpw_mat)
+    clth_binned = {
+        (ftag1, ftag2): binned_theory_from_unbinned(ps_th, bpw_mat)
+        for (ftag1, ftag2), bpw_mat in bpw_mats.items()
+    }
 
     plot_data = {
         (ms1, ms2, fp): {
@@ -178,14 +187,19 @@ def sacc_plotter(args):
     if args.sims:
         # Load theory
         for ms1, ms2 in ps_names:
+            ftag1 = meta.filtering_tag_from_map_set(ms1)
+            ftag2 = meta.filtering_tag_from_map_set(ms2)
+
             for fp in field_pairs:
                 mask_th = (psth["l"] <= 2 * meta.nside - 1)
                 x_th, y_th = psth["l"][mask_th], psth[fp][mask_th]
 
                 s1, s2 = fields_to_spin[fp[0]], fields_to_spin[fp[1]]
-                mask = ((np.arange(len(lb)) > idx_bad_tf[f"{s1}x{s2}"]) &
+
+                idx_bad = idx_bad_tf[ftag1, ftag2][f"{s1}x{s2}"]
+                mask = ((np.arange(len(lb)) > idx_bad) &
                         (lb <= 2 * meta.nside - 1))
-                th_binned = clth_binned[fp][mask]
+                th_binned = clth_binned[ftag1, ftag2][fp][mask]
 
                 plot_data[ms1, ms2, fp]["x_th"] = x_th
                 plot_data[ms1, ms2, fp]["y_th"] = y_th
@@ -208,7 +222,7 @@ def sacc_plotter(args):
                     f"{ms2}_s{spins[f2]}",
                     return_cov=True)
 
-                idx_bad = idx_bad_tf[f"{s1}x{s2}"]
+                idx_bad = idx_bad_tf[ftag1, ftag2][f"{s1}x{s2}"]
                 mask = (
                     (np.arange(len(ell)) > idx_bad) &
                     (ell <= 2 * meta.nside - 1))
