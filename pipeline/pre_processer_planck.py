@@ -42,7 +42,6 @@ def pre_processer(args):
         os.makedirs(dirs, exist_ok=True)
     
     binary_mask = meta.read_mask("binary")
-    fsky = np.mean(binary_mask)
     
     freqs = [] # ['030', '100', '143', '217', '353']
     nside_out = meta.nside
@@ -76,23 +75,26 @@ def pre_processer(args):
     splits = ['A', 'B']
     splits_dict = {'A':0, 'B':1}
     
+    print("Generating dipole template")
     # dipole amplitude, Galactic coordinates of the dipole direction
     # from NPIPE paper, Solar dipole measurements, Table 11
-    dipole_amplitude = 3366.6
-    dipole_longitude = np.radians(263.986)
-    dipole_latitude = np.radians(48.247)
+    dipole_amplitude = 3366.6 # [muK_cmb]
+    dipole_longitude = np.radians(263.986) # l [deg]
+    dipole_latitude = np.radians(48.247) # b [deg]
     # Convert Galactic coordinates to Cartesian coordinates
     x = np.cos(dipole_latitude) * np.cos(dipole_longitude)
     y = np.cos(dipole_latitude) * np.sin(dipole_longitude)
     z = np.sin(dipole_latitude)
+    # Generate a dipole template (for the two possible nside)
+    dipole_template = {}
+    dipole_template[1024] = dipole_amplitude * np.dot([x, y, z], hp.pix2vec(1024, np.arange(hp.nside2npix(1024))))
+    dipole_template[2048] = dipole_amplitude * np.dot([x, y, z], hp.pix2vec(2048, np.arange(hp.nside2npix(2048))))
     
     # alms of original maps
     print("Computing alms of original maps")
     meta.timer.start("Compute alms of original data maps")
     for nu in freqs:
         nside_in = 1024 if nu=='030' else 2048 # original maps nside
-        # Generate a dipole template (here because depending on input map nside)
-        dipole_template = dipole_amplitude * np.dot([x, y, z], hp.pix2vec(nside_in, np.arange(hp.nside2npix(nside_in))))
         for split in splits:
             print('---------------------')
             print(f'channel {nu} - split {split}')
@@ -106,7 +108,7 @@ def pre_processer(args):
             print('reading input maps at', fname_in)
             m = 1e6 * hp.read_map(fname_in, field=[0,1,2]) # TQU, K to muK
             print('removing dipole')
-            m[0] -= dipole_template
+            m[0] -= dipole_template[nside_in]
             
             print(f'computing alms, input map has nside={nside_in}')
             alm = hp.map2alm(m, pol=True, use_pixel_weights=True)
@@ -163,6 +165,7 @@ def pre_processer(args):
                 print('plotting maps')
                 utils.plot_map(m_masked, f"{plots_dir}/map_planck_f{nu}_split_{splits_dict[split]}",
                                title=f'planck_f{nu}', TQU=True)
+                plt.close()
     meta.timer.stop("Rotate and downgrade data maps")
     
     
@@ -216,10 +219,8 @@ def pre_processer(args):
                     m = 1e6 * hp.read_map(fname_in, field=[0,1,2]) # TQU, K to muK
                     
                     if process_sims:
-                        # Generate a dipole template (here because depending on input map nside)
-                        dipole_template = dipole_amplitude * np.dot([x, y, z], hp.pix2vec(nside_in, np.arange(hp.nside2npix(nside_in))))
                         # Subtract the dipole
-                        m[0] -= dipole_template
+                        m[0] -= dipole_template[nside_in]
                         print(f'computing alms, input map has nside={nside_in}')
                         alm = hp.map2alm(m, pol=True, use_pixel_weights=True)
                         print('clipping alms') # clipping alms at l>lmax_out to avoid artifacts
@@ -239,13 +240,13 @@ def pre_processer(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Pre-processing Planck data/sims for the pipeline")
+        description="Pre-processing Planck NPIPE data/sims for the pipeline")
     parser.add_argument("--globals", type=str,
                         help="Path to the yaml with global parameters")
     parser.add_argument("--sims", action="store_true",
-                        help="Pass to pre-process NPIPE simulations located at NERSC")
+                        help="Pass to pre-process simulations located at NERSC")
     parser.add_argument("--noise", action="store_true",
-                        help="Pass to pre-process NPIPE noise sims located at NERSC")
+                        help="Pass to pre-process noise sims located at NERSC")
     parser.add_argument("--plots", action="store_true",
                         help="Pass to generate plots")
 

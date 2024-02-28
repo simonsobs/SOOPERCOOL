@@ -9,4 +9,4 @@ echo "------------------------------------------------------------"
 echo "Pre-processing data..."
 echo "-------------------"
 python mask_handler.py --globals ${paramfile}
-python pre_processer_planck.py --globals ${paramfile} --plots --sims # --noise # --process_sims
+python pre_processer_planck.py --globals ${paramfile} --plots --sims # --noise
