@@ -91,6 +91,7 @@ sim_pars:
   anisotropic_noise: False
   null_e_modes: False
   num_sims: 10
+  ## Used for cosmo TF validation and cov sims
   cosmology:
     cosmomc_theta: 0.0104085
     As: 2.1e-9
@@ -108,9 +109,17 @@ sim_pars:
   mock_nsrcs: 80
   mock_srcs_hole_radius: 40  
 
-## Filtering transfer function related parameters
-tf_settings:
+## Filtering related parameters
+filtering:
 
+  slurm: False # Run TOAST filtering locally or with SLURM scheduller
+  # `slurm_autosubmit` only works if `slurm` is True.
+  # `slurm_autosubmit` set to True to auto-submit generated sbatch scripts.
+  # Set to False would generate scripts but not submitted, give you a chance to check generated scripts.
+  slurm_autosubmit: False
+  scripts_dir: "../sbatch"                             # directory of filtering scripts
+
+  ## Define filtering tags
   tags_settings:
 
     # If true, beams will be applied only on the validation simulations. By default (false), beam are applied to both the estimation and validation sims,
@@ -120,24 +129,27 @@ tf_settings:
     mcut30:
       filtering_type: "m_filterer"
       m_cut: 30
-      beam: null
+      beam: null # beam null means no beam is applied to TF estimation steps
 
-    toast:
+    toast_SAT1_f090:
       filtering_type: "toast"
-      schedule: "../outputs/schedules/schedule_sat.txt"
-      instrument: "SAT1"
-      band: "SAT_f090"
-      thinfp: 8
-      group_size: 4
+      template: "../paramfiles/run_toast.sh.j2"            # TOAST template script.
+      config: "../paramfiles/defaults.toml"                # TOAST toml config file
+      schedule: "../outputs/schedules/schedule_sat.txt"    # TOAST schedule file
+      tf_instrument: "SAT1"                                # Instrument used for transfer function calculation
+      tf_band: "SAT_f090"                                  # Band used for transfer function calculation
       beam: null
 
+  ## Number of sims for tf estimation and validation
   tf_est_num_sims: 10
 
+  ## Parameters of the PL sims used for TF estimation
   power_law_pars_tf_est:
     amp: 1.0
     delta_ell: 10
     power_law_index: 2.
   
+  ## Parameters of the PL sims used for TF validation
   power_law_pars_tf_val:
     amp:
       TT: 10.
