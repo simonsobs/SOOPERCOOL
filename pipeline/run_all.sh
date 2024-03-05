@@ -31,19 +31,14 @@ echo "------------------------------------------------------------"
 echo "Running filterer for transfer"
 echo "-----------------------------"
 python filterer.py --globals ${paramfile} --transfer
-# Uncomment line below (and comment above) to use MPI
-# e.g. if running with toast filtering
-#OMP_NUM_THREADS=2 mpirun -n 4 python filterer.py --globals ${paramfile} --transfer
 
 echo "Running filterer for sims"
 echo "-------------------------"
 python filterer.py --globals ${paramfile} --sims
-#OMP_NUM_THREADS=2 mpirun -n 4 python filterer.py --globals ${paramfile} --sims
 
 echo "Running filterer for data"
 echo "-------------------------"
 python filterer.py --globals ${paramfile} --data
-#OMP_NUM_THREADS=2 mpirun -n 4 python filterer.py --globals ${paramfile} --data
 
 
 echo "------------------------------------------------------------"

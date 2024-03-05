@@ -244,9 +244,12 @@ def m_filter_map(map, map_file, mask, m_cut):
 
 
 def toast_filter_map(map, map_file, mask,
-                     schedule, thinfp, instrument, band, group_size, nside):
+                     template, config, schedule,
+                     nside, instrument, band,
+                     sbatch_job_name, sbatch_dir,
+                     nhits_map_only=False, sim_noise=False):
     """
-    Applies the TOAST filter to a given map.
+    Create sbatch scripts for each simulation, based on given template file.
 
     Parameters
     ----------
@@ -258,116 +261,70 @@ def toast_filter_map(map, map_file, mask,
     mask : array-like (unused)
         This is an unused argument included for compatibility with other
         filters. TOAST won't read the mask itself.
+    template : str
+        Path to sbatch template file in Jinja2.
+    config : str
+        Path to TOAST toml config file.
     schedule : str
-        Text file path with the TOAST schedule.
-    thinfp : int
-        Thinning factor of the number of detectors used in the TOAST
-        focalplane.
+        Path to TOAST schedule file.
+    nside : int
+        Healpix Nside parameter of the filtered map.
     instrument : str
         Name of the instrument simulated by TOAST.
     band : str
         Name of the frequency band simulated by TOAST.
-    group_size : int
-        Group size used for parallelizing filtering with TOAST.
-    nside : int
-        Healpix Nside parameter of the filtered map.
+    sbatch_job_name : str
+        Sbatch job name
+    sbatch_dir : str
+        Sbatch output directory.
+    nhits_map_only : bool
+        If True, only get a hits map from TOAST schedule file.
+    sim_noise : bool
+        If True, simulate noise with TOAST.
     """
-    import toast
-    import sotodlib.toast as sotoast
-    from astropy import units as u
-    from .toast_utils import (
-        apply_scanning, apply_det_pointing_radec, apply_pixels_radec,
-        apply_weights_radec, apply_noise_model, apply_scan_map, create_binner,
-        apply_demodulation, make_filterbin
-    )
-    from types import SimpleNamespace
-    import toast.mpi
+    from jinja2 import Environment, FileSystemLoader
+    from pathlib import Path
 
     del map, mask  # delete unused arguments
 
-    comm, procs, rank = toast.mpi.get_world()
+    # Path(...).resovle() will return absolute path.
+    map_file = Path(map_file).resolve()
+    if nhits_map_only:
+        map_dir = map_file.parent
+        map_dir.mkdir(parents=True, exist_ok=True)
+    template_file = Path(template).resolve()
+    template_dir = template_file.parent
+    template_name = template_file.name
+    config_file = Path(config).resolve()
+    schedule_file = Path(schedule).resolve()
+    sbatch_dir = Path(sbatch_dir).resolve()
+    sbatch_outdir = sbatch_dir/sbatch_job_name
+    sbatch_outdir.mkdir(parents=True, exist_ok=True)
+    sbatch_file = sbatch_dir/(sbatch_job_name + '.sh')
+    sbatch_log = sbatch_dir/(sbatch_job_name + '.log')
 
-    output_dir = map_file.replace('.fits', '/')
-    os.makedirs(output_dir, exist_ok=True)
+    jinja2_env = Environment(
+        loader=FileSystemLoader(template_dir),
+        trim_blocks=True,
+        lstrip_blocks=True)
+    jinja2_temp = jinja2_env.get_template(template_name)
 
-    # Initialize schedule
-    schedule_ = toast.schedule.GroundSchedule()
-
-    if not os.path.exists(schedule):
-        raise FileNotFoundError(f"The corresponding schedule file {schedule} "
-                                "is not stored.")
-
-    # Read schedule
-    print('Read schedule')
-    schedule_.read(schedule)
-
-    # Setup focal plane
-    print('Initialize focal plane and telescope')
-    focalplane = sotoast.SOFocalplane(hwfile=None,
-                                      telescope=instrument,
-                                      sample_rate=40 * u.Hz,
-                                      bands=band,
-                                      wafer_slots='w25',
-                                      tube_slots=None,
-                                      thinfp=thinfp,
-                                      comm=comm)
-
-    # Setup telescope
-    telescope = toast.Telescope(
-        name=instrument,
-        focalplane=focalplane,
-        site=toast.GroundSite("Atacama", schedule_.site_lat,
-                              schedule_.site_lon, schedule_.site_alt)
-    )
-
-    # Setup toast communicator
-    runargs = SimpleNamespace(node_mem=None,
-                              group_size=group_size)  # Note the underscore
-    group_size = toast.job_group_size(
-        comm,
-        runargs,
-        schedule=schedule_,
-        focalplane=focalplane,
-    )
-    toast_comm = toast.Comm(world=comm,
-                            groupsize=group_size)  # Note no underscore
-
-    # Create data object
-    data = toast.Data(comm=toast_comm)
-
-    # Apply filters
-    print('Apply filters')
-    _, sim_gnd = apply_scanning(data, telescope, schedule_)
-    data, det_pointing_radec = apply_det_pointing_radec(data, sim_gnd)
-    data, pixels_radec = apply_pixels_radec(data, det_pointing_radec, nside)
-    data, weights_radec = apply_weights_radec(data, det_pointing_radec)
-    data, noise_model = apply_noise_model(data)
-
-    # Scan map
-    print('Scan input map')
-    data, scan_map = apply_scan_map(data, map_file, pixels_radec,
-                                    weights_radec)
-
-    # Create the binner
-    binner = create_binner(pixels_radec, det_pointing_radec)
-
-    # Demodulate
-    data, weights_radec = apply_demodulation(data, weights_radec, sim_gnd,
-                                             binner)
-
-    # Map filterbin
-    make_filterbin(data, binner, output_dir)
-
-    if rank == 0:
-        # Only one rank can do this
-        # Unify name conventions
-        if os.path.isfile(output_dir + 'FilterBin_unfiltered_map.fits'):
-            # only for TOAST versions < 3.0.0a20
-            os.remove(output_dir + 'FilterBin_unfiltered_map.fits')
-        os.rename(output_dir + 'FilterBin_filtered_map.fits',
-                  output_dir[:-1] + '_filtered.fits')
-        if os.path.isdir(output_dir):
-            os.rmdir(output_dir)
+    with open(sbatch_file, mode='w') as f:
+        f.write(jinja2_temp.render(
+            sbatch_job_name=sbatch_job_name,
+            sbatch_log=sbatch_log,
+            outdir=str(sbatch_outdir),
+            nside=nside,
+            band=band,
+            telescope=instrument,
+            config=str(config_file),
+            schedule=str(schedule_file),
+            map_file=str(map_file),
+            nhits_map_only=nhits_map_only,
+            sim_noise=sim_noise,
+            ))
+    os.chmod(sbatch_file, 0o755)
+    return sbatch_file
 
 
 def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,

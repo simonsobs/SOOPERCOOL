@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+#SBATCH --time=INFINITE
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=4
+#SBATCH --job-name={{ sbatch_job_name }}
+#SBATCH --output={{ sbatch_log }}
+
+CONDA_ENV='soconda'
+ntask=1
+thinfp=8
+sample_rate=40
+job_group_size=$ntask
+
+nside="{{ nside }}"
+band="{{ band }}"
+telescope="{{ telescope }}"
+config="{{ config }}"
+schedule="{{ schedule }}"
+outdir="{{ outdir }}"
+{% if nhits_map_only %}
+hitsmap="{{ map_file }}"
+{% else %}
+scanmap="{{ map_file }}"
+{% endif %}
+
+mkdir -p "$outdir"
+
+if [ -n "$SLURM_CPUS_PER_TASK" ] ; then
+    export OMP_NUM_THREADS="$SLURM_CPUS_PER_TASK"
+fi
+
+"$CONDA_EXE" run -n "$CONDA_ENV" \
+toast_so_sim \
+    {% if nhits_map_only %}
+    {# Generate nhits map only  #}
+    --scan_map.disable \
+    --filterbin.no_write_map \
+    {% else %}
+    {# Scan given sky map  #}
+    --scan_map.enable \
+    --filterbin.no_write_hits \
+    --scan_map.file "$scanmap" \
+    {% endif %}
+    {% if sim_noise %}
+    {# Enable noise simulation  #}
+    --sim_noise.enable \
+    --sim_atmosphere_coarse.enable \
+    {% else %}
+    {# Disable noise simulation  #}
+    --sim_noise.disable \
+    --sim_atmosphere_coarse.disable \
+    --sim_atmosphere.disable \
+    {% endif %}
+    {# Remaining common options #}
+    --thinfp "$thinfp" \
+    --config "$config" \
+    --schedule "$schedule" \
+    --bands "$band" \
+    --telescope "$telescope" \
+    --sample_rate "$sample_rate" \
+    --pixels_healpix_radec.nside "$nside" \
+    --out_dir "$outdir" \
+    --job_group_size "$job_group_size" \
+    --demodulate.disable \
+    --polyfilter1D.enable \
+    --save_hdf5.disable \
+    --mapmaker.disable \
+    --filterbin.enable \
+    --filterbin.no_write_cov \
+    --filterbin.no_write_rcond
+
+
+# move maps/directories if toast_so_sim exit without error
+if [[ "${PIPESTATUS[0]}" == 0 ]] ; then
+    echo -e "\n"
+    {% if nhits_map_only %}
+    echo "mv \"$outdir/filterbin_hits.fits\" \"$hitsmap\""
+    mv "$outdir/filterbin_hits.fits" "$hitsmap"
+    {% else %}
+    echo "mv \"$outdir/filterbin_filtered_map.fits\" \"${scanmap/%.fits/_filtered.fits}\""
+    mv "$outdir/filterbin_filtered_map.fits" "${scanmap/%.fits/_filtered.fits}"
+    {% endif %}
+    rm -r "$outdir"
+fi
+echo -e "\n\n\n"
+
