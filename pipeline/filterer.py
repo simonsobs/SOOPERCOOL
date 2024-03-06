@@ -21,8 +21,10 @@ def filter(args):
     # Read the mask
     mask = meta.read_mask("binary")
 
-    meta.timer.start(f"Filter {meta.tf_est_num_sims} sims for TF estimation.")
+    
     if args.transfer:
+
+        meta.timer.start(f"Filter {meta.tf_est_num_sims} sims for TF estimation.")
 
         filtering_tags = meta.get_filtering_tags()
         filter_funcs = {
@@ -50,31 +52,26 @@ def filter(args):
                         else:
                             filter_map(map, map_file, mask)
 
-    filtering_type_list = [meta.tags_settings[ftag]["filtering_type"] for ftag in filtering_tags]
-    if "toast" in filtering_type_list:
-        if meta.slurm:
-            # Running with SLURM job scheduller
-            cmd = "find '{}' -type f -name 'sbatch_tf__*.sh' -exec sbatch {{}} \;".format(
-                Path(meta.scripts_dir).resolve())
-            if meta.slurm_autosubmit:
-                subprocess.run(cmd, shell=True, check=True)
-                print('Submitted {} sims to SLURM for TF estimation.'.format(meta.tf_est_num_sims))
+        filtering_type_list = [meta.tags_settings[ftag]["filtering_type"] for ftag in filtering_tags]
+        if "toast" in filtering_type_list:                  
+            if meta.slurm:
+                # Running with SLURM job scheduller
+                cmd = "find '{}' -type f -name 'sbatch_tf__*.sh' -exec sbatch {{}} \;".format(
+                    Path(meta.scripts_dir).resolve())
+                if meta.slurm_autosubmit:
+                    subprocess.run(cmd, shell=True, check=True)
+                    print('Submitted {} sims to SLURM for TF estimation.'.format(meta.tf_est_num_sims))
+                else:
+                    meta.print_banner(
+                        msg='To submit these scripts to SLURM:\n    {}'\
+                            .format(cmd))
             else:
-                print('')
-                print("===============================================================")
-                print('')
-                print('To submit these scripts to SLURM:')
-                print("    {}".format(cmd))
-                print('')
-                print("===============================================================")
-                print('')
-        else:
-            cmd = "find '{}' -type f -name 'sbatch_tf__*.sh' -exec {{}} \;".format(
-                Path(meta.scripts_dir).resolve())
-            subprocess.run(cmd, shell=True, check=True)
+                cmd = "find '{}' -type f -name 'sbatch_tf__*.sh' -exec {{}} \;".format(
+                    Path(meta.scripts_dir).resolve())
+                subprocess.run(cmd, shell=True, check=True)
 
-    meta.timer.stop(f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
-                    verbose=True)
+        meta.timer.stop(f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
+                        verbose=True)
 
     if args.sims or args.data:
         Nsims = meta.num_sims if args.sims else 1
@@ -100,14 +97,6 @@ def filter(args):
                     kwargs = {"instrument": meta.toast['tf_instrument'],
                               "band": meta.toast['tf_band'],
                               "sbatch_job_name": sbatch_job_name}
-                    #if not meta.toast['sim_noise']:
-                    #    kwargs = {"instrument": meta.toast['tf_instrument'],
-                    #              "band": meta.toast['tf_band'],
-                    #              "sbatch_job_name": sbatch_job_name}
-                    #else:
-                    #    kwargs = {"instrument": meta.map_sets[map_set]['instrument'],
-                    #              "band": meta.map_sets[map_set]['band'],
-                    #              "sbatch_job_name": sbatch_job_name}
                 else:
                     kwargs = {}
                 filter_map(map, map_file, mask, kwargs)
@@ -122,14 +111,10 @@ def filter(args):
                     subprocess.run(cmd, shell=True, check=True)
                     print('Submitted {} sims to SLURM for TF estimation.'.format(meta.tf_est_num_sims))
                 else:
-                    print('')
-                    print("===============================================================")
-                    print('')
-                    print('To submit these scripts to SLURM:')
-                    print("    {}".format(cmd))
-                    print('')
-                    print("===============================================================")
-                    print('')
+                    meta.print_banner(
+                        msg='To submit these scripts to SLURM:\n    {}'\
+                            .format(cmd)
+                        )
             else:
                 cmd = "find '{}' -type f -name 'sbatch_{}__*.sh' -exec {{}} \;".format(
                     Path(meta.toast['scripts_dir']).resolve(), _type)

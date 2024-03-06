@@ -448,6 +448,19 @@ class BBmeta(object):
 
         return filter_operation
 
+    def print_banner(self, msg):
+        """
+        print a banner message
+        """
+        print('')
+        print("==============================================================")
+        print('')
+        print(msg)
+        print('')
+        print("==============================================================")
+        print('')
+
+
     def get_nhits_map_from_toast_schedule(self, filter_tag):
         from soopercool.utils import toast_filter_map
         import subprocess
@@ -481,14 +494,9 @@ class BBmeta(object):
                 raise Exception('Submitted SLURM script for nhits map calculation. \
                                  Please run the script again after SLURM job finished.')
             else:
-                print('')
-                print("===============================================================")
-                print('')
-                print('To submit these scripts to SLURM:')
-                print("    {}".format(cmd))
-                print('')
-                print("===============================================================")
-                print('')
+                self.print_banner(
+                    msg='To submit these scripts to SLURM:\n    {}'.format(cmd)
+                    )
                 raise Exception('Pleas run the script again after SLURM job finished.')
         else:
             # Run the script directly
