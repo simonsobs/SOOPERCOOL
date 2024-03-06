@@ -421,7 +421,8 @@ class BBmeta(object):
                                       "not implemented")
 
         def filter_operation(map, map_file, mask, extra_kwargs={}):
-            return filter_function(map, map_file, mask, **kwargs, **extra_kwargs)
+            return filter_function(
+                map, map_file, mask, **kwargs, **extra_kwargs)
 
         return filter_operation
 
@@ -463,13 +464,15 @@ class BBmeta(object):
             cmd = "sbatch {}".format(str(sbatch_file.resolve()))
             if self.toast['slurm_autosubmit']:
                 subprocess.run(cmd, shell=True, check=True)
-                raise Exception('Submitted SLURM script for nhits map calculation. \
-                                 Please run the script again after SLURM job finished.')
+                raise Exception(
+                    'Submitted SLURM script for nhits map calculation. \
+                    Please run the script again after SLURM job finished.')
             else:
                 self.print_banner(
                     msg='To submit these scripts to SLURM:\n    {}'.format(cmd)
                     )
-                raise Exception('Pleas run the script again after SLURM job finished.')
+                raise Exception(
+                    'Pleas run the script again after SLURM job finished.')
         else:
             # Run the script directly
             subprocess.run(str(sbatch_file.resolve()), shell=True, check=True)

@@ -43,27 +43,35 @@ def filter(args):
                     filter_map(map, map_file, mask, kwargs)
         if meta.filtering_type == "toast":
             if meta.toast['slurm']:
-                meta.timer.stop(f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
-                                verbose=True)
+                meta.timer.stop(
+                    f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
+                    verbose=True)
                 # Running with SLURM job scheduller
-                cmd = "find '{}' -type f -name 'sbatch_tf__*.sh' -exec sbatch {{}} \;".format(
-                    Path(meta.toast['scripts_dir']).resolve())
+                cmd = "find '{}' -type f \
+                                 -name 'sbatch_tf__*.sh' \
+                                 -exec sbatch {{}} \;"\
+                    .format(Path(meta.toast['scripts_dir']).resolve())
                 if meta.toast['slurm_autosubmit']:
                     subprocess.run(cmd, shell=True, check=True)
-                    print('Submitted {} sims to SLURM for TF estimation.'.format(meta.tf_est_num_sims))
+                    print('Submitted {} sims to SLURM for TF estimation.'\
+                        .format(meta.tf_est_num_sims))
                 else:
                     meta.print_banner(
                         msg='To submit these scripts to SLURM:\n    {}'\
                             .format(cmd))
             else:
-                cmd = "find '{}' -type f -name 'sbatch_tf__*.sh' -exec {{}} \;".format(
-                    Path(meta.toast['scripts_dir']).resolve())
+                cmd = "find '{}' -type f \
+                                 -name 'sbatch_tf__*.sh' \
+                                 -exec {{}} \;"\
+                    .format(Path(meta.toast['scripts_dir']).resolve())
                 subprocess.run(cmd, shell=True, check=True)
-                meta.timer.stop(f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
-                                verbose=True)
+                meta.timer.stop(
+                    f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
+                    verbose=True)
         else:
-            meta.timer.stop(f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
-                            verbose=True)
+            meta.timer.stop(
+                f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
+                verbose=True)
 
     if args.sims or args.data:
         Nsims = meta.num_sims if args.sims else 1
@@ -79,22 +87,24 @@ def filter(args):
                 map = hp.read_map(map_file, field=[0, 1, 2])
                 if meta.filtering_type == "toast":
                     if args.sims:
-                        sbatch_job_name = 'sbatch_sims__{:04d}_{}'.format(
-                            id_sim, str(Path(map_file).name))
+                        sbatch_job_name = 'sbatch_sims__{:04d}_{}'\
+                            .format(id_sim, str(Path(map_file).name))
                     elif args.data:
-                        sbatch_job_name = 'sbatch_data__{}'.format(
-                            str(Path(map_file).name))
+                        sbatch_job_name = 'sbatch_data__{}'\
+                            .format(str(Path(map_file).name))
                     kwargs = {"instrument": meta.toast['tf_instrument'],
                               "band": meta.toast['tf_band'],
                               "sbatch_job_name": sbatch_job_name}
                     #if not meta.toast['sim_noise']:
-                    #    kwargs = {"instrument": meta.toast['tf_instrument'],
-                    #              "band": meta.toast['tf_band'],
-                    #              "sbatch_job_name": sbatch_job_name}
+                    #    kwargs = {
+                    #        "instrument": meta.toast['tf_instrument'],
+                    #        "band": meta.toast['tf_band'],
+                    #        "sbatch_job_name": sbatch_job_name}
                     #else:
-                    #    kwargs = {"instrument": meta.map_sets[map_set]['instrument'],
-                    #              "band": meta.map_sets[map_set]['band'],
-                    #              "sbatch_job_name": sbatch_job_name}
+                    #    kwargs = {
+                    #        "instrument": meta.map_sets[map_set]['instrument'],
+                    #        "band": meta.map_sets[map_set]['band'],
+                    #        "sbatch_job_name": sbatch_job_name}
                 else:
                     kwargs = {}
                 filter_map(map, map_file, mask, kwargs)
@@ -103,19 +113,24 @@ def filter(args):
             if meta.toast['slurm']:
                 meta.timer.stop(f"Filter {Nsims} sims.", verbose=True)
                 # Running with SLURM job scheduller
-                cmd = "find '{}' -type f -name 'sbatch_{}__*.sh' -exec sbatch {{}} \;".format(
-                    Path(meta.toast['scripts_dir']).resolve(), _type)
+                cmd = "find '{}' -type f \
+                                 -name 'sbatch_{}__*.sh' \
+                                 -exec sbatch {{}} \;"\
+                    .format(Path(meta.toast['scripts_dir']).resolve(), _type)
                 if meta.toast['slurm_autosubmit']:
                     subprocess.run(cmd, shell=True, check=True)
-                    print('Submitted {} sims to SLURM for TF estimation.'.format(meta.tf_est_num_sims))
+                    print('Submitted {} sims to SLURM for TF estimation.'\
+                        .format(meta.tf_est_num_sims))
                 else:
                     meta.print_banner(
                         msg='To submit these scripts to SLURM:\n    {}'\
                             .format(cmd)
                         )
             else:
-                cmd = "find '{}' -type f -name 'sbatch_{}__*.sh' -exec {{}} \;".format(
-                    Path(meta.toast['scripts_dir']).resolve(), _type)
+                cmd = "find '{}' -type f \
+                                 -name 'sbatch_{}__*.sh' \
+                                 -exec {{}} \;"\
+                    .format(Path(meta.toast['scripts_dir']).resolve(), _type)
                 subprocess.run(cmd, shell=True, check=True)
                 meta.timer.stop(f"Filter {Nsims} sims.", verbose=True)
         else:
