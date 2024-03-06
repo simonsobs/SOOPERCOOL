@@ -60,12 +60,12 @@ def filter(args):
                     Path(meta.scripts_dir).resolve())
                 if meta.slurm_autosubmit:
                     subprocess.run(cmd, shell=True, check=True)
-                    print('Submitted {} sims to SLURM for TF estimation.'\
-                        .format(meta.tf_est_num_sims))
+                    print('Submitted {} sims to SLURM for TF estimation.'
+                          .format(meta.tf_est_num_sims))
                 else:
                     meta.print_banner(
-                        msg='To submit these scripts to SLURM:\n    {}'\
-                            .format(cmd))
+                        msg='To submit these scripts to SLURM:\n    {}'
+                        .format(cmd))
             else:
                 cmd = "find '{}' -type f -name 'sbatch_tf__*.sh' -exec {{}} \;".format(
                     Path(meta.scripts_dir).resolve())
@@ -106,24 +106,27 @@ def filter(args):
             if meta.toast['slurm']:
                 meta.timer.stop(f"Filter {Nsims} sims.", verbose=True)
                 # Running with SLURM job scheduller
-                cmd = "find '{}' -type f \
-                                 -name 'sbatch_{}__*.sh' \
-                                 -exec sbatch {{}} \\;"\
-                    .format(Path(meta.toast['scripts_dir']).resolve(), _type)
+                cmd = (
+                    "find '{}' -type f "
+                    + "-name 'sbatch_{}__*.sh' "
+                    + "-exec sbatch {{}} \\;").format(
+                        Path(meta.toast['scripts_dir']).resolve(),
+                        _type)
                 if meta.toast['slurm_autosubmit']:
                     subprocess.run(cmd, shell=True, check=True)
-                    print('Submitted {} sims to SLURM for TF estimation.'\
-                        .format(meta.tf_est_num_sims))
+                    print('Submitted {} sims to SLURM for TF estimation.'
+                          .format(meta.tf_est_num_sims))
                 else:
                     meta.print_banner(
-                        msg='To submit these scripts to SLURM:\n    {}'\
-                            .format(cmd)
-                        )
+                        msg='To submit these scripts to SLURM:\n    {}'
+                        .format(cmd))
             else:
-                cmd = "find '{}' -type f \
-                                 -name 'sbatch_{}__*.sh' \
-                                 -exec {{}} \\;"\
-                    .format(Path(meta.toast['scripts_dir']).resolve(), _type)
+                cmd = (
+                    "find '{}' -type f "
+                    + "-name 'sbatch_{}__*.sh' "
+                    + "-exec {{}} \\;").format(
+                        Path(meta.toast['scripts_dir']).resolve(),
+                        _type)
                 subprocess.run(cmd, shell=True, check=True)
                 meta.timer.stop(f"Filter {Nsims} sims.", verbose=True)
         else:
