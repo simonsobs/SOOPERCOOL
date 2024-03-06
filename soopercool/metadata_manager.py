@@ -438,7 +438,6 @@ class BBmeta(object):
         print("==============================================================")
         print('')
 
-
     def get_nhits_map_from_toast_schedule(self):
         from soopercool.utils import toast_filter_map
         import subprocess
