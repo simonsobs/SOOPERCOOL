@@ -52,14 +52,9 @@ def filter(args):
                     subprocess.run(cmd, shell=True, check=True)
                     print('Submitted {} sims to SLURM for TF estimation.'.format(meta.tf_est_num_sims))
                 else:
-                    print('')
-                    print("===============================================================")
-                    print('')
-                    print('To submit these scripts to SLURM:')
-                    print("    {}".format(cmd))
-                    print('')
-                    print("===============================================================")
-                    print('')
+                    meta.print_banner(
+                        msg='To submit these scripts to SLURM:\n    {}'\
+                            .format(cmd))
             else:
                 cmd = "find '{}' -type f -name 'sbatch_tf__*.sh' -exec {{}} \;".format(
                     Path(meta.toast['scripts_dir']).resolve())
@@ -114,14 +109,10 @@ def filter(args):
                     subprocess.run(cmd, shell=True, check=True)
                     print('Submitted {} sims to SLURM for TF estimation.'.format(meta.tf_est_num_sims))
                 else:
-                    print('')
-                    print("===============================================================")
-                    print('')
-                    print('To submit these scripts to SLURM:')
-                    print("    {}".format(cmd))
-                    print('')
-                    print("===============================================================")
-                    print('')
+                    meta.print_banner(
+                        msg='To submit these scripts to SLURM:\n    {}'\
+                            .format(cmd)
+                        )
             else:
                 cmd = "find '{}' -type f -name 'sbatch_{}__*.sh' -exec {{}} \;".format(
                     Path(meta.toast['scripts_dir']).resolve(), _type)
