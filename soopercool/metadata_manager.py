@@ -471,7 +471,7 @@ class BBmeta(object):
                     msg='To submit these scripts to SLURM:\n    {}'.format(cmd)
                     )
                 raise Exception(
-                    'Pleas run the script again after SLURM job finished.')
+                    'Pleas __rerun__ the script after SLURM job finished.')
         else:
             # Run the script directly
             subprocess.run(str(sbatch_file.resolve()), shell=True, check=True)

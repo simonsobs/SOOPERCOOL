@@ -49,8 +49,8 @@ def filter(args):
                 # Running with SLURM job scheduller
                 cmd = (
                     "find '{}' -type f "
-                    + "-name 'sbatch_tf__*.sh' "
-                    + " -exec sbatch {{}} \\;").format(
+                    "-name 'sbatch_tf__*.sh' "
+                    " -exec sbatch {{}} \\;").format(
                         Path(meta.toast['scripts_dir']).resolve())
                 if meta.toast['slurm_autosubmit']:
                     subprocess.run(cmd, shell=True, check=True)
@@ -63,8 +63,8 @@ def filter(args):
             else:
                 cmd = (
                     "find '{}' -type f "
-                    + "-name 'sbatch_tf__*.sh' "
-                    + "-exec {{}} \\;").format(
+                    "-name 'sbatch_tf__*.sh' "
+                    "-exec {{}} \\;").format(
                         Path(meta.toast['scripts_dir']).resolve())
                 subprocess.run(cmd, shell=True, check=True)
                 meta.timer.stop(
@@ -107,8 +107,8 @@ def filter(args):
                 # Running with SLURM job scheduller
                 cmd = (
                     "find '{}' -type f "
-                    + "-name 'sbatch_{}__*.sh' "
-                    + "-exec sbatch {{}} \\;").format(
+                    "-name 'sbatch_{}__*.sh' "
+                    "-exec sbatch {{}} \\;").format(
                         Path(meta.toast['scripts_dir']).resolve(),
                         _type)
                 if meta.toast['slurm_autosubmit']:
@@ -122,8 +122,8 @@ def filter(args):
             else:
                 cmd = (
                     "find '{}' -type f "
-                    + "-name 'sbatch_{}__*.sh' "
-                    + "-exec {{}} \\;").format(
+                    "-name 'sbatch_{}__*.sh' "
+                    "-exec {{}} \\;").format(
                         Path(meta.toast['scripts_dir']).resolve(),
                         _type)
                 subprocess.run(cmd, shell=True, check=True)
