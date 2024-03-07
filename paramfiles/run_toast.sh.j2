@@ -27,6 +27,7 @@ scanmap="{{ map_file }}"
 mkdir -p "$outdir"
 
 if [ -n "$SLURM_CPUS_PER_TASK" ] ; then
+    # $SLURM_CPUS_PER_TASK is defined means this is running with SLURM
     export OMP_NUM_THREADS="$SLURM_CPUS_PER_TASK"
 fi
 
@@ -72,7 +73,7 @@ toast_so_sim \
 
 
 # move maps/directories if toast_so_sim exit without error
-if [[ "${PIPESTATUS[0]}" == 0 ]] ; then
+if [[ "$?" == 0 ]] ; then
     echo -e "\n"
     {% if nhits_map_only %}
     echo "mv \"$outdir/filterbin_hits.fits\" \"$hitsmap\""
