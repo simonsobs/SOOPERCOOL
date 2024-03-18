@@ -115,8 +115,8 @@
     elnods = "[]" # List of relative el_nods
     enabled = true # If True, this class instance is marked as enabled
     fix_rate_on_sky = true # If True, `scan_rate_az` is given in sky coordinates and azimuthal rate on mount will be adjusted to meet it.  If False, `scan_rate_az` is used as the mount azimuthal rate.
-    hwp_angle = "None" # Observation shared key for HWP angle
-    hwp_rpm = "None" # The rate (in RPM) of the HWP rotation
+    hwp_angle = "hwp_angle" # Observation shared key for HWP angle
+    hwp_rpm = 120 # The rate (in RPM) of the HWP rotation
     hwp_step = "None" # For stepped HWP, the angle of each step
     hwp_step_time = "None" # For stepped HWP, the time between steps
     kernel_implementation = 0 # Which kernel implementation to use (DEFAULT, COMPILED, NUMPY, JAX).
@@ -168,7 +168,7 @@
     corotate_lat = true # If True, rotate LAT receiver to maintain projected focalplane orientation
     corotator_angle = "corotator_angle" # Observation shared key for corotation angle
     elevation = "elevation" # Observation shared key for boresight elevation
-    enabled = true # If True, this class instance is marked as enabled
+    enabled = false # If True, this class instance is marked as enabled
     kernel_implementation = 0 # Which kernel implementation to use (DEFAULT, COMPILED, NUMPY, JAX).
     name = "corotate_lat" # The 'name' of this class instance
 
@@ -222,7 +222,7 @@
     detector_pointing = "None" # Operator that translates boresight pointing into detector frame
     enabled = true # If True, this class instance is marked as enabled
     fp_gamma = "gamma" # Focalplane key for detector gamma offset angle
-    hwp_angle = "None" # Observation shared key for HWP angle
+    hwp_angle = "hwp_angle" # Observation shared key for HWP angle
     kernel_implementation = 0 # Which kernel implementation to use (DEFAULT, COMPILED, NUMPY, JAX).
     mode = "IQU" # The Stokes weights to generate (I or IQU)
     name = "weights_azel" # The 'name' of this class instance
@@ -238,7 +238,7 @@
     detector_pointing = "None" # Operator that translates boresight pointing into detector frame
     enabled = true # If True, this class instance is marked as enabled
     fp_gamma = "gamma" # Focalplane key for detector gamma offset angle
-    hwp_angle = "None" # Observation shared key for HWP angle
+    hwp_angle = "hwp_angle" # Observation shared key for HWP angle
     kernel_implementation = 0 # Which kernel implementation to use (DEFAULT, COMPILED, NUMPY, JAX).
     mode = "IQU" # The Stokes weights to generate (I or IQU)
     name = "weights_radec" # The 'name' of this class instance
@@ -1016,7 +1016,7 @@
     API = 0 # Internal interface version for this operator
     bad_fit_mask = 2 # Bit mask to raise for bad fits
     det_mask = 1 # Bit mask value for per-detector flagging
-    enabled = true # If True, this class instance is marked as enabled
+    enabled = false # If True, this class instance is marked as enabled
     f_min = "Quantity('1.00000000000000e-05 Hz')" # Low-frequency rolloff of model in the fit
     kernel_implementation = 0 # Which kernel implementation to use (DEFAULT, COMPILED, NUMPY, JAX).
     least_squares_ftol = 1e-10 # The ftol value passed to the least_squares solver
@@ -1033,7 +1033,7 @@
     API = 0 # Internal interface version for this operator
     det_flags = "flags" # Observation detdata key for flags to use
     det_mask = 1 # Bit mask value for per-detector flagging
-    enabled = true # If True, this class instance is marked as enabled
+    enabled = false # If True, this class instance is marked as enabled
     kernel_implementation = 0 # Which kernel implementation to use (DEFAULT, COMPILED, NUMPY, JAX).
     name = "noise_cut_flag" # The 'name' of this class instance
     noise_model = "noise_model" # The observation key containing the noise model
@@ -1072,7 +1072,7 @@
     det_mask = 1 # Bit mask value for per-detector flagging
     do_2f = false # also cache the 2f-demodulated signal
     elevation = "elevation" # Observation shared key for Elevation
-    enabled = false # If True, this class instance is marked as enabled
+    enabled = true # If True, this class instance is marked as enabled
     fmax = "None" # Override automatic lowpass cut-off frequency
     hwp_angle = "hwp_angle" # Observation shared key for HWP angle
     kernel_implementation = 0 # Which kernel implementation to use (DEFAULT, COMPILED, NUMPY, JAX).
@@ -1130,7 +1130,7 @@
     API = 0 # Internal interface version for this operator
     bad_fit_mask = 2 # Bit mask to raise for bad fits
     det_mask = 1 # Bit mask value for per-detector flagging
-    enabled = true # If True, this class instance is marked as enabled
+    enabled = false # If True, this class instance is marked as enabled
     f_min = "Quantity('1.00000000000000e-05 Hz')" # Low-frequency rolloff of model in the fit
     kernel_implementation = 0 # Which kernel implementation to use (DEFAULT, COMPILED, NUMPY, JAX).
     least_squares_ftol = 1e-10 # The ftol value passed to the least_squares solver
@@ -1185,7 +1185,7 @@
     API = 0 # Internal interface version for this operator
     bad_fit_mask = 2 # Bit mask to raise for bad fits
     det_mask = 1 # Bit mask value for per-detector flagging
-    enabled = true # If True, this class instance is marked as enabled
+    enabled = false # If True, this class instance is marked as enabled
     f_min = "Quantity('1.00000000000000e-05 Hz')" # Low-frequency rolloff of model in the fit
     kernel_implementation = 0 # Which kernel implementation to use (DEFAULT, COMPILED, NUMPY, JAX).
     least_squares_ftol = 1e-10 # The ftol value passed to the least_squares solver
@@ -1494,7 +1494,7 @@
     binning = "None" # Binning operator used for solving template amplitudes
     convergence = 1e-12 # Relative convergence limit
     det_data = "signal" # Observation detdata key for the timestream data
-    enabled = true # If True, this class instance is marked as enabled
+    enabled = false # If True, this class instance is marked as enabled
     iter_max = 100 # Maximum number of iterations
     iter_min = 3 # Minimum number of iterations
     keep_final_products = false # If True, keep the map domain products in data after write
@@ -1537,7 +1537,7 @@
     det_flag_mask = 7 # Bit mask value for detector sample flagging
     det_flags = "flags" # Observation detdata key for flags to use
     det_mask = 7 # Bit mask value for per-detector flagging
-    enabled = false # If True, this class instance is marked as enabled
+    enabled = true # If True, this class instance is marked as enabled
     filter_flag_mask = 1 # Bit mask value for flagging samples that fail filtering
     ground_filter_order = 5 # Order of a Legendre polynomial to fit as a function of azimuth.
     hwp_angle = "hwp_angle" # Observation shared key for HWP angle
@@ -1635,4 +1635,24 @@
     key = "azimuth" # Observation data key for the periodic quantity
     minimum_bin_hits = 3 # Minimum number of samples per amplitude bin
     name = "azss" # The 'name' of this class instance
+    view = "None" # Use this view of the data in all observations
+
+[templates.fourier2d]
+    class = "toast.templates.fourier2d.Fourier2D"
+    correlation_amplitude = 10.0 # Scale factor of the filter
+    correlation_length = "Quantity('5.00000000000000e+00 s')" # Correlation length in time
+    data = "None" # This must be an instance of a Data class (or None)
+    debug_plots = "None" # If not None, make debugging plots in this directory
+    det_data = "signal" # Observation detdata key for the timestream data
+    det_data_units = "Unit('K')" # Desired units of detector data
+    det_flag_mask = 7 # Bit mask value for solver flags
+    det_flags = "flags" # Observation detdata key for solver flags to use
+    det_mask = 1 # Bit mask value for per-detector flagging
+    enabled = false # If True, this class instance is marked as enabled
+    fit_subharmonics = false # If True, fit subharmonics
+    kernel_implementation = 0 # Which kernel implementation to use (DEFAULT, COMPILED, NUMPY, JAX).
+    name = "fourier2d" # The 'name' of this class instance
+    noise_model = "None" # Observation key containing the optional noise model
+    order = 1 # The filter order
+    times = "times" # Observation shared key for timestamps
     view = "None" # Use this view of the data in all observations

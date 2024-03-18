@@ -42,6 +42,8 @@ toast_so_sim \
     --scan_map.enable \
     --filterbin.no_write_hits \
     --scan_map.file "$scanmap" \
+    --scan_map_pixels.enable \
+    --scan_map_pixels.nside "$nside" \
     {% endif %}
     {% if sim_noise %}
     {# Enable noise simulation  #}
@@ -63,8 +65,8 @@ toast_so_sim \
     --pixels_healpix_radec.nside "$nside" \
     --out_dir "$outdir" \
     --job_group_size "$job_group_size" \
-    --demodulate.disable \
-    --polyfilter1D.enable \
+    --demodulate.enable \
+    --polyfilter1D.disable \
     --save_hdf5.disable \
     --mapmaker.disable \
     --filterbin.enable \
