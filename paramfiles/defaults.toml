@@ -1561,7 +1561,7 @@
     shared_flags = "flags" # Observation shared key for telescope flags to use
     split_ground_template = false # Apply a different template for left and right scans
     write_binmap = false # If True, write the unfiltered map
-    write_cov = true # If True, write the white noise covariance matrices.
+    write_cov = false # If True, write the white noise covariance matrices.
     write_hdf5 = false # If True, output maps are in HDF5 rather than FITS format.
     write_hdf5_serial = false # If True, force serial HDF5 write of output maps.
     write_hits = true # If True, write the hits map
@@ -1570,7 +1570,7 @@
     write_noiseweighted_binmap = false # If True, write the noise-weighted unfiltered map
     write_noiseweighted_map = false # If True, write the noise-weighted filtered map
     write_obs_matrix = false # Write the observation matrix
-    write_rcond = true # If True, write the reciprocal condition numbers.
+    write_rcond = false # If True, write the reciprocal condition numbers.
 
 [operators.filtered_statistics]
     class = "toast.ops.statistics.Statistics"
