@@ -1,4 +1,4 @@
-# Here is a sample .yaml file that can be used 
+# Here is a sample .yaml file that can be used
 # to store the metadata necessary to run the
 # SO BB pipeline.
 
@@ -10,7 +10,7 @@ data_dirs:
   beam_directory: "beams"
   bandpasses_directory: "bandpasses"
 ## Then directories in which we will store outputs
-output_dirs: 
+output_dirs:
   root: "../outputs"
   mask_directory: "masks"
   pre_process_directory: "pre_processing"
@@ -94,26 +94,34 @@ sim_pars:
     tau: 0.0544
     r: 0.01
   mock_nsrcs: 80
-  mock_srcs_hole_radius: 40  
+  mock_srcs_hole_radius: 40
+
+## Filtering settings
+filtering:
+  filtering_type: "m_filter"  # "m_filterer" or "toast"
+  m_cut: 30  # necessary only if `filtering_type` is set to "m_filterer"
+  toast: # necessary only if `filtering.type` is set to "toast"
+    template: "../paramfiles/run_toast.sh.j2"            # TOAST template script.
+    config: "../paramfiles/defaults.toml"                # TOAST toml config file
+    schedule: "../outputs/schedules/schedule_sat.txt"    # TOAST schedule file
+    scripts_dir: "../sbatch"                             # directory of filtering scripts
+    tf_instrument: "SAT1"                                # Instrument used for transfer function calculation
+    tf_band: "SAT_f090"                                  # Band used for transfer function calculation
+    slurm: False                                         # Run TOAST filtering locally or with SLURM scheduller
+    # `slurm_autosubmit` only works if `slurm` is True.
+    # `slurm_autosubmit` set to True to auto-submit generated sbatch scripts.
+    # Set to False would generate scripts but not submitted, give you a chance to check generated scripts.
+    slurm_autosubmit: False
 
 ## Filtering transfer function related parameters
 tf_settings:
-  filtering_type: "m_filterer"  # "m_filterer" or "toast"
-  m_cut: 30  # necessary only if `filtering_type` is set to "m_filterer"
-  toast:  # necessary only if `filtering_type` is set to "toast"
-    schedule: "../outputs/schedules/schedule_sat.txt"
-    instrument: "SAT1"
-    band: "SAT_f090"
-    thinfp: 8
-    group_size: 4
-
   tf_est_num_sims: 4
 
   power_law_pars_tf_est:
     amp: 1.0
     delta_ell: 10
     power_law_index: 2.
-  
+
   power_law_pars_tf_val:
     amp:
       TT: 10.

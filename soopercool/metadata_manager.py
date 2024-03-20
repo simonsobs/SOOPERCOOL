@@ -73,6 +73,9 @@ class BBmeta(object):
         # Simulation
         self._init_simulation_params()
 
+        # Filtering
+        self._init_filtering_params()
+
         # Tf estimation
         self._init_tf_estimation_params()
         self.tf_est_sims_dir = f"{self.pre_process_directory}/tf_est_sims"
@@ -283,6 +286,13 @@ class BBmeta(object):
                      "null_e_modes", "mock_nsrcs", "mock_srcs_hole_radius"]:
             setattr(self, name, self.sim_pars[name])
 
+    def _init_filtering_params(self):
+        """
+        Loop over the filtering parameters and set them as attributes.
+        """
+        for name in self.filtering:
+            setattr(self, name, self.filtering[name])
+
     def _init_tf_estimation_params(self):
         """
         Loop over the transfer function parameters and set them as attributes.
@@ -399,21 +409,72 @@ class BBmeta(object):
             filter_function = m_filter_map
 
         elif self.filtering_type == "toast":
-            kwargs = {"schedule": self.toast['schedule'],
-                      "thinfp": self.toast['thinfp'],
-                      "instrument": self.toast['instrument'],
-                      "band": self.toast['band'],
-                      "group_size": self.toast['group_size'],
-                      "nside": self.nside}
+            kwargs = {"template": self.toast['template'],
+                      "config": self.toast['config'],
+                      "schedule": self.toast['schedule'],
+                      "nside": self.nside,
+                      "sbatch_dir": self.toast['scripts_dir'],
+                      }
             filter_function = toast_filter_map
         else:
             raise NotImplementedError(f"Filterer type {self.filtering_type} "
                                       "not implemented")
 
-        def filter_operation(map, map_file, mask):
-            return filter_function(map, map_file, mask, **kwargs)
+        def filter_operation(map, map_file, mask, extra_kwargs={}):
+            return filter_function(
+                map, map_file, mask, **kwargs, **extra_kwargs)
 
         return filter_operation
+
+    def print_banner(self, msg):
+        """
+        print a banner message
+        """
+        print('')
+        print("==============================================================")
+        print('')
+        print(msg)
+        print('')
+        print("==============================================================")
+        print('')
+
+    def get_nhits_map_from_toast_schedule(self):
+        from soopercool.utils import toast_filter_map
+        import subprocess
+        if self.filtering_type != "toast":
+            raise NotImplementedError(f"Filterer type {self.filtering_type} "
+                                      "not implemented")
+        kwargs = {"map": None,
+                  "map_file": self.masks["input_nhits_path"],
+                  "mask": None,
+                  "template": self.toast['template'],
+                  "config": self.toast['config'],
+                  "schedule": self.toast['schedule'],
+                  "nside": self.nside,
+                  "instrument": self.toast['tf_instrument'],
+                  "band": self.toast['tf_band'],
+                  "sbatch_job_name": "get_nhits_map",
+                  "sbatch_dir": self.toast['scripts_dir'],
+                  "nhits_map_only": True}
+        sbatch_file = toast_filter_map(**kwargs)
+
+        if self.toast['slurm']:
+            # Running with SLURM job scheduller
+            cmd = "sbatch {}".format(str(sbatch_file.resolve()))
+            if self.toast['slurm_autosubmit']:
+                subprocess.run(cmd, shell=True, check=True)
+                raise Exception(
+                    'Submitted SLURM script for nhits map calculation. \
+                    Please run the script again after SLURM job finished.')
+            else:
+                self.print_banner(
+                    msg='To submit these scripts to SLURM:\n    {}'.format(cmd)
+                    )
+                raise Exception(
+                    'Pleas __rerun__ the script after SLURM job finished.')
+        else:
+            # Run the script directly
+            subprocess.run(str(sbatch_file.resolve()), shell=True, check=True)
 
     def get_map_filename_transfer2(self, id_sim, cl_type, pure_type=None):
         """
