@@ -7,7 +7,6 @@ import tarfile
 import shutil
 import wget
 import astropy.io.fits as fits
-import matplotlib.pyplot as plt
 
 
 def pre_processer(args):
@@ -33,7 +32,7 @@ def pre_processer(args):
         Global parameters and command line arguments.
     ----------
     outputs:
-        - Beams, temperature and polarization, per freq and split
+        - Beams, temperature (both) and polarization (Planck only)
         - Spherical armonics transforms (alm) of data maps
         - Downgraded data maps, rotated in equatorial coords
         - Downgraded sims/noise maps, rotated in equatorial coords
@@ -129,27 +128,6 @@ def pre_processer(args):
                 np.savetxt(beam_fname_pol, np.transpose([ells_beam, bl_pol]))
                 np.savetxt(beam_fname, np.transpose([ells_beam, bl_pol]))
 
-                if args.plots:
-                    plt.plot(bl_T, label=r'$b_\ell$ (T)')
-                    plt.plot(bl_pol, label=r'$b_\ell$ (E)')
-                    plt.title(f"{f} GHz")
-                    plt.legend(frameon=False)
-                    plt.savefig(f"{plots_dir}/beam_{file_root}.png",
-                                bbox_inches='tight')
-                    # plt.show()
-                    plt.clf()
-
-        if args.plots:
-            for map_set in meta.map_sets_list:
-                if 'planck' in map_set:
-                    plt.plot(beams[map_set], label=str(map_set))
-            plt.xlabel(r'$\ell$')
-            plt.ylabel(r'$B_\ell$')
-            plt.title("Planck beams")
-            plt.legend(frameon=False)
-            plt.savefig(f"{plots_dir}/beams_planck.png")
-            plt.clf()
-
         print("- frequency-split dependent beams")
         for split in splits:
             for f in freqs:
@@ -175,16 +153,6 @@ def pre_processer(args):
                 np.savetxt(beam_fname_T, np.transpose([ells_beam, bl_T]))
                 np.savetxt(beam_fname_pol, np.transpose([ells_beam, bl_pol]))
 
-                if args.plots:
-                    plt.plot(bl_T, label=r'$b_\ell$ (T)')
-                    plt.plot(bl_pol, label=r'$b_\ell$ (E)')
-                    plt.title(f"{f}{split}")
-                    plt.legend(frameon=False)
-                    plt.savefig(f"{plots_dir}/beam_f{f}_{split}.png",
-                                bbox_inches='tight')
-                    # plt.show()
-                    plt.clf()
-
         shutil.rmtree(f"{beam_dir}/simulated_maps")
 
         if not args.noise:
@@ -208,62 +176,73 @@ def pre_processer(args):
         to_muk = 1e3
         bands_dict = {'023': 'K1', '033': 'Ka1'}
         wmap_dir = f"{prep_dir}/external_data/maps"
-        url_pref = "https://lambda.gsfc.nasa.gov/data/map/dr5/skymaps/1yr/raw"
-        # Download WMAP single-year maps from URL and save temporarily
-        print("Downloading WMAP single-year maps")
+
         for map_set in meta.map_sets_list:
             if 'wmap' in map_set:
-                f = str(meta.freq_tag_from_map_set(map_set)).zfill(3)
-                freqs.append(f)
+                f = meta.freq_tag_from_map_set(map_set)
+                freqs.append(str(f).zfill(3))
                 nsplits = meta.n_splits_from_map_set(map_set)
-                for yr in range(1, nsplits+1):
+        splits = list(range(1, nsplits+1))
+
+        if args.data:
+            meta.timer.start("Download WMAP data")
+            url_pref = "https://lambda.gsfc.nasa.gov/data/map/dr5/skymaps/1yr/raw"  # noqa
+            # Download WMAP single-year maps from URL and save temporarily
+            print("Downloading WMAP single-year maps")
+            for f in freqs:
+                for yr in splits:
                     fname_map = f"wmap_iqumap_r9_yr{yr}_{bands_dict[f]}_v5.fits"  # noqa
                     print("-", fname_map)
                     fname_data_map = f"{map_dir}/wmap_f{f}_split_{yr-1}.fits"
                     if os.path.isfile(fname_data_map):
-                        print("data maps already on disk")
+                        print("  data maps already on disk")
                         continue
                     url = f"{url_pref}/{fname_map}"
                     fname_out = f"{wmap_dir}/{fname_map}"
                     if os.path.isfile(fname_out):
-                        print("original data already downloaded:", fname_out)
+                        print("  data already downloaded, at", wmap_dir)
                         continue
                     wget.download(url, fname_out)
                     print("\n")
-        splits = list(range(1, nsplits+1))
+            meta.timer.stop("Download WMAP data")
 
-        print("Beams")
-        print("Downloading WMAP beam window functions")
-        ext_dir = f"{prep_dir}/external_data"
-        url_pref = "https://lambda.gsfc.nasa.gov/data/map/dr5/ancillary/beams"
+            print("Beams")
+            print("Downloading WMAP beam window functions")
+            ext_dir = f"{prep_dir}/external_data"
+            url_pref = "https://lambda.gsfc.nasa.gov/data/map/dr5/ancillary/beams"  # noqa
 
-        for f in freqs:
-            print(f"wmap_f{f}")
-            beam_fname = f"{beam_dir}/beam_wmap_f{f}.dat"
-            if os.path.isfile(beam_fname):
-                print(f"beams found at {beam_fname}")
-                continue
-            beam_tf = f"{ext_dir}/wmap_beam_{bands_dict[f]}.txt"
-            if not os.path.isfile(beam_tf):
-                url = f"{url_pref}/wmap_ampl_bl_{bands_dict[f]}_9yr_v5p1.txt"
-                wget.download(url, beam_tf)
-                print("\n")
-            # read beams
-            # WMAP max l is 750, so we extend beams repeating the last value
-            bl = np.zeros(3*nside_out+1)
-            l, b, _ = np.loadtxt(beam_tf, unpack=True)
-            lmax_file = int(l[-1])
-            bl[:(lmax_file+1)] = b
-            bl[lmax_file:] = b[-1]
-            np.savetxt(beam_fname, np.transpose([ells_beam, bl]))
+            for f in freqs:
+                print(f"wmap_f{f}")
+                beam_fname = f"{beam_dir}/beam_wmap_f{f}.dat"
+                if os.path.isfile(beam_fname):
+                    print(f"beams found at {beam_fname}")
+                    continue
+                beam_tf = f"{ext_dir}/wmap_beam_{bands_dict[f]}.txt"
+                if not os.path.isfile(beam_tf):
+                    url = f"{url_pref}/wmap_ampl_bl_{bands_dict[f]}_9yr_v5p1.txt"  # noqa
+                    wget.download(url, beam_tf)
+                    print("\n")
+                # read beams
+                # if last ell < 3*nside_out
+                # extend beams repeating the last value
+                bl = np.zeros(3*nside_out+1)
+                l, b, _ = np.loadtxt(beam_tf, unpack=True)
+                lmax_file = int(l[-1])
+                if lmax_file < 3*nside_out:
+                    bl[:(lmax_file+1)] = b
+                    bl[lmax_file:] = b[-1]
+                else:
+                    bl = b[:(3*nside_out+1)]
+                print(3*nside_out, lmax_file, len(bl))
+                np.savetxt(beam_fname, np.transpose([ells_beam, bl]))
 
     if args.data:
         # rotating and downgrading data maps
         # both operations carried out in harmonic space (alms)
         # to conserve harmonic properties
         print("---------------------")
-        print("Rotating/downgrading external data maps")
-        meta.timer.start("Rotate/downgrade external data maps")
+        print("Processing external maps")
+        meta.timer.start("Process external maps")
         angles = hp.rotator.coordsys2euler_zyz(coord=["G", "C"])
         for nu in freqs:
             if args.planck:
@@ -272,13 +251,14 @@ def pre_processer(args):
             elif args.wmap:
                 nside_in = 512
 
-            if nside_in != nside_out:  # if downgrading
+            dgrade = (nside_in != nside_out)
+            if dgrade:  # if downgrading
                 # which alms indices to clip before downgrading
                 lmax_in = 3*nside_in - 1
-                clipping_indices = []
+                clip_indices = []
                 for m in range(lmax_out+1):
-                    clipping_indices.append(hp.Alm.getidx(lmax_in, np.arange(m, lmax_out+1), m))  # noqa
-                clipping_indices = np.concatenate(clipping_indices)
+                    clip_indices.append(hp.Alm.getidx(lmax_in, np.arange(m, lmax_out+1), m))  # noqa
+                clip_indices = np.concatenate(clip_indices)
 
             for split in splits:
                 print("---------------------")
@@ -287,18 +267,16 @@ def pre_processer(args):
                     fname_in = f"{npipe_dir}/npipe6v20{split}/npipe6v20{split}_{nu}_map.fits"  # noqa
                     fname_alms = f"{alms_dir}/npipe6v20{split}/alms_npipe6v20{split}_{nu}_map_ns{nside_in}.npz"  # noqa
                     fname_out = f"{map_dir}/planck_f{nu}_split_{splits_dict[split]}.fits"  # noqa
-                    os.makedirs(f"{alms_dir}/npipe6v20{split}",
-                                exist_ok=True)
+                    os.makedirs(f"{alms_dir}/npipe6v20{split}", exist_ok=True)
                 elif args.wmap:
                     fname_in = f"{wmap_dir}/wmap_iqumap_r9_yr{split}_{bands_dict[nu]}_v5.fits"  # noqa
-                    fname_alms = f"{alms_dir}/wmap_{bands_dict[nu]}/alms_wmap_r9_yr{split}_{bands_dict[nu]}_map_{nside_in}.npz"  # noqa
+                    fname_alms = f"{alms_dir}/wmap_{bands_dict[nu]}/alms_wmap_{bands_dict[nu]}_yr{split}_map_{nside_in}.npz"  # noqa
                     fname_out = f"{map_dir}/wmap_f{nu}_split_{split-1}.fits"
                     os.makedirs(f"{alms_dir}/wmap_{bands_dict[nu]}",
                                 exist_ok=True)
 
                 if os.path.isfile(fname_out):
-                    print("map already rotated/downgraded, found at",
-                          fname_out)
+                    print("maps already processed, found in", map_dir)
                     continue
                 if os.path.isfile(fname_alms):
                     print("reading alms at", fname_alms)
@@ -308,54 +286,52 @@ def pre_processer(args):
                                     alm_file['alm_B']])
                 else:
                     print("reading input maps at", fname_in)
-                    # TQU, -> muK
-                    m = to_muk * hp.read_map(fname_in, field=[0, 1, 2])
+                    # read TQU, convert to muK
+                    map_in = to_muk * hp.read_map(fname_in, field=[0, 1, 2])
                     if args.planck:
                         print("removing dipole")
-                        m[0] -= dipole_template[nside_in]
+                        map_in[0] -= dipole_template[nside_in]
 
                     print("computing alms")
-                    alm = hp.map2alm(m, pol=True, use_pixel_weights=True)
+                    alm = hp.map2alm(map_in, pol=True, use_pixel_weights=True)
+                    del map_in
                     print("writing alms to disk")
                     np.savez(fname_alms, alm_T=alm[0],
                              alm_E=alm[1], alm_B=alm[2])
-                    del m
 
-                if nside_in != nside_out:
-                    print("clipping alms")
+                if dgrade:
+                    print(f"downgrading to nside={nside_out}")
                     # clipping alms at l>lmax_out to avoid artifacts
-                    alm = [each[clipping_indices] for each in alm]
+                    alm = [each[clip_indices] for each in alm]
 
                 print("rotating alms from galactic to equatorial coords")
                 hp.rotate_alm(alm, *angles)
 
-                print("projecting alms to map")
-                if nside_in != nside_out:
-                    print(f"and downgrading to nside={nside_out}")
-                m_out = hp.alm2map(alm, nside=nside_out, pol=True)
+                print("projecting alms to maps")
+                map_out = hp.alm2map(alm, nside=nside_out, pol=True)
 
                 # mask external maps with SO binary mask
-                # m_out *= binary_mask
+                map_out *= binary_mask
 
                 print("writing maps to disk")
-                hp.write_map(fname_out, m_out,
+                hp.write_map(fname_out, map_out,
                              overwrite=True, dtype=np.float32)
 
                 if args.plots:
                     print("plotting maps")
                     if args.planck:
-                        utils.plot_map(m_out,
+                        utils.plot_map(map_out,
                                        f"{map_plots_dir}/map_planck_f{nu}_split_{splits_dict[split]}",  # noqa
                                        title=f'planck_f{nu}', TQU=True)
                     elif args.wmap:
-                        utils.plot_map(m_out,
+                        utils.plot_map(map_out,
                                        f"{map_plots_dir}/map_wmap_f{nu}_split_{split-1}",  # noqa
                                        title=f'wmap_f{nu}', TQU=True)
         if 'm_out' in locals():
-            del m_out
+            del map_out
         if 'alm' in locals():
             del alm
-        meta.timer.stop("Rotate/downgrade external data maps")
+        meta.timer.stop("Process external maps")
 
     if args.sims or args.noise:
         print("---------------------")
@@ -363,10 +339,10 @@ def pre_processer(args):
         meta.timer.start("Process simulations")
         nsims = meta.num_sims
         # path to already downgraded and rotated npipe sims
-        if args.planck:
-            ext_sims_dir = f"/global/cfs/cdirs/sobs/users/cranucci/npipe/npipe_nside{nside_out}_coords_eq"  # noqa
-        elif args.wmap:
-            ext_sims_dir = f"/global/cfs/cdirs/sobs/users/cranucci/wmap/noise_sims_nside{nside_out}_coords_eq"  # noqa
+        ext_sims_dir = "/global/cfs/cdirs/sobs/users/cranucci"
+        ext_sims_dir += "/npipe" if args.planck else "/wmap"
+        ext_sims_dir += f"/nside{nside_out}_coords_eq"
+
         if os.path.isdir(ext_sims_dir) or args.wmap:
             process_sims = False
         else:
@@ -379,65 +355,80 @@ def pre_processer(args):
             # starting seed from 0200 to 0000 (if processing original maps)
             sim_id_in = sim_id+200 if process_sims else sim_id
             if args.noise:
+                # noise output dirs
                 if args.planck:
-                    noise_dir = f"{sims_dir}/{sim_id:04d}/npipe_residual"
+                    noise_dir = f"{sims_dir}/{sim_id:04d}/noise_planck"
                 elif args.wmap:
-                    noise_dir = f"{sims_dir}/{sim_id:04d}/wmap_noise"
+                    noise_dir = f"{sims_dir}/{sim_id:04d}/noise_wmap"
                 os.makedirs(noise_dir, exist_ok=True)
             else:
+                # sims output dirs
                 os.makedirs(f"{sims_dir}/{sim_id:04d}", exist_ok=True)
 
             for nu in freqs:
                 nside_in = 1024 if nu == '030' else 2048  # original nside
+                dgrade = (nside_in != nside_out)
 
-                if process_sims:
+                if process_sims and dgrade:
                     # which alms indices to clip before downgrading
                     lmax_in = 3*nside_in - 1
-                    clipping_indices = []
+                    clip_indices = []
                     for m in range(lmax_out+1):
-                        clipping_indices.append(hp.Alm.getidx(lmax_in, np.arange(m, lmax_out+1), m)) # noqa
-                    clipping_indices = np.concatenate(clipping_indices)
+                        clip_indices.append(hp.Alm.getidx(lmax_in, np.arange(m, lmax_out+1), m)) # noqa
+                    clip_indices = np.concatenate(clip_indices)
 
                 for split in splits:
                     print("---------------------")
-                    print(f"-sim {sim_id:04d} - channel {nu} - split {split}")
+                    print(f"sim {sim_id:04d} - channel {nu} - split {split}")
                     if args.noise:
+                        # noise fnames (Planck and WMAP)
                         if args.planck:
-                            fname_in = f"{ext_sims_dir}/npipe6v20{split}_sim/{sim_id_in:04d}/residual/residual_npipe6v20{split}_{nu}_{sim_id_in:04d}.fits"  # noqa
+                            fname_in = f"{ext_sims_dir}/npipe6v20{split}_sim"
+                            fname_in += f"/{sim_id_in:04d}/residual"
+                            fname_in += f"/residual_npipe6v20{split}_{nu}_{sim_id_in:04d}.fits"  # noqa
                             fname_out = f"{noise_dir}/planck_f{nu}_split_{splits_dict[split]}.fits"  # noqa
                         elif args.wmap:
-                            fname_in = f"{ext_sims_dir}/{sim_id_in:04d}/wmap_noise_mK_bandK_yr{split-1}_nside{nside_out}.fits"  # noqa
-                            fname_out = f"{noise_dir}/wmap_f{nu}_split_{split-1}.fits"  # noqa
+                            fname_in = f"{ext_sims_dir}/noise/{sim_id_in:04d}"
+                            fname_in += f"/noise_maps_mK_band{bands_dict[nu]}_yr{split}.fits"  # noqa
+                            fname_out = f"{noise_dir}/wmap_f{nu}_split_{split}.fits"  # noqa
                     else:
-                        fname_in = f"{ext_sims_dir}/npipe6v20{split}_sim/{sim_id_in:04d}/npipe6v20{split}_{nu}_map.fits"  # noqa
+                        # sims fnames (only Planck)
+                        fname_in = f"{ext_sims_dir}/npipe6v20{split}_sim"
+                        fname_in += f"/{sim_id_in:04d}/npipe6v20{split}_{nu}_map.fits"  # noqa
                         fname_out = f"{sims_dir}/{sim_id:04d}/planck_f{nu}_split_{splits_dict[split]}.fits"  # noqa
 
                     if os.path.isfile(fname_out):
-                        print("sims already rotated/downgraded, found at",
-                              fname_out)
+                        print("sims already processed, found in", sims_dir)
                         continue
 
                     print("reading input maps at", fname_in)
-                    m = to_muk * hp.read_map(fname_in, field=[0, 1, 2])
+                    # read TQU, convert to muK
+                    map_in = to_muk * hp.read_map(fname_in, field=[0, 1, 2])
 
                     if process_sims:
                         if not args.noise:
                             # Subtract the dipole (not from noise)
-                            m[0] -= dipole_template[nside_in]
+                            map_in[0] -= dipole_template[nside_in]
                         print("computing alms")
-                        alm = hp.map2alm(m, pol=True, use_pixel_weights=True)
-                        print("clipping alms")
-                        # clipping alms at l>lmax_out to avoid artifacts
-                        alm_clipped = [each[clipping_indices] for each in alm]
-                        print("rotate alms, galactic to equatorial coords")
-                        hp.rotate_alm(alm_clipped, *angles)
-                        print(f"downgrade to nside={nside_out}")
-                        m = hp.alm2map(alm_clipped, nside=nside_out, pol=True)
+                        alm = hp.map2alm(map_in,
+                                         pol=True, use_pixel_weights=True)
+                        del map_in
+
+                        if dgrade:
+                            print(f"downgrading to nside={nside_out}")
+                            # clipping alms at l>lmax_out to avoid artifacts
+                            alm = [each[clip_indices] for each in alm]
+                        print("rotating alms, galactic -> equatorial")
+                        hp.rotate_alm(alm, *angles)
+                        print("projecting alms to map")
+                        map_out = hp.alm2map(alm, nside=nside_out, pol=True)
+                    else:
+                        map_out = map_in
 
                     print("masking")
-                    m *= binary_mask
+                    map_out *= binary_mask
                     print("writing maps to disk")
-                    hp.write_map(fname_out, m,
+                    hp.write_map(fname_out, map_out,
                                  overwrite=True, dtype=np.float32)
         meta.timer.stop("Process simulations")
         print("---------------------")
@@ -462,8 +453,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.wmap and (args.sims or args.noise):
+    if args.wmap and args.sims:
         print("WMAP simulations not available yet.")
+        print("Only noise sims are available.")
         print("exiting...")
     else:
         pre_processer(args)
