@@ -67,7 +67,7 @@ def mocker(args):
         file_root = meta.file_root_from_map_set(map_set)
         beam_fname = f"{beam_dir}/beam_{file_root}.dat"
 
-        if not 'SAT' in map_set and os.path.isfile(beam_fname):
+        if 'SAT' not in map_set and os.path.isfile(beam_fname):
             print("reading beam", file_root)
             _, beams[map_set] = meta.read_beam(map_set)
         else:
