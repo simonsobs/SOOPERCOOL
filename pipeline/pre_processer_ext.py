@@ -233,7 +233,6 @@ def pre_processer(args):
                     bl[lmax_file:] = b[-1]
                 else:
                     bl = b[:(3*nside_out+1)]
-                print(3*nside_out, lmax_file, len(bl))
                 np.savetxt(beam_fname, np.transpose([ells_beam, bl]))
 
     if args.data:
@@ -321,11 +320,11 @@ def pre_processer(args):
                     print("plotting maps")
                     if args.planck:
                         utils.plot_map(map_out,
-                                       f"{map_plots_dir}/map_planck_f{nu}_split_{splits_dict[split]}",  # noqa
+                                       f"{map_plots_dir}/map_planck_f{nu}__{splits_dict[split]}",  # noqa
                                        title=f'planck_f{nu}', TQU=True)
                     elif args.wmap:
                         utils.plot_map(map_out,
-                                       f"{map_plots_dir}/map_wmap_f{nu}_split_{split-1}",  # noqa
+                                       f"{map_plots_dir}/map_wmap_f{nu}__{split-1}",  # noqa
                                        title=f'wmap_f{nu}', TQU=True)
         if 'm_out' in locals():
             del map_out
@@ -357,9 +356,9 @@ def pre_processer(args):
             if args.noise:
                 # noise output dirs
                 if args.planck:
-                    noise_dir = f"{sims_dir}/{sim_id:04d}/noise_planck"
+                    noise_dir = f"{sims_dir}/{sim_id:04d}"
                 elif args.wmap:
-                    noise_dir = f"{sims_dir}/{sim_id:04d}/noise_wmap"
+                    noise_dir = f"{sims_dir}/{sim_id:04d}"
                 os.makedirs(noise_dir, exist_ok=True)
             else:
                 # sims output dirs
@@ -390,7 +389,7 @@ def pre_processer(args):
                         elif args.wmap:
                             fname_in = f"{ext_sims_dir}/noise/{sim_id_in:04d}"
                             fname_in += f"/noise_maps_mK_band{bands_dict[nu]}_yr{split}.fits"  # noqa
-                            fname_out = f"{noise_dir}/wmap_f{nu}_split_{split}.fits"  # noqa
+                            fname_out = f"{noise_dir}/wmap_f{nu}_split_{split-1}.fits"  # noqa
                     else:
                         # sims fnames (only Planck)
                         fname_in = f"{ext_sims_dir}/npipe6v20{split}_sim"
@@ -436,7 +435,7 @@ def pre_processer(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Pre-processing Planck NPIPE maps for the pipeline")
+        description="Pre-processing external data for the pipeline")
     parser.add_argument("--globals", type=str,
                         help="Path to the yaml with global parameters")
     parser.add_argument("--planck", action="store_true",
