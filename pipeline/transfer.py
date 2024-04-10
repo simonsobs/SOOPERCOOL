@@ -308,7 +308,8 @@ def transfer(args):
             **couplings[ms1, ms2]
         )
 
-    # Then for validation simulations (i.e. with/without beams, with/without tf)
+    # Then for validation simulations
+    # (i.e. with/without beams, with/without tf)
     couplings_val_with_tf = get_couplings_dict(
         mcms_dict_val, nmt_binning, spin_pairs,
         transfer_dict=trans,

@@ -77,7 +77,6 @@ class BBmeta(object):
         self._init_filtering_params()
 
         # Tf estimation
-        #self._init_tf_estimation_params()
         self.tf_est_sims_dir = f"{self.pre_process_directory}/tf_est_sims"
         self.tf_val_sims_dir = f"{self.pre_process_directory}/tf_val_sims"
         self.cosmo_sims_dir = f"{self.pre_process_directory}/cosmo_sims"
@@ -295,13 +294,6 @@ class BBmeta(object):
         for name in self.filtering:
             setattr(self, name, self.filtering[name])
 
-    #def _init_tf_estimation_params(self):
-    #    """
-    #    Loop over the transfer function parameters and set them as attributes.
-    #    """
-    #    for name in self.tf_settings:
-    #        setattr(self, name, self.tf_settings[name])
-
     def save_fiducial_cl(self, ell, cl_dict, cl_type):
         """
         Save a fiducial power spectra dictionary to disk and return file name.
@@ -424,13 +416,14 @@ class BBmeta(object):
             filter_function = m_filter_map
 
         elif filtering_type == "toast":
-            kwargs = {"template": tag_settings["template"],
-                      "config": tag_settings["config"],
-                      "schedule": tag_settings["schedule"],
-                      "instrument": tag_settings["tf_instrument"],
-                      "band": tag_settings["tf_band"],
-                      "nside": self.nside,
-                      "sbatch_dir": self.scripts_dir
+            kwargs = {
+                "template": tag_settings["template"],
+                "config": tag_settings["config"],
+                "schedule": tag_settings["schedule"],
+                "instrument": tag_settings["tf_instrument"],
+                "band": tag_settings["tf_band"],
+                "nside": self.nside,
+                "sbatch_dir": self.scripts_dir
             }
             filter_function = toast_filter_map
         else:
@@ -456,7 +449,6 @@ class BBmeta(object):
         print('')
         print("==============================================================")
         print('')
-
 
     def get_nhits_map_from_toast_schedule(self, filter_tag):
         from soopercool.utils import toast_filter_map
@@ -500,8 +492,7 @@ class BBmeta(object):
         else:
             # Run the script directly
             subprocess.run(str(sbatch_file.resolve()), shell=True, check=True)
-
-    
+ 
     def get_map_filename_transfer(self, id_sim, cl_type,
                                   pure_type=None, filter_tag=None):
         """
