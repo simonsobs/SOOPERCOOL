@@ -9,7 +9,7 @@ data_dirs:
   map_directory: "maps"
   beam_directory: "beams"
   bandpasses_directory: "bandpasses"
-  mock_dir: "mock_data"
+  mock_directory: "mock_data"
 ## Then directories in which we will store outputs
 output_dirs:
   root: "../outputs"
@@ -49,7 +49,7 @@ map_sets:
     n_splits: 4
     freq_tag: 145
     exp_tag: "SAT1"
-    filtering_tag: "mcut30"
+    filtering_tag: "mcut15"
 
 ####################
 # Masking metadata #
@@ -130,6 +130,11 @@ filtering:
       filtering_type: "m_filterer"
       m_cut: 30
       beam: null # beam null means no beam is applied to TF estimation steps
+
+    mcut15:
+      filtering_type: "m_filterer"
+      m_cut: 15
+      beam: null
 
     toast_SAT1_f090:
       filtering_type: "toast"
