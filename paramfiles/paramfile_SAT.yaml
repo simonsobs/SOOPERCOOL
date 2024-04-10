@@ -1,4 +1,4 @@
-# Here is a sample .yaml file that can be used 
+# Here is a sample .yaml file that can be used
 # to store the metadata necessary to run the
 # SO BB pipeline.
 
@@ -107,7 +107,7 @@ sim_pars:
     one_over_f_mode: "optimistic"
 
   mock_nsrcs: 80
-  mock_srcs_hole_radius: 40  
+  mock_srcs_hole_radius: 40
 
 ## Filtering related parameters
 filtering:
@@ -153,7 +153,7 @@ filtering:
     amp: 1.0
     delta_ell: 10
     power_law_index: 2.
-  
+
   ## Parameters of the PL sims used for TF validation
   power_law_pars_tf_val:
     amp:

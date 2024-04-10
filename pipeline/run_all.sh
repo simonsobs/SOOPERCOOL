@@ -42,6 +42,7 @@ echo "-------------------------"
 python filterer.py --globals ${paramfile} --data
 #OMP_NUM_THREADS=2 mpirun -n 4 python filterer.py --globals ${paramfile} --data
 
+
 echo "------------------------------------------------------------"
 echo "|                 COMPUTING POWER SPECTRA                  |"
 echo "------------------------------------------------------------"
