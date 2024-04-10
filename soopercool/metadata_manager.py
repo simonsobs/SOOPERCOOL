@@ -122,10 +122,6 @@ class BBmeta(object):
         """
         for key, value in self.general_pars.items():
             setattr(self, key, value)
-        # If "tf_est_pure_B" is left unspecified, use B-mode purification
-        # on the TF estimation sims only if data is also B-purified.
-        if "tf_est_pure_B" not in self.general_pars:
-            setattr(self, "tf_est_pure_B", self.pure_B)
 
     def _get_map_sets_list(self):
         """
@@ -706,7 +702,6 @@ class BBmeta(object):
         """
         nmt_binning = self.read_nmt_binning()
         n_bins = nmt_binning.get_n_bands()
-        pure_string = "_pure" if self.tf_est_pure_B and not beamed else ""
         filter_flags = [""] if beamed else ["filtered", "unfiltered"]
         map_set_pairs = (self.get_ps_names_list(type="all", coadd=True)
                          if beamed else [("", "")])
@@ -715,7 +710,7 @@ class BBmeta(object):
         for ms1, ms2 in map_set_pairs:
             for filter_flag in filter_flags:
                 map_label = f"{ms1}_{ms2}" if beamed else ""
-                fname = f"couplings_{map_label}{filter_flag}{pure_string}"
+                fname = f"couplings_{map_label}{filter_flag}"
                 couplings = np.load(f"{self.coupling_directory}/{fname}.npz")
                 coupling_dict = {
                     k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
