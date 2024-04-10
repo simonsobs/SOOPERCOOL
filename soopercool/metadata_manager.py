@@ -492,7 +492,7 @@ class BBmeta(object):
         else:
             # Run the script directly
             subprocess.run(str(sbatch_file.resolve()), shell=True, check=True)
- 
+
     def get_map_filename_transfer(self, id_sim, cl_type,
                                   pure_type=None, filter_tag=None):
         """

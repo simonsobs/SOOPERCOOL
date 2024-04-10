@@ -94,7 +94,7 @@ def mcmer(args):
     # used for the transfer validation stage, in
     # case we beamed the estimation and validation simulations
     for ftag1, ftag2 in meta.get_independent_filtering_pairs():
-        
+
         beam_label1 = meta.tags_settings[ftag1]["beam"]
         beam_label2 = meta.tags_settings[ftag2]["beam"]
 
@@ -103,7 +103,7 @@ def mcmer(args):
 
         beamed_mcm = mcm * \
             np.outer(bl1, bl2)[np.newaxis, :, np.newaxis, :]
-        
+
         mcm_binned = np.einsum('ij,kjlm->kilm', binner, beamed_mcm)
 
         fname = f"{coupling_dir}/mcm_{ftag1}_{ftag2}.npz"

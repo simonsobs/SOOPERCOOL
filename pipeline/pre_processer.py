@@ -172,7 +172,7 @@ def pre_processer(args):
 
                 else:
                     for ftag, bl in beams.items():
-                        
+
                         sim = utils.generate_map_from_alms(
                             [alms_T, alms_E, alms_B],
                             meta.nside,
