@@ -100,6 +100,7 @@ def filter(args):
                 else:
                     filter_map(map, map_file, mask)
 
+        filtering_tags = meta.get_filtering_tags()
         filtering_type_list = [meta.tags_settings[ftag]["filtering_type"] for ftag in filtering_tags]
         if "toast" in filtering_type_list:
             _type = 'sims' if args.sims else 'data'
