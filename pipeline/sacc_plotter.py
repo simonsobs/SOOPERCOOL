@@ -74,7 +74,7 @@ def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
         main = plt.subplot(grid[:-1])
         sub = plt.subplot(grid[-1])
         sub.set_xlabel(r"$\ell$")
-        sub.set_ylabel(r"$\Delta C_\ell / \sigma$")
+        sub.set_ylabel(r"$\Delta C_\ell / (\sigma / \sqrt{N_\mathrm{sims}})$")
     else:
         main = plt.subplot(grid[:])
         main.set_xlabel(r"$\ell$")
@@ -211,6 +211,8 @@ def sacc_plotter(args):
         s = sacc.Sacc.load_fits(f"{sacc_dir}/cl_and_cov_sacc{sim_label}.fits")
 
         for ms1, ms2 in ps_names:
+            ftag1 = meta.filtering_tag_from_map_set(ms1)
+            ftag2 = meta.filtering_tag_from_map_set(ms2)
 
             for fp in field_pairs:
                 f1, f2 = fp
