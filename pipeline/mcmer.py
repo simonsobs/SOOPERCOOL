@@ -28,12 +28,7 @@ def mcmer(args):
 
     # Create dummy NaMaster fields, spin-2 is optionally purified.
     field_spin0 = nmt.NmtField(mask, None, spin=0)
-    field_spin2 = nmt.NmtField(mask, None, spin=2)
-    # Whether we want to B-purify data or transfer function estimations,
-    # in either case we will need a purified mode coupling matrix.
-    if meta.pure_B or meta.tf_est_pure_B:
-        field_spin2_pure = nmt.NmtField(mask, None, spin=2,
-                                        purify_b=True)
+    field_spin2 = nmt.NmtField(mask, None, spin=2, purify_b=meta.pure_B)
 
     # Binning scheme is irrelevant for us, but NaMaster needs one.
     nmt_bins = meta.read_nmt_binning()
@@ -47,20 +42,10 @@ def mcmer(args):
     print("Computing MCM")
     w = nmt.NmtWorkspace()
     w.compute_coupling_matrix(field_spin0, field_spin2, nmt_bins, is_teb=True)
-    if meta.pure_B or meta.tf_est_pure_B:
-        w_pure = nmt.NmtWorkspace()
-        w_pure.compute_coupling_matrix(field_spin0, field_spin2_pure, nmt_bins,
-                                       is_teb=True)
 
     mcm = np.transpose(w.get_coupling_matrix().reshape([nl, nspec, nl, nspec]),
                        axes=[1, 0, 3, 2])
     mcm_binned = np.einsum('ij,kjlm->kilm', binner, mcm)
-    if meta.pure_B or meta.tf_est_pure_B:
-        mcm_pure = np.transpose(
-            w_pure.get_coupling_matrix().reshape([nl, nspec, nl, nspec]),
-            axes=[1, 0, 3, 2]
-        )
-        mcm_pure_binned = np.einsum('ij,kjlm->kilm', binner, mcm_pure)
 
     # Load beams to correct the mode coupling matrix
     beams = {}
@@ -71,8 +56,7 @@ def mcmer(args):
     # Beam-correct the mode coupling matrix
     beamed_mcm = {}
     for map_set1, map_set2 in meta.get_ps_names_list("all", coadd=True):
-        m = mcm_pure if meta.pure_B else mcm
-        beamed_mcm[map_set1, map_set2] = m * \
+        beamed_mcm[map_set1, map_set2] = mcm * \
             np.outer(beams[map_set1],
                      beams[map_set2])[np.newaxis, :, np.newaxis, :]
     # Save files
@@ -88,22 +72,6 @@ def mcmer(args):
         spin0xspin2_binned=mcm_binned[1:3, :, 1:3, :],
         spin2xspin2_binned=mcm_binned[3:, :, 3:, :]
     )
-
-    # If we B-purify for transfer function estimation, store the
-    # un-beamed purified mode coupling matrix
-    if meta.tf_est_pure_B:
-        fname = f"{coupling_dir}/mcm_pure.npz"
-        np.savez(
-            fname,
-            binner=binner,
-            spin0xspin0=mcm_pure[0, :, 0, :].reshape([1, nl, 1, nl]),
-            spin0xspin2=mcm_pure[1:3, :, 1:3, :],
-            spin2xspin2=mcm_pure[3:, :, 3:, :],
-            spin0xspin0_binned=mcm_pure_binned[0, :, 0, :].reshape([1, n_bins,
-                                                                    1, nl]),
-            spin0xspin2_binned=mcm_pure_binned[1:3, :, 1:3, :],
-            spin2xspin2_binned=mcm_pure_binned[3:, :, 3:, :]
-        )
 
     # Then the beamed MCM
     for map_set1, map_set2 in meta.get_ps_names_list("all", coadd=True):

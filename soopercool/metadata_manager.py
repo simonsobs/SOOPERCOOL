@@ -77,7 +77,7 @@ class BBmeta(object):
         self._init_filtering_params()
 
         # Tf estimation
-        self._init_tf_estimation_params()
+        #self._init_tf_estimation_params()
         self.tf_est_sims_dir = f"{self.pre_process_directory}/tf_est_sims"
         self.tf_val_sims_dir = f"{self.pre_process_directory}/tf_val_sims"
         self.cosmo_sims_dir = f"{self.pre_process_directory}/cosmo_sims"
@@ -299,12 +299,12 @@ class BBmeta(object):
         for name in self.filtering:
             setattr(self, name, self.filtering[name])
 
-    def _init_tf_estimation_params(self):
-        """
-        Loop over the transfer function parameters and set them as attributes.
-        """
-        for name in self.tf_settings:
-            setattr(self, name, self.tf_settings[name])
+    #def _init_tf_estimation_params(self):
+    #    """
+    #    Loop over the transfer function parameters and set them as attributes.
+    #    """
+    #    for name in self.tf_settings:
+    #        setattr(self, name, self.tf_settings[name])
 
     def save_fiducial_cl(self, ell, cl_dict, cl_type):
         """
@@ -469,7 +469,7 @@ class BBmeta(object):
         tag_settings = self.tags_settings[filter_tag]
 
         if tag_settings["filtering_type"] != "toast":
-            raise NotImplementedError(f"Filterer type {tag_settings["filtering_type"]} " # noqa
+            raise NotImplementedError(f"Filterer type {tag_settings['filtering_type']} " # noqa
                                       "not implemented")
         kwargs = {
             "map": None,

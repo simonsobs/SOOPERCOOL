@@ -279,12 +279,12 @@ def pcler(args):
                     field = {
                         "spin0": nmt.NmtField(mask, map[:1]),
                         "spin2": nmt.NmtField(mask, map[1:],
-                                              purify_b=meta.tf_est_pure_B)
+                                              purify_b=meta.pure_B)
                     }
                     field_filtered = {
                         "spin0": nmt.NmtField(mask, map_filtered[:1]),
                         "spin2": nmt.NmtField(mask, map_filtered[1:],
-                                              purify_b=meta.tf_est_pure_B)
+                                              purify_b=meta.pure_B)
                     }
 
                     fields[ftag]["unfiltered"][pure_type] = field
@@ -315,7 +315,6 @@ def pcler(args):
         filtering_tags = meta.get_filtering_tags()
         meta.timer.start("couplings_tf_val")
         inv_couplings = {}
-        pure_str = "_pure" if meta.tf_est_pure_B else ""
 
         for ftype in ["filtered", "unfiltered"]:
 
@@ -324,7 +323,7 @@ def pcler(args):
             for ftag1, ftag2 in filtering_tag_pairs:
 
                 cross_name = f"{ftag1}x{ftag2}"
-                couplings = np.load(f"{meta.coupling_directory}/couplings_{cross_name}_{ftype}{pure_str}.npz")  # noqa
+                couplings = np.load(f"{meta.coupling_directory}/couplings_{cross_name}_{ftype}.npz")  # noqa
                 inv_couplings[ftype][ftag1, ftag2] = {
                     k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
                                                                 ncl*n_bins])
@@ -357,7 +356,7 @@ def pcler(args):
                         fields[ftag] = {
                             "spin0": nmt.NmtField(mask, map[:1]),
                             "spin2": nmt.NmtField(mask, map[1:],
-                                                  purify_b=meta.tf_est_pure_B)
+                                                  purify_b=meta.pure_B)
                         }
 
                     for ftag1, ftag2 in filtering_tag_pairs:

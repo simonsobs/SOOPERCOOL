@@ -254,21 +254,17 @@ def transfer(args):
 
     meta.timer.start("Load mode-coupling matrices")
     # Load the beam corrected mode coupling matrices
+    # used for the data and cov sims
     ps_names = meta.get_ps_names_list("all", coadd=True)
     mcms_dict = load_mcms(coupling_dir, spin_pairs, ps_names=ps_names)
 
     # Load the un-beamed mode coupling matrix
+    # for the TF validation steps, including
+    # the beam according to the filtering tag
     mcms_dict_val = load_mcms(coupling_dir,
                               spin_pairs,
                               ps_names=filtering_pairs)
 
-    # If we B-purify for transfer function estimation, load the un-beamed
-    # purified mode coupling matrix
-    if meta.tf_est_pure_B:
-        mcms_dict_val_pure = load_mcms(coupling_dir,
-                                       spin_pairs,
-                                       ps_names=filtering_pairs,
-                                       B_pure=True)
     meta.timer.stop("Load mode-coupling matrices", verbose=True)
 
     # Compute and save the transfer functions
@@ -312,8 +308,7 @@ def transfer(args):
             **couplings[ms1, ms2]
         )
 
-    # Then for validation simulations (i.e. no beams, with/without tf)
-
+    # Then for validation simulations (i.e. with/without beams, with/without tf)
     couplings_val_with_tf = get_couplings_dict(
         mcms_dict_val, nmt_binning, spin_pairs,
         transfer_dict=trans,
@@ -334,28 +329,6 @@ def transfer(args):
             **couplings_val_without_tf[ftag1, ftag2]
         )
 
-    # Finally an optional case for pure B tf estimation
-    if meta.tf_est_pure_B:
-        couplings_val_with_tf_pure = get_couplings_dict(
-            mcms_dict_val_pure, nmt_binning, spin_pairs,
-            transfer_dict=trans,
-            filtering_pairs=filtering_pairs
-        )
-        couplings_val_without_tf_pure = get_couplings_dict(
-            mcms_dict_val_pure, nmt_binning, spin_pairs,
-            filtering_pairs=filtering_pairs
-        )
-
-        for ftag1, ftag2 in filtering_pairs:
-            ftag_label = f"{ftag1}x{ftag2}"
-            np.savez(
-                f"{coupling_dir}/couplings_{ftag_label}_filtered_pure.npz",
-                **couplings_val_with_tf_pure[ftag1, ftag2]
-            )
-            np.savez(
-                f"{coupling_dir}/couplings_{ftag_label}_unfiltered_pure.npz",
-                **couplings_val_without_tf_pure
-            )
     meta.timer.stop("Compute full coupling", verbose=True)
 
 
