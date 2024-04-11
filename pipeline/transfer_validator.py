@@ -1,7 +1,8 @@
 import argparse
 import numpy as np
-import matplotlib.pyplot as plt
 from soopercool import BBmeta
+import matplotlib.pyplot as plt
+from soopercool import utils
 
 
 def read_transfer(transfer_file):
@@ -33,93 +34,65 @@ def transfer_validator(args):
 
     fields = ["TT", "TE", "TB", "EE", "EB", "BE", "BB"]
 
-    tf_dict = read_transfer(f"{meta.coupling_directory}/transfer_function.npz")
-
     nmt_binning = meta.read_nmt_binning()
     nl = nmt_binning.lmax+1
     lb = nmt_binning.get_effective_ells()
 
     plot_dir = meta.plot_dir_from_output_dir(meta.coupling_directory)
+
+    filtering_pairs = meta.get_independent_filtering_pairs()
+
     # First plot the transfer functions
-    plt.figure(figsize=(20, 20))
-    grid = plt.GridSpec(7, 7, hspace=0.3, wspace=0.3)
+    for ftag1, ftag2 in filtering_pairs:
+        tf_dict = read_transfer(
+            f"{meta.coupling_directory}/transfer_function_{ftag1}x{ftag2}.npz"
+        )
 
-    for id1, f1 in enumerate(fields):
-        for id2, f2 in enumerate(fields):
-            ax = plt.subplot(grid[id1, id2])
-
-            if f1 == "TT" and f2 != "TT":
-                ax.axis("off")
-                continue
-            if f1 in ["TE", "TB"] and f2 not in ["TE", "TB"]:
-                ax.axis("off")
-                continue
-            if f1 in ["EE", "EB", "BE", "BB"] and \
-               f2 not in ["EE", "EB", "BE", "BB"]:
-                ax.axis("off")
-                continue
-
-            ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
-
-            ax.errorbar(
-                lb, tf_dict[f1, f2], tf_dict[f1, f2, "std"],
-                marker=".", markerfacecolor="white",
-                color="navy")
-
-            if not ([id1, id2] in [[0, 0], [2, 1],
-                                   [2, 2], [6, 3],
-                                   [6, 4], [6, 5],
-                                   [6, 6]]):
-                ax.set_xticks([])
-            else:
-                ax.set_xlabel(r"$\ell$", fontsize=14)
-
-            if f1 == f2:
-                ax.axhline(1., color="k", ls="--")
-            else:
-                ax.axhline(0, color="k", ls="--")
-
-            ax.set_xlim(meta.lmin, meta.lmax)
-
-    plt.savefig(f"{plot_dir}/transfer.pdf", bbox_inches="tight")
+        utils.plot_transfer_function(
+            lb, tf_dict, meta.lmin, meta.lmax,
+            fields,
+            file_name=f"{plot_dir}/transfer_{ftag1}x{ftag2}.pdf"
+        )
 
     # Then we read the decoupled spectra
-    # both for the filtered and unfiltered
-    # cases
+    # both for the filtered and unfiltered cases
     cl_dir = meta.cell_transfer_directory
     cross_fields = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
     val_types = ["tf_val", "cosmo"]
-    filter_flags = ["filtered", "unfiltered"]
+    ftypes = ["filtered", "unfiltered"]
 
     cls_dict = {
-        (val_type, filter_flag, k): []
+        (val_type, ftype, ftag1, ftag2, k): []
         for val_type in val_types
         for k in cross_fields
-        for filter_flag in filter_flags
+        for ftype in ftypes
+        for ftag1, ftag2 in filtering_pairs
     }
 
     for val_type in ["tf_val", "cosmo"]:
-        for filter_flag in filter_flags:
-            for id_sim in range(meta.tf_est_num_sims):
-
-                cls = np.load(f"{cl_dir}/pcls_{val_type}_{id_sim:04d}_{filter_flag}.npz")  # noqa
-                for k in cross_fields:
-                    cls_dict[val_type, filter_flag, k] += [cls[k]]
+        for ftype in ftypes:
+            for ftag1, ftag2 in filtering_pairs:
+                for id_sim in range(meta.tf_est_num_sims):
+                    cls = np.load(f"{cl_dir}/pcls_{val_type}_{ftag1}x{ftag2}_{id_sim:04d}_{ftype}.npz")  # noqa
+                    for k in cross_fields:
+                        cls_dict[val_type, ftype, ftag1, ftag2, k] += [cls[k]]
 
     # Compute mean and std
     cls_mean_dict = {
-        (val_type, filter_flag, k):
-        np.mean(cls_dict[val_type, filter_flag, k], axis=0)
+        (val_type, ftype, ftag1, ftag2, k):
+        np.mean(cls_dict[val_type, ftype, ftag1, ftag2, k], axis=0)
         for val_type in val_types
-        for filter_flag in filter_flags
+        for ftype in ftypes
         for k in cross_fields
+        for ftag1, ftag2 in filtering_pairs
     }
     cls_std_dict = {
-        (val_type, filter_flag, k):
-        np.std(cls_dict[val_type, filter_flag, k], axis=0)
+        (val_type, ftype, ftag1, ftag2, k):
+        np.std(cls_dict[val_type, ftype, ftag1, ftag2, k], axis=0)
         for val_type in val_types
-        for filter_flag in filter_flags
+        for ftype in ftypes
         for k in cross_fields
+        for ftag1, ftag2 in filtering_pairs
     }
     cls_theory = {
         val_type: meta.load_fiducial_cl(val_type)
@@ -127,126 +100,167 @@ def transfer_validator(args):
     }
 
     cls_theory_binned = {}
-    bp_win = np.load(f"{meta.coupling_directory}/couplings_unfiltered.npz")
-    for spin_comb in ["spin0xspin0", "spin0xspin2", "spin2xspin2"]:
-        bpw_mat = bp_win[f"bp_win_{spin_comb}"]
-        for val_type in val_types:
-            if spin_comb == "spin0xspin0":
-                cls_vec = np.array([cls_theory[val_type]["TT"][:nl]])
-                cls_vec = cls_vec.reshape(1, nl)
-            elif spin_comb == "spin0xspin2":
-                cls_vec = np.array([cls_theory[val_type]["TE"][:nl],
-                                    cls_theory[val_type]["TB"][:nl]])
-            elif spin_comb == "spin2xspin2":
-                cls_vec = np.array([cls_theory[val_type]["EE"][:nl],
-                                    cls_theory[val_type]["EB"][:nl],
-                                    cls_theory[val_type]["EB"][:nl],
-                                    cls_theory[val_type]["BB"][:nl]])
+    for ftag1, ftag2 in filtering_pairs:
+        ftag_label = f"{ftag1}x{ftag2}"
+        bp_win = np.load(
+            f"{meta.coupling_directory}/couplings_{ftag_label}_unfiltered.npz"
+        )
+        for spin_comb in ["spin0xspin0", "spin0xspin2", "spin2xspin2"]:
+            bpw_mat = bp_win[f"bp_win_{spin_comb}"]
+            for val_type in val_types:
+                if spin_comb == "spin0xspin0":
+                    cls_vec = np.array([cls_theory[val_type]["TT"][:nl]])
+                    cls_vec = cls_vec.reshape(1, nl)
+                elif spin_comb == "spin0xspin2":
+                    cls_vec = np.array([cls_theory[val_type]["TE"][:nl],
+                                        cls_theory[val_type]["TB"][:nl]])
+                elif spin_comb == "spin2xspin2":
+                    cls_vec = np.array([cls_theory[val_type]["EE"][:nl],
+                                        cls_theory[val_type]["EB"][:nl],
+                                        cls_theory[val_type]["EB"][:nl],
+                                        cls_theory[val_type]["BB"][:nl]])
 
-            cls_vec_binned = np.einsum("ijkl,kl", bpw_mat, cls_vec)
-            if spin_comb == "spin0xspin0":
-                cls_theory_binned[val_type, "TT"] = cls_vec_binned[0]
-            elif spin_comb == "spin0xspin2":
-                cls_theory_binned[val_type, "TE"] = cls_vec_binned[0]
-                cls_theory_binned[val_type, "TB"] = cls_vec_binned[1]
-            elif spin_comb == "spin2xspin2":
-                cls_theory_binned[val_type, "EE"] = cls_vec_binned[0]
-                cls_theory_binned[val_type, "EB"] = cls_vec_binned[1]
-                cls_theory_binned[val_type, "BE"] = cls_vec_binned[2]
-                cls_theory_binned[val_type, "BB"] = cls_vec_binned[3]
+                cls_vec_binned = np.einsum("ijkl,kl", bpw_mat, cls_vec)
+                if spin_comb == "spin0xspin0":
+                    cls_theory_binned[ftag1, ftag2, val_type, "TT"] = \
+                        cls_vec_binned[0]
+                elif spin_comb == "spin0xspin2":
+                    cls_theory_binned[ftag1, ftag2, val_type, "TE"] = \
+                        cls_vec_binned[0]
+                    cls_theory_binned[ftag1, ftag2, val_type, "TB"] = \
+                        cls_vec_binned[1]
+                elif spin_comb == "spin2xspin2":
+                    cls_theory_binned[ftag1, ftag2, val_type, "EE"] = \
+                        cls_vec_binned[0]
+                    cls_theory_binned[ftag1, ftag2, val_type, "EB"] = \
+                        cls_vec_binned[1]
+                    cls_theory_binned[ftag1, ftag2, val_type, "BE"] = \
+                        cls_vec_binned[2]
+                    cls_theory_binned[ftag1, ftag2, val_type, "BB"] = \
+                        cls_vec_binned[3]
 
     for val_type in val_types:
-        plt.figure(figsize=(16, 16))
-        grid = plt.GridSpec(9, 3, hspace=0.3, wspace=0.3)
-        for id1, f1 in enumerate("TEB"):
-            for id2, f2 in enumerate("TEB"):
-                # Define subplots
-                main = plt.subplot(grid[3*id1:3*(id1+1)-1, id2])
-                sub = plt.subplot(grid[3*(id1+1)-1, id2])
+        for ftag1, ftag2 in filtering_pairs:
+            plt.figure(figsize=(16, 16))
+            grid = plt.GridSpec(9, 3, hspace=0.3, wspace=0.3)
+            for id1, f1 in enumerate("TEB"):
+                for id2, f2 in enumerate("TEB"):
+                    # Define subplots
+                    main = plt.subplot(grid[3*id1:3*(id1+1)-1, id2])
+                    sub = plt.subplot(grid[3*(id1+1)-1, id2])
 
-                spec = f2 + f1 if id1 > id2 else f1 + f2
+                    spec = f2 + f1 if id1 > id2 else f1 + f2
 
-                # Plot theory
-                ell = cls_theory[val_type]["l"]
-                rescaling = 1 if val_type == "tf_val" \
-                    else ell * (ell + 1) / (2*np.pi)
-                main.plot(ell, rescaling*cls_theory[val_type][spec], color="k")
+                    # Plot theory
+                    ell = cls_theory[val_type]["l"]
+                    rescaling = 1 if val_type == "tf_val" \
+                        else ell * (ell + 1) / (2*np.pi)
+                    main.plot(ell, rescaling*cls_theory[val_type][spec],
+                              color="k")
 
-                offset = 0.5
-                rescaling = 1 if val_type == "tf_val" \
-                    else lb * (lb + 1) / (2*np.pi)
-                # Plot filtered & unfiltered (decoupled)
-                main.errorbar(
-                    lb-offset, rescaling*cls_mean_dict[val_type,
-                                                       "unfiltered",
-                                                       spec],
-                    rescaling*cls_std_dict[val_type, "unfiltered", spec],
-                    color="navy", marker=".", markerfacecolor="white",
-                    label=r"Unfiltered decoupled $C_\ell$", ls="None"
-                )
-                main.errorbar(
-                    lb+offset, rescaling*cls_mean_dict[val_type,
-                                                       "filtered",
-                                                       spec],
-                    rescaling*cls_std_dict[val_type, "filtered", spec],
-                    color="darkorange", marker=".", markerfacecolor="white",
-                    label=r"Filtered decoupled $C_\ell$", ls="None"
-                )
+                    offset = 0.5
+                    rescaling = 1 if val_type == "tf_val" \
+                        else lb * (lb + 1) / (2*np.pi)
+                    # Plot filtered & unfiltered (decoupled)
+                    main.errorbar(
+                        lb-offset,
+                        rescaling*cls_mean_dict[val_type,
+                                                "unfiltered",
+                                                ftag1, ftag2,
+                                                spec],
+                        rescaling*cls_std_dict[val_type,
+                                               "unfiltered",
+                                               ftag1, ftag2,
+                                               spec],
+                        color="navy",
+                        marker=".",
+                        markerfacecolor="white",
+                        label=r"Unfiltered decoupled $C_\ell$",
+                        ls="None"
+                    )
+                    main.errorbar(
+                        lb+offset, rescaling*cls_mean_dict[val_type,
+                                                           "filtered",
+                                                           ftag1, ftag2,
+                                                           spec],
+                        rescaling*cls_std_dict[val_type,
+                                               "filtered",
+                                               ftag1, ftag2,
+                                               spec],
+                        color="darkorange",
+                        marker=".",
+                        markerfacecolor="white",
+                        label=r"Filtered decoupled $C_\ell$",
+                        ls="None"
+                    )
 
-                if f1 == f2:
-                    main.set_yscale("log")
+                    main.plot(lb,
+                              rescaling*cls_theory_binned[ftag1, ftag2,
+                                                          val_type, spec],
+                              color="tab:red", ls="--", label="Theory")
 
-                # Plot residuals
-                residual_unfiltered = \
-                    (cls_mean_dict[val_type, "unfiltered", spec] -
-                     cls_theory_binned[val_type, spec]) / \
-                    cls_std_dict[val_type, "unfiltered", spec]
-                residual_filtered = \
-                    (cls_mean_dict[val_type, "filtered", spec] -
-                     cls_theory_binned[val_type, spec]) / \
-                    cls_std_dict[val_type, "filtered", spec]
+                    if f1 == f2:
+                        main.set_yscale("log")
 
-                sub.axhspan(-2, 2, color="gray", alpha=0.2)
-                sub.axhspan(-1, 1, color="gray", alpha=0.7)
+                    # Plot residuals
+                    residual_unfiltered = \
+                        (cls_mean_dict[val_type, "unfiltered",
+                                       ftag1, ftag2, spec] -
+                         cls_theory_binned[ftag1, ftag2,
+                                           val_type, spec]) / \
+                        cls_std_dict[val_type, "unfiltered",
+                                     ftag1, ftag2, spec]
 
-                sub.axhline(0, color="k")
-                sub.plot(lb-offset,
-                         residual_unfiltered * np.sqrt(meta.tf_est_num_sims),
-                         color="navy", marker=".", markerfacecolor="white",
-                         ls="None")
-                sub.plot(lb+offset,
-                         residual_filtered * np.sqrt(meta.tf_est_num_sims),
-                         color="darkorange", marker=".",
-                         markerfacecolor="white", ls="None")
+                    residual_filtered = \
+                        (cls_mean_dict[val_type, "filtered",
+                                       ftag1, ftag2, spec] -
+                         cls_theory_binned[ftag1, ftag2,
+                                           val_type, spec]) / \
+                        cls_std_dict[val_type, "filtered",
+                                     ftag1, ftag2, spec]
 
-                # Multipole range
-                main.set_xlim(2, meta.lmax)
-                sub.set_xlim(*main.get_xlim())
+                    sub.axhspan(-2, 2, color="gray", alpha=0.2)
+                    sub.axhspan(-1, 1, color="gray", alpha=0.7)
 
-                # Suplot y range
-                sub.set_ylim((-5., 5.))
+                    sub.axhline(0, color="k")
+                    sqrt_nsims = np.sqrt(meta.tf_est_num_sims)
+                    sub.plot(lb-offset,
+                             residual_unfiltered * sqrt_nsims,
+                             color="navy", marker=".", markerfacecolor="white",
+                             ls="None")
+                    sub.plot(lb+offset,
+                             residual_filtered * sqrt_nsims,
+                             color="darkorange", marker=".",
+                             markerfacecolor="white", ls="None")
 
-                # Cosmetix
-                main.set_title(f1+f2, fontsize=14)
-                if spec == "TT":
-                    main.legend(fontsize=13)
-                main.set_xticklabels([])
-                if id1 != 2:
-                    sub.set_xticklabels([])
-                else:
-                    sub.set_xlabel(r"$\ell$", fontsize=13)
+                    # Multipole range
+                    main.set_xlim(2, meta.lmax)
+                    sub.set_xlim(*main.get_xlim())
 
-                if id2 == 0:
-                    if isinstance(rescaling, float):
-                        main.set_ylabel(r"$C_\ell$", fontsize=13)
+                    # Suplot y range
+                    sub.set_ylim((-5., 5.))
+
+                    # Cosmetix
+                    main.set_title(f1+f2, fontsize=14)
+                    if spec == "TT":
+                        main.legend(fontsize=13)
+                    main.set_xticklabels([])
+                    if id1 != 2:
+                        sub.set_xticklabels([])
                     else:
-                        main.set_ylabel(r"$\ell(\ell+1)C_\ell/2\pi$",
-                                        fontsize=13)
-                    sub.set_ylabel(r"$\Delta C_\ell / (\sigma/\sqrt{N_\mathrm{sims}})$",  # noqa
-                                   fontsize=13)
+                        sub.set_xlabel(r"$\ell$", fontsize=13)
 
-        plt.savefig(f"{plot_dir}/decoupled_{val_type}.pdf",
-                    bbox_inches="tight")
+                    if id2 == 0:
+                        if isinstance(rescaling, float):
+                            main.set_ylabel(r"$C_\ell$", fontsize=13)
+                        else:
+                            main.set_ylabel(r"$\ell(\ell+1)C_\ell/2\pi$",
+                                            fontsize=13)
+                        sub.set_ylabel(r"$\Delta C_\ell / (\sigma/\sqrt{N_\mathrm{sims}})$",  # noqa
+                                       fontsize=13)
+
+            plt.savefig(f"{plot_dir}/decoupled_{val_type}_{ftag1}x{ftag2}.pdf",
+                        bbox_inches="tight")
 
 
 if __name__ == "__main__":

@@ -73,8 +73,10 @@ class BBmeta(object):
         # Simulation
         self._init_simulation_params()
 
+        # Filtering
+        self._init_filtering_params()
+
         # Tf estimation
-        self._init_tf_estimation_params()
         self.tf_est_sims_dir = f"{self.pre_process_directory}/tf_est_sims"
         self.tf_val_sims_dir = f"{self.pre_process_directory}/tf_val_sims"
         self.cosmo_sims_dir = f"{self.pre_process_directory}/cosmo_sims"
@@ -83,6 +85,10 @@ class BBmeta(object):
         self.cosmo_cls_file = f"{self.pre_process_directory}/cosmo_cls.npz"
         self.tf_est_cls_file = f"{self.pre_process_directory}/tf_est_cls.npz"
         self.tf_val_cls_file = f"{self.pre_process_directory}/tf_val_cls.npz"
+        self.noise_cls_file = {
+            map_set: f"{self.pre_process_directory}/noise_cls_{map_set}.npz"
+            for map_set in self.map_sets_list
+        }
 
         # Initialize a timer
         self.timer = Timer()
@@ -115,10 +121,6 @@ class BBmeta(object):
         """
         for key, value in self.general_pars.items():
             setattr(self, key, value)
-        # If "tf_est_pure_B" is left unspecified, use B-mode purification
-        # on the TF estimation sims only if data is also B-purified.
-        if "tf_est_pure_B" not in self.general_pars:
-            setattr(self, "tf_est_pure_B", self.pure_B)
 
     def _get_map_sets_list(self):
         """
@@ -273,22 +275,24 @@ class BBmeta(object):
         file_root = self.file_root_from_map_set(map_set)
         beam_file = f"{self.beam_directory}/beam_{file_root}.dat"
         l, bl = np.loadtxt(beam_file, unpack=True)
+        if self.beam_floor is not None:
+            bl[bl < self.beam_floor] = self.beam_floor
         return l, bl
 
     def _init_simulation_params(self):
         """
         Loop over the simulation parameters and set them as attributes.
         """
-        for name in ["num_sims", "cosmology", "anisotropic_noise",
+        for name in ["num_sims", "cosmology", "noise", "anisotropic_noise",
                      "null_e_modes", "mock_nsrcs", "mock_srcs_hole_radius"]:
             setattr(self, name, self.sim_pars[name])
 
-    def _init_tf_estimation_params(self):
+    def _init_filtering_params(self):
         """
-        Loop over the transfer function parameters and set them as attributes.
+        Loop over the filtering parameters and set them as attributes.
         """
-        for name in self.tf_settings:
-            setattr(self, name, self.tf_settings[name])
+        for name in self.filtering:
+            setattr(self, name, self.filtering[name])
 
     def save_fiducial_cl(self, ell, cl_dict, cl_type):
         """
@@ -302,11 +306,10 @@ class BBmeta(object):
             Dictionnary with the power spectra.
         cl_type : str
             Type of power spectra.
-            Can be "cosmo", "tf_est" or "tf_val".
+            Can be "cosmo", "tf_est", "tf_val" or "noise".
         """
         fname = getattr(self, f"{cl_type}_cls_file")
         np.savez(fname, l=ell, **cl_dict)
-        return fname
 
     def load_fiducial_cl(self, cl_type):
         """
@@ -316,10 +319,21 @@ class BBmeta(object):
         ----------
         cl_type : str
             Type of power spectra.
-            Can be "cosmo", "tf_est" or "tf_val".
+            Can be "cosmo", "tf_est", "tf_val" or "noise".
         """
         fname = getattr(self, f"{cl_type}_cls_file")
-        return np.load(fname)
+        data = np.load(fname)
+        data = dict(data)
+
+        to_update = []
+        for k, v in data.items():
+            if not (k[::-1] in data):
+                to_update.append((k[::-1], v))
+
+        for k, v in to_update:
+            data[k] = v
+
+        return data
 
     def plot_dir_from_output_dir(self, out_dir):
         """
@@ -391,37 +405,103 @@ class BBmeta(object):
         return os.path.join(path_to_maps,
                             f"{map_set_root}_split_{id_split}.fits")
 
-    def get_filter_function(self):
+    def get_filter_function(self, filter_tag):
         from soopercool.utils import m_filter_map, toast_filter_map
 
-        if self.filtering_type == "m_filterer":
-            kwargs = {"m_cut": self.m_cut}
+        tag_settings = self.tags_settings[filter_tag]
+        filtering_type = tag_settings["filtering_type"]
+
+        if filtering_type == "m_filterer":
+            kwargs = {"m_cut": tag_settings["m_cut"]}
             filter_function = m_filter_map
 
-        elif self.filtering_type == "toast":
-            kwargs = {"schedule": self.toast['schedule'],
-                      "thinfp": self.toast['thinfp'],
-                      "instrument": self.toast['instrument'],
-                      "band": self.toast['band'],
-                      "group_size": self.toast['group_size'],
-                      "nside": self.nside}
+        elif filtering_type == "toast":
+            kwargs = {
+                "template": tag_settings["template"],
+                "config": tag_settings["config"],
+                "schedule": tag_settings["schedule"],
+                "instrument": tag_settings["tf_instrument"],
+                "band": tag_settings["tf_band"],
+                "nside": self.nside,
+                "sbatch_dir": self.scripts_dir
+            }
             filter_function = toast_filter_map
         else:
-            raise NotImplementedError(f"Filterer type {self.filtering_type} "
-                                      "not implemented")
+            raise NotImplementedError(
+                f"Filterer type {self.filtering_type} "
+                "not implemented"
+            )
 
-        def filter_operation(map, map_file, mask):
-            return filter_function(map, map_file, mask, **kwargs)
+        def filter_operation(map, map_file, mask, extra_kwargs={}):
+            return filter_function(
+                map, map_file, mask, **kwargs, **extra_kwargs)
 
         return filter_operation
 
-    def get_map_filename_transfer2(self, id_sim, cl_type, pure_type=None):
+    def print_banner(self, msg):
+        """
+        print a banner message
+        """
+        print('')
+        print("==============================================================")
+        print('')
+        print(msg)
+        print('')
+        print("==============================================================")
+        print('')
+
+    def get_nhits_map_from_toast_schedule(self, filter_tag):
+        from soopercool.utils import toast_filter_map
+        import subprocess
+
+        tag_settings = self.tags_settings[filter_tag]
+
+        if tag_settings["filtering_type"] != "toast":
+            raise NotImplementedError(f"Filterer type {tag_settings['filtering_type']} " # noqa
+                                      "not implemented")
+        kwargs = {
+            "map": None,
+            "map_file": self.masks["input_nhits_path"],
+            "mask": None,
+            "template": tag_settings["template"],
+            "config": tag_settings["config"],
+            "schedule": tag_settings["schedule"],
+            "nside": self.nside,
+            "instrument": tag_settings["tf_instrument"],
+            "band": tag_settings["tf_band"],
+            "sbatch_job_name": "get_nhits_map",
+            "sbatch_dir": self.scripts_dir,
+            "nhits_map_only": True
+        }
+        sbatch_file = toast_filter_map(**kwargs)
+
+        if self.slurm:
+            # Running with SLURM job scheduller
+            cmd = "sbatch {}".format(str(sbatch_file.resolve()))
+            if self.slurm_autosubmit:
+                subprocess.run(cmd, shell=True, check=True)
+                raise Exception(
+                    'Submitted SLURM script for nhits map calculation. \
+                    Please run the script again after SLURM job finished.')
+            else:
+                self.print_banner(
+                    msg='To submit these scripts to SLURM:\n    {}'.format(cmd)
+                    )
+                raise Exception(
+                    'Pleas __rerun__ the script after SLURM job finished.')
+        else:
+            # Run the script directly
+            subprocess.run(str(sbatch_file.resolve()), shell=True, check=True)
+
+    def get_map_filename_transfer(self, id_sim, cl_type,
+                                  pure_type=None, filter_tag=None):
         """
         """
         path_to_maps = getattr(self, f"{cl_type}_sims_dir")
 
+        beam_label = f"_{filter_tag}" if filter_tag else ""
         pure_label = f"_{pure_type}" if pure_type else ""
-        file_name = f"TQU{pure_label}_noiseless_nside{self.nside}_lmax{self.lmax}_{id_sim:04d}.fits"  # noqa
+        file_name = f"TQU{pure_label}{beam_label}_noiseless_nside{self.nside}_lmax{self.lmax}_{id_sim:04d}.fits"  # noqa
 
         return f"{path_to_maps}/{file_name}"
 
@@ -586,6 +666,60 @@ class BBmeta(object):
             raise ValueError("You selected an invalid type. "
                              "Options are 'cross', 'auto', and 'all'.")
         return n_pairs
+
+    def get_filtering_tags(self):
+        """
+        """
+        return list(set(
+            [self.filtering_tag_from_map_set(ms)
+             for ms in self.map_sets_list]
+        ))
+
+    def get_independent_filtering_pairs(self):
+        """
+        """
+        cross_ps_names = self.get_ps_names_list(coadd=True)
+        filtering_pairs = []
+        for ms1, ms2 in cross_ps_names:
+            fp1 = self.filtering_tag_from_map_set(ms1)
+            fp2 = self.filtering_tag_from_map_set(ms2)
+            filtering_pairs.append((fp1, fp2))
+        return list(set(filtering_pairs))
+
+    def get_inverse_couplings(self, beamed=False):
+        """
+        This function outputs a dictionary with the inverse mode coupling
+        matrices
+        """
+        nmt_binning = self.read_nmt_binning()
+        n_bins = nmt_binning.get_n_bands()
+        filter_flags = [""] if beamed else ["filtered", "unfiltered"]
+        map_set_pairs = (self.get_ps_names_list(type="all", coadd=True)
+                         if beamed else [("", "")])
+        inv_couplings = {}
+
+        for ms1, ms2 in map_set_pairs:
+            for filter_flag in filter_flags:
+                map_label = f"{ms1}_{ms2}" if beamed else ""
+                fname = f"couplings_{map_label}{filter_flag}"
+                couplings = np.load(f"{self.coupling_directory}/{fname}.npz")
+                coupling_dict = {
+                    k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
+                                                                ncl*n_bins])
+                    for k1, k2, ncl in zip(["spin0xspin0", "spin0xspin2",
+                                            "spin2xspin0", "spin2xspin2"],
+                                           ["spin0xspin0", "spin0xspin2",
+                                            "spin0xspin2", "spin2xspin2"],
+                                           [1, 2, 2, 4])
+                }
+                if beamed:
+                    inv_couplings[ms1, ms2] = coupling_dict
+                    if ms1 != ms2:
+                        inv_couplings[ms2, ms1] = coupling_dict
+                else:
+                    inv_couplings[filter_flag] = coupling_dict
+
+        return inv_couplings
 
 
 class Timer:
