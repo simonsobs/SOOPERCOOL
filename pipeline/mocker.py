@@ -4,6 +4,8 @@ from soopercool.utils import (get_noise_cls, generate_noise_map)
 import numpy as np
 from soopercool import BBmeta, utils
 import warnings
+import os
+import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 
 
 def mocker(args):
@@ -51,6 +53,44 @@ def mocker(args):
     # Load hitmap
     hitmap = meta.read_hitmap()
 
+    # Load and save beams
+    meta.timer.start("Generating beams")
+
+    noise_model = noise_calc.SOSatV3point1()
+
+    beam_arcmin = {freq_band: beam_arcmin
+                   for freq_band, beam_arcmin in zip(noise_model.get_bands(),
+                                                     noise_model.get_beams())}
+    # WMAP and Planck beams in arcmin
+    noise_dir = "/global/cfs/cdirs/sobs/users/cranucci/"
+    noise_dir_planck = f"{noise_dir}/npipe/nside{meta.nside}_coords_eq"
+    noise_dir_wmap = f"{noise_dir}/wmap/nside{meta.nside}_coords_eq/noise"
+    splits_dict_planck = {0: 'A', 1: 'B'}
+    bands_dict_wmap = {23: 'K1', 33: 'Ka1'}
+    # beam_arcmin_ext = {'023': 52.8, '033': 39.6, '030': 32.34, '100': 9.66,
+    #                    '143': 7.27, '217': 5.01, '353': 4.86}
+    beam_arcmin_ext = {23.: 52.8, 33.: 39.6, 30.: 32.34, 100.: 9.66,
+                       143.: 7.27, 217.: 5.01, 353.: 4.86}
+    beam_arcmin.update(beam_arcmin_ext)
+
+    beams = {}
+    for map_set in meta.map_sets_list:
+        freq_tag = meta.freq_tag_from_map_set(map_set)
+        file_root = meta.file_root_from_map_set(map_set)
+        beam_dir = meta.beam_directory
+        beam_fname = f"{beam_dir}/beam_{file_root}.dat"
+        # TODO: when refactoring, this part might be unnecessary
+        if 'SAT' not in map_set and os.path.isfile(beam_fname):
+            print("reading beam", file_root)
+            _, beams[map_set] = meta.read_beam(map_set)
+        else:
+            beams[map_set] = utils.beam_gaussian(lth, beam_arcmin[freq_tag])
+
+            # Save beams
+            if not os.path.exists(beam_fname):
+                np.savetxt(beam_fname, np.transpose([lth, beams[map_set]]))
+    meta.timer.stop("Generating beams")
+
     hp_ordering = ["TT", "TE", "TB", "EE", "EB", "BB"]
 
     Nsims = meta.num_sims if args.sims else 1
@@ -75,13 +115,29 @@ def mocker(args):
             freq_tag = meta.freq_tag_from_map_set(map_set)
 
             for id_split in range(n_splits):
-                noise_map = generate_noise_map(
-                    nlth_deconvolved_dict[freq_tag]["TT"],
-                    nlth_deconvolved_dict[freq_tag]["EE"],
-                    hitmap,
-                    n_splits,
-                    is_anisotropic=meta.anisotropic_noise
-                )
+                if 'SAT' in map_set:
+                    noise_map = generate_noise_map(
+                        nlth_deconvolved_dict["T"][freq_tag],
+                        nlth_deconvolved_dict["P"][freq_tag],
+                        hitmap,
+                        n_splits,
+                        is_anisotropic=meta.anisotropic_noise
+                    )
+                else:
+                    if 'planck' in map_set:
+                        to_muk = 1e6
+                        s = splits_dict_planck[id_split]
+                        fname_noise = f"{noise_dir_planck}/npipe6v20{s}_sim/{id_sim:04d}/residual"  # noqa
+                        fname_noise += f"/residual_npipe6v20{s}_{freq_tag:03d}_{id_sim:04d}.fits"  # noqa
+                    elif 'wmap' in map_set:
+                        to_muk = 1e3
+                        s = id_split + 1
+                        fname_noise = f"{noise_dir_wmap}/{id_sim:04d}"
+                        fname_noise += f"/noise_maps_mK_band{bands_dict_wmap[freq_tag]}_yr{id_split+1}.fits"  # noqa
+
+                    noise_map = to_muk * hp.read_map(fname_noise,
+                                                     field=[0, 1, 2])
+
                 split_map = cmb_map_beamed + noise_map
 
                 split_map *= binary_mask
