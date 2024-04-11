@@ -187,7 +187,7 @@ def pre_processer(args):
         if args.data:
             meta.timer.start("Download WMAP data")
             url_pref = "https://lambda.gsfc.nasa.gov/data/map/dr5/skymaps/1yr/raw"  # noqa
-            # Download WMAP single-year maps from URL and save temporarily
+            # Download WMAP single-year maps from URL and store
             print("Downloading WMAP single-year maps")
             for f in freqs:
                 for yr in splits:
@@ -204,7 +204,16 @@ def pre_processer(args):
                         continue
                     wget.download(url, fname_out)
                     print("\n")
-            meta.timer.stop("Download WMAP data")
+
+            print("Mask")
+            # Download WMAP temperature analysis mask from URL and store
+            url_pref = "https://lambda.gsfc.nasa.gov/data/map/dr5/ancillary/masks"  # noqa
+            url = f"{url_pref}/wmap_temperature_kq85_analysis_mask_r9_9yr_v5.fits"  # noqa
+            fname_mask = f"{mask_dir}/wmap_temperature_analysis_mask.fits"
+            if not os.path.isfile(fname_mask):
+                wget.download(url, fname_mask)
+                print("\n")
+            mask = hp.read_map(fname_mask, field=['N_OBS'])
 
             print("Beams")
             print("Downloading WMAP beam window functions")
@@ -234,6 +243,7 @@ def pre_processer(args):
                 else:
                     bl = b[:(3*nside_out+1)]
                 np.savetxt(beam_fname, np.transpose([ells_beam, bl]))
+            meta.timer.stop("Download WMAP data")
 
     if args.data:
         # rotating and downgrading data maps
@@ -290,6 +300,11 @@ def pre_processer(args):
                     if args.planck:
                         print("removing dipole")
                         map_in[0] -= dipole_template[nside_in]
+                    elif args.wmap:
+                        # remove mean temperature outside mask
+                        map_in_masked = hp.ma(map_in[0])
+                        map_in_masked.mask = np.logical_not(mask)
+                        map_in[0] -= np.mean(map_in_masked)
 
                     print("computing alms")
                     alm = hp.map2alm(map_in, pol=True, use_pixel_weights=True)
@@ -355,10 +370,7 @@ def pre_processer(args):
             sim_id_in = sim_id+200 if process_sims else sim_id
             if args.noise:
                 # noise output dirs
-                if args.planck:
-                    noise_dir = f"{sims_dir}/{sim_id:04d}"
-                elif args.wmap:
-                    noise_dir = f"{sims_dir}/{sim_id:04d}"
+                noise_dir = f"{sims_dir}/{sim_id:04d}/noise"
                 os.makedirs(noise_dir, exist_ok=True)
             else:
                 # sims output dirs
