@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 from soopercool import BBmeta
 import matplotlib.pyplot as plt
+from soopercool import utils
 
 
 def read_transfer(transfer_file):
@@ -47,48 +48,11 @@ def transfer_validator(args):
             f"{meta.coupling_directory}/transfer_function_{ftag1}x{ftag2}.npz"
         )
 
-        plt.figure(figsize=(20, 20))
-        grid = plt.GridSpec(7, 7, hspace=0.3, wspace=0.3)
-
-        for id1, f1 in enumerate(fields):
-            for id2, f2 in enumerate(fields):
-                ax = plt.subplot(grid[id1, id2])
-
-                if f1 == "TT" and f2 != "TT":
-                    ax.axis("off")
-                    continue
-                if f1 in ["TE", "TB"] and f2 not in ["TE", "TB"]:
-                    ax.axis("off")
-                    continue
-                if f1 in ["EE", "EB", "BE", "BB"] and \
-                   f2 not in ["EE", "EB", "BE", "BB"]:
-                    ax.axis("off")
-                    continue
-
-                ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
-
-                ax.errorbar(
-                    lb, tf_dict[f1, f2], tf_dict[f1, f2, "std"],
-                    marker=".", markerfacecolor="white",
-                    color="navy")
-
-                if not ([id1, id2] in [[0, 0], [2, 1],
-                                       [2, 2], [6, 3],
-                                       [6, 4], [6, 5],
-                                       [6, 6]]):
-                    ax.set_xticks([])
-                else:
-                    ax.set_xlabel(r"$\ell$", fontsize=14)
-
-                if f1 == f2:
-                    ax.axhline(1., color="k", ls="--")
-                else:
-                    ax.axhline(0, color="k", ls="--")
-
-                ax.set_xlim(meta.lmin, meta.lmax)
-
-        plt.savefig(f"{plot_dir}/transfer_{ftag1}x{ftag2}.pdf",
-                    bbox_inches="tight")
+        utils.plot_transfer_function(
+            lb, tf_dict, meta.lmin, meta.lmax,
+            fields,
+            file_name=f"{plot_dir}/transfer_{ftag1}x{ftag2}.pdf"
+        )
 
     # Then we read the decoupled spectra
     # both for the filtered and unfiltered cases

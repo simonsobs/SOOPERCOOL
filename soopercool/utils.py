@@ -424,19 +424,15 @@ def bin_validation_power_spectra(cls_dict, nmt_binning,
     return cls_binned_dict
 
 
-def plot_transfer_function(meta, tf_dict):
+def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
     """
     Plot the transfer function given an input dictionary.
     """
-    nmt_binning = meta.read_nmt_binning()
-    lb = nmt_binning.get_effective_ells()
-
-    fields = ["TT", "TE", "TB", "EE", "EB", "BE", "BB"]
     plt.figure(figsize=(20, 20))
     grid = plt.GridSpec(7, 7, hspace=0.3, wspace=0.3)
 
-    for id1, f1 in enumerate(fields):
-        for id2, f2 in enumerate(fields):
+    for id1, f1 in enumerate(field_pairs):
+        for id2, f2 in enumerate(field_pairs):
             ax = plt.subplot(grid[id1, id2])
 
             if f1 == "TT" and f2 != "TT":
@@ -470,10 +466,9 @@ def plot_transfer_function(meta, tf_dict):
             else:
                 ax.axhline(0, color="k", ls="--")
 
-            ax.set_xlim(meta.lmin, meta.lmax)
+            ax.set_xlim(lmin, lmax)
 
-    plot_dir = meta.plot_dir_from_output_dir(meta.coupling_directory)
-    plt.savefig(f"{plot_dir}/transfer.pdf", bbox_inches="tight")
+    plt.savefig(file_name, bbox_inches="tight")
 
 
 def plot_transfer_validation(meta, map_set_1, map_set_2,
