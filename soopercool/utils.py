@@ -123,7 +123,7 @@ def random_src_mask(mask, nsrcs, mask_radius_arcmin):
     return ps_mask
 
 
-def get_beam_windows(meta, plot=False, beam_floor=1.e-2):
+def get_beam_windows(meta, plot=False):
     """
     Compute and save dictionary with beam window functions for each map set.
     """
