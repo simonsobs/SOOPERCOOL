@@ -4,6 +4,8 @@ from soopercool.utils import (get_noise_cls, generate_noise_map)
 import numpy as np
 from soopercool import BBmeta, utils
 import warnings
+import os
+import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 
 
 def mocker(args):
@@ -54,6 +56,8 @@ def mocker(args):
     # Load and save beams
     meta.timer.start("Generating beams")
 
+    noise_model = noise_calc.SOSatV3point1()
+
     beam_arcmin = {freq_band: beam_arcmin
                    for freq_band, beam_arcmin in zip(noise_model.get_bands(),
                                                      noise_model.get_beams())}
@@ -73,13 +77,14 @@ def mocker(args):
     for map_set in meta.map_sets_list:
         freq_tag = meta.freq_tag_from_map_set(map_set)
         file_root = meta.file_root_from_map_set(map_set)
+        beam_dir = meta.beam_directory
         beam_fname = f"{beam_dir}/beam_{file_root}.dat"
         # TODO: when refactoring, this part might be unnecessary
         if 'SAT' not in map_set and os.path.isfile(beam_fname):
             print("reading beam", file_root)
             _, beams[map_set] = meta.read_beam(map_set)
         else:
-            beams[map_set] = beam_gaussian(lth, beam_arcmin[freq_tag])
+            beams[map_set] = utils.beam_gaussian(lth, beam_arcmin[freq_tag])
 
             # Save beams
             if not os.path.exists(beam_fname):
@@ -112,8 +117,8 @@ def mocker(args):
             for id_split in range(n_splits):
                 if 'SAT' in map_set:
                     noise_map = generate_noise_map(
-                        nlth_dict["T"][freq_tag],
-                        nlth_dict["P"][freq_tag],
+                        nlth_deconvolved_dict["T"][freq_tag],
+                        nlth_deconvolved_dict["P"][freq_tag],
                         hitmap,
                         n_splits,
                         is_anisotropic=meta.anisotropic_noise
