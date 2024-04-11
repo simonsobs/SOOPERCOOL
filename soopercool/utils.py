@@ -1,82 +1,30 @@
-import yaml
 import numpy as np
 import os
-from scipy.interpolate import interp1d
 import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 import healpy as hp
 import matplotlib.pyplot as plt
 from matplotlib import cm
-import sacc
 import camb
 
 
-def get_pcls(man, fnames, names, fname_out, mask, binning, winv=None):
-    """
-    man -> pipeline manager
-    fnames -> files with input maps
-    names -> map names
-    fname_out -> output file name
-    mask -> mask
-    binning -> binning scheme to use
-    winv -> inverse binned MCM (optional)
-    """
-    import pymaster as nmt
-
-    if winv is not None:
-        nbpw = binning.get_n_bands()
-        if winv.shape != (4, nbpw, 4, nbpw):
-            raise ValueError("Incompatible binning scheme and "
-                             "binned MCM.")
-        winv = winv.reshape([4*nbpw, 4*nbpw])
-
-    # Read maps
-    fields = []
-    for fname in fnames:
-        mpQ, mpU = hp.read_map(fname, field=[0, 1])
-        f = nmt.NmtField(mask, [mpQ, mpU])
-        fields.append(f)
-    nmaps = len(fields)
-
-    # Compute pseudo-C_\ell
-    cls = []
-    for icl, i, j in man.cl_pair_iter(nmaps):
-        f1 = fields[i]
-        f2 = fields[j]
-        pcl = binning.bin_cell(nmt.compute_coupled_cell(f1, f2))
-        if winv is not None:
-            pcl = np.dot(winv, pcl.flatten()).reshape([4, nbpw])
-        cls.append(pcl)
-
-    # Save to sacc
-    leff = binning.get_effective_ells()
-    s = sacc.Sacc()
-    for n in names:
-        s.add_tracer('Misc', n)
-    for icl, i, j in man.cl_pair_iter(nmaps):
-        s.add_ell_cl('cl_ee', names[i], names[j], leff, cls[icl][0])
-        s.add_ell_cl('cl_eb', names[i], names[j], leff, cls[icl][1])
-        if i != j:
-            s.add_ell_cl('cl_be', names[i], names[j], leff, cls[icl][2])
-        s.add_ell_cl('cl_bb', names[i], names[j], leff, cls[icl][3])
-    s.save_fits(fname_out, overwrite=True)
-
-
-def theory_cls(cosmo_params, lmax, lmin=0):
+def get_theory_cls(cosmo_params, lmax, lmin=0):
     """
     """
     params = camb.set_params(**cosmo_params)
     results = camb.get_results(params)
     powers = results.get_cmb_power_spectra(params, CMB_unit='muK', raw_cl=True)
-    ell = np.arange(lmin, lmax+1)
-    out_ps = {
+    lth = np.arange(lmin, lmax+1)
+
+    cl_th = {
         "TT": powers["total"][:, 0][lmin:lmax+1],
         "EE": powers["total"][:, 1][lmin:lmax+1],
         "TE": powers["total"][:, 3][lmin:lmax+1],
         "BB": powers["total"][:, 2][lmin:lmax+1]
     }
     for spec in ["EB", "TB"]:
-        out_ps[spec] = np.zeros_like(ell)
-    return ell, out_ps
+        cl_th[spec] = np.zeros_like(lth)
+
+    return lth, cl_th
 
 
 def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
@@ -100,15 +48,27 @@ def generate_noise_map_white(nside, noise_rms_muKarcmin, ncomp=3):
     return out_map
 
 
-def get_noise_cls(fsky, lmax, lmin=0, sensitivity_mode='baseline',
-                  oof_mode='optimistic', is_beam_deconvolved=True):
+def get_noise_cls(noise_kwargs, lmax, lmin=0, fsky=0.1,
+                  is_beam_deconvolved=False):
     """
+    Load polarization noise from SO SAT noise model.
+    Assume polarization noise is half of that.
     """
-    # Load noise curves
-    noise_model = noise_calc.SOSatV3point1(sensitivity_mode=sensitivity_mode)
+    oof_dict = {"pessimistic": 0, "optimistic": 1}
+    oof_mode = noise_kwargs["one_over_f_mode"]
+    oof_mode = oof_dict[oof_mode]
+
+    sensitivity_mode = noise_kwargs["sensitivity_mode"]
+
+    noise_model = noise_calc.SOSatV3point1(
+        sensitivity_mode=sensitivity_mode,
+        N_tubes=[1., 1., 1.],
+        one_over_f_mode=oof_mode,
+        survey_years=noise_kwargs["survey_years"]
+    )
     lth, _, nlth_P = noise_model.get_noise_curves(
         fsky,
-        lmax+1,
+        lmax + 1,
         delta_ell=1,
         deconv_beam=is_beam_deconvolved
     )
@@ -116,14 +76,20 @@ def get_noise_cls(fsky, lmax, lmin=0, sensitivity_mode='baseline',
     nlth_P = np.array(
         [np.concatenate(([0, 0], nl))[lmin:] for nl in nlth_P]
     )
-    # Only support polarization noise at the moment
-    nlth_dict = {
-        "T": {freq_band: nlth_P[i]/2
-              for i, freq_band in enumerate(noise_model.get_bands())},
-        "P": {freq_band: nlth_P[i]
-              for i, freq_band in enumerate(noise_model.get_bands())}
-    }
-    return lth, nlth_dict
+
+    # Attention: at the moment, the noise model's frequencies must match
+    # soopercool's frequency tags.
+    freq_tags = [int(f) for f in noise_model.get_bands()]
+    nl_all_frequencies = {}
+    for i_f, freq_tag in enumerate(freq_tags):
+        nl_th_dict = {pq: nlth_P[i_f]
+                      for pq in ["EE", "EB", "BE", "BB"]}
+        nl_th_dict["TT"] = 0.5*nlth_P[i_f]
+        nl_th_dict["TE"] = 0.*nlth_P[i_f]
+        nl_th_dict["TB"] = 0.*nlth_P[i_f]
+        nl_all_frequencies[freq_tag] = nl_th_dict
+
+    return lth, nl_all_frequencies
 
 
 def generate_noise_map(nl_T, nl_P, hitmap, n_splits, is_anisotropic=True):
@@ -155,6 +121,39 @@ def random_src_mask(mask, nsrcs, mask_radius_arcmin):
                              np.deg2rad(mask_radius_arcmin / 60))
         ps_mask[disc] = 0
     return ps_mask
+
+
+def get_beam_windows(meta, plot=False):
+    """
+    Compute and save dictionary with beam window functions for each map set.
+    """
+    oof_dict = {"pessimistic": 0, "optimistic": 1}
+
+    noise_model = noise_calc.SOSatV3point1(
+        survey_years=meta.noise["survey_years"],
+        sensitivity_mode=meta.noise["sensitivity_mode"],
+        one_over_f_mode=oof_dict[meta.noise["one_over_f_mode"]]
+    )
+
+    lth = np.arange(3*meta.nside)
+    beam_arcmin = {int(freq_band): beam_arcmin
+                   for freq_band, beam_arcmin in zip(noise_model.get_bands(),
+                                                     noise_model.get_beams())}
+    beams_dict = {}
+    for map_set in meta.map_sets_list:
+        freq_tag = meta.freq_tag_from_map_set(map_set)
+        beams_dict[map_set] = beam_gaussian(lth, beam_arcmin[freq_tag])
+        file_root = meta.file_root_from_map_set(map_set)
+
+        if not os.path.exists(file_root):
+            np.savetxt(f"{meta.beam_directory}/beam_{file_root}.dat",
+                       np.transpose([lth, beams_dict[map_set]]))
+        if plot:
+            plt.plot(lth, beams_dict[map_set], label=map_set)
+    if plot:
+        plt.yscale("log")
+        plt.legend()
+        plt.savefig(f"{meta.beam_directory}/beams.png")
 
 
 def beam_gaussian(ll, fwhm_amin):
@@ -361,196 +360,226 @@ def plot_map(map, fname, vrange_T=300, vrange_P=10, title=None, TQU=True):
         plt.savefig(f"{fname}_{m}.png", bbox_inches="tight")
 
 
-class PipelineManager(object):
-    def __init__(self, fname_config):
-        with open(fname_config) as f:
-            self.config = yaml.load(f, Loader=yaml.FullLoader)
-        self.nside = self.config['nside']
-        self.fname_mask = self.config['mask']
-        self.fname_binary_mask = self.config['binary_mask']
-        self.bpw_edges = None
-        self.pl_names = np.loadtxt(self.config['pl_sims'], dtype=str)
-        self.val_names = np.loadtxt(self.config['val_sims'], dtype=str)
-        self.pl_input_dir = self.config['pl_sims_dir']
-        self.val_input_dir = self.config['val_sims_dir']
-        self._get_cls_PL()
-        self._get_cls_val()
+def beam_alms(alms, bl):
+    """
+    """
+    if bl is not None:
+        for i, alm in enumerate(alms):
+            alms[i] = hp.almxfl(alm, bl)
 
-        self.stname_mcm = 'mcm'
-        self.stname_filtpl = 'filter_PL'
-        self.stname_pclpl_in = 'pcl_PL_in'
-        self.stname_pclpl_filt = 'pcl_PL_filt'
-        self.stname_filtval = 'filter_val'
-        self.stname_pclval_in = 'pcl_val_in'
-        self.stname_pclval_filt = 'pcl_val_filt'
-        self.stname_clval = 'cl_val'
-        self.stname_transfer = 'transfer'
+    return alms
 
-    def get_filename(self, product, out_base_dir, simname=None):
-        if product == 'mcm':  # NaMaster's MCM
-            fname = os.path.join(out_base_dir, '..',
-                                 self.stname_mcm, 'mcm.npz')
-        if product == 'mcm_plots':  # NaMaster's MCM plots dir
-            fname = os.path.join(out_base_dir, '..',
-                                 self.stname_mcm)
-        if product == 'pl_sim_input':  # Input PL sims
-            fname = os.path.join(self.pl_input_dir,
-                                 simname+'.fits')
-        if product == 'pl_sim_filtered':  # Filtered PL sims
-            fname = os.path.join(
-                out_base_dir, '..', self.stname_filtpl,
-                simname+'.fits')
-        if product == 'pcl_pl_sim_input':  # PCL of input PL sims
-            fname = os.path.join(
-                out_base_dir, '..', self.stname_pclpl_in,
-                simname+'_pcl_in.fits')
-        if product == 'pcl_pl_sim_filtered':  # PCL of filtered PL sims
-            fname = os.path.join(
-                out_base_dir, '..', self.stname_pclpl_filt,
-                simname+'_pcl_filt.fits')
-        if product == 'val_sim_input':  # Input validation sims
-            fname = os.path.join(self.val_input_dir,
-                                 simname+'.fits')
-        if product == 'val_sim_filtered':  # Filtered validation sims
-            fname = os.path.join(
-                out_base_dir, '..', self.stname_filtval,
-                simname+'.fits')
-        if product == 'pcl_val_sim_input':  # PCL of input validations sims
-            fname = os.path.join(
-                out_base_dir, '..', self.stname_pclval_in,
-                simname+'_pcl_in.fits')
-        if product == 'pcl_val_sim_filtered':
-            # PCL of filtered validation sims
-            fname = os.path.join(
-                out_base_dir, '..', self.stname_pclval_filt,
-                simname+'_pcl_filt.fits')
-        if product == 'cl_val_sim':  # CL of filtered validation sims
-            fname = os.path.join(
-                out_base_dir, '..', self.stname_clval,
-                simname+'_cl.fits')
-        if product == 'transfer_function':
-            fname = os.path.join(
-                out_base_dir, '..', self.stname_transfer, 'transfer.npz')
-        return fname
 
-    def _get_cls_PL(self):
-        d = np.load(self.config['cl_PL'])
-        lin = d['ls']
-        ls = np.arange(3*self.nside)
-        self.cls_PL = []
-        for kind in ['EE', 'EB', 'BE', 'BB']:
-            cli = interp1d(lin, d[f'cl{kind}'], bounds_error=False,
-                           fill_value=0)
-            self.cls_PL.append(cli(ls))
-        self.cls_PL = np.array(self.cls_PL)
+def generate_map_from_alms(alms, nside, pureE=False, pureB=False, bl=None):
+    """
+    """
+    alms = beam_alms(alms, bl)
+    Tlm, Elm, Blm = alms
+    if pureE:
+        alms = [Tlm, Elm, Blm*0.]
+    elif pureB:
+        alms = [Tlm, Elm*0., Blm]
 
-    def _get_cls_val(self):
-        d = np.load(self.config['cl_val'])
-        lin = d['ls']
-        ls = np.arange(3*self.nside)
-        self.cls_val = []
-        for kind in ['EE', 'EB', 'BE', 'BB']:
-            cli = interp1d(lin, d[f'cl{kind}'], bounds_error=False,
-                           fill_value=0)
-            self.cls_val.append(cli(ls))
-        self.cls_val = np.array(self.cls_val)
+    return hp.alm2map(alms, nside, lmax=3*nside - 1)
 
-    def get_bpw_edges(self):
-        if self.bpw_edges is None:
-            self.bpw_edges = np.load(self.config['bpw_edges'])['bpw_edges']
-        return self.bpw_edges
 
-    def get_nmt_bins(self):
-        import pymaster as nmt
-        bpw_edges = self.get_bpw_edges()
-        b = nmt.NmtBin.from_edges(bpw_edges[:-1], bpw_edges[1:])
-        return b
+def bin_validation_power_spectra(cls_dict, nmt_binning,
+                                 bandpower_window_function):
+    """
+    Bin multipoles of transfer function validation power spectra into
+    binned bandpowers.
+    """
+    nl = nmt_binning.lmax + 1
+    cls_binned_dict = {}
 
-    def cl_pair_iter(self, nmaps):
-        icl = 0
-        for i in range(nmaps):
-            for j in range(i, nmaps):
-                yield icl, i, j
-                icl += 1
+    for spin_comb in ["spin0xspin0", "spin0xspin2", "spin2xspin2"]:
+        bpw_mat = bandpower_window_function[f"bp_win_{spin_comb}"]
 
-    def val_sim_names(self, sim0, nsims, output_dir, which='input'):
-        if nsims == -1:
-            names = self.val_names[sim0:]
-        else:
-            names = self.val_names[sim0:sim0+nsims]
-        fnames = []
-        for n in names:
-            if which == 'names':
-                fn = n
-            elif which == 'input':
-                fn = self.get_filename('val_sim_input',
-                                       output_dir, n)
-            elif which in ['filtered', 'decoupled']:
-                fn = self.get_filename('val_sim_filtered',
-                                       output_dir, n)
-            elif which == 'input_Cl':
-                fn = self.get_filename("pcl_val_sim_input",
-                                       output_dir, n)
-            elif which == 'filtered_Cl':
-                fn = self.get_filename("pcl_val_sim_filtered",
-                                       output_dir, n)
-            elif which == 'decoupled_Cl':
-                fn = self.get_filename("cl_val_sim",
-                                       output_dir, n)
+        for val_type in ["tf_val", "cosmo"]:
+            if spin_comb == "spin0xspin0":
+                cls_vec = np.array([cls_dict[val_type]["TT"][:nl]])
+                cls_vec = cls_vec.reshape(1, nl)
+            elif spin_comb == "spin0xspin2":
+                cls_vec = np.array([cls_dict[val_type]["TE"][:nl],
+                                    cls_dict[val_type]["TB"][:nl]])
+            elif spin_comb == "spin2xspin2":
+                cls_vec = np.array([cls_dict[val_type]["EE"][:nl],
+                                    cls_dict[val_type]["EB"][:nl],
+                                    cls_dict[val_type]["EB"][:nl],
+                                    cls_dict[val_type]["BB"][:nl]])
+
+            cls_vec_binned = np.einsum("ijkl,kl", bpw_mat, cls_vec)
+
+            if spin_comb == "spin0xspin0":
+                cls_binned_dict[val_type, "TT"] = cls_vec_binned[0]
+            elif spin_comb == "spin0xspin2":
+                cls_binned_dict[val_type, "TE"] = cls_vec_binned[0]
+                cls_binned_dict[val_type, "TB"] = cls_vec_binned[1]
+            elif spin_comb == "spin2xspin2":
+                cls_binned_dict[val_type, "EE"] = cls_vec_binned[0]
+                cls_binned_dict[val_type, "EB"] = cls_vec_binned[1]
+                cls_binned_dict[val_type, "BE"] = cls_vec_binned[2]
+                cls_binned_dict[val_type, "BB"] = cls_vec_binned[3]
+
+    return cls_binned_dict
+
+
+def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
+    """
+    Plot the transfer function given an input dictionary.
+    """
+    plt.figure(figsize=(20, 20))
+    grid = plt.GridSpec(7, 7, hspace=0.3, wspace=0.3)
+
+    for id1, f1 in enumerate(field_pairs):
+        for id2, f2 in enumerate(field_pairs):
+            ax = plt.subplot(grid[id1, id2])
+
+            if f1 == "TT" and f2 != "TT":
+                ax.axis("off")
+                continue
+            if f1 in ["TE", "TB"] and f2 not in ["TE", "TB"]:
+                ax.axis("off")
+                continue
+            if f1 in ["EE", "EB", "BE", "BB"] \
+                    and f2 not in ["EE", "EB", "BE", "BB"]:
+                ax.axis("off")
+                continue
+
+            ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
+
+            ax.errorbar(
+                lb, tf_dict[f1, f2], tf_dict[f1, f2, "std"],
+                marker=".", markerfacecolor="white",
+                color="navy")
+
+            if not ([id1, id2] in [[0, 0], [2, 1],
+                                   [2, 2], [6, 3],
+                                   [6, 4], [6, 5],
+                                   [6, 6]]):
+                ax.set_xticks([])
             else:
-                raise ValueError(f"Unknown kind {which}")
-            fnames.append(fn)
-        return fnames
+                ax.set_xlabel(r"$\ell$", fontsize=14)
 
-    def pl_sim_names_EandB(self, sim0, nsims, output_dir, which):
-        return self.pl_sim_names(sim0, nsims, output_dir,
-                                 which=which, EandB=True)
-
-    def pl_sim_names(self, sim0, nsims, output_dir, which='input',
-                     EandB=False):
-        if nsims == -1:
-            names = self.pl_names[sim0:]
-        else:
-            names = self.pl_names[sim0:sim0+nsims]
-        fnames = []
-        for n in names:
-            if which == 'names':
-                fE = n+'_E'
-                fB = n+'_B'
-                if EandB:
-                    fnames.append([fE, fB])
-                else:
-                    fnames.append(fE)
-                    fnames.append(fB)
-            elif which == 'input':
-                fE = self.get_filename('pl_sim_input',
-                                       output_dir, n+'_E')
-                fB = self.get_filename('pl_sim_input',
-                                       output_dir, n+'_B')
-                if EandB:
-                    fnames.append([fE, fB])
-                else:
-                    fnames.append(fE)
-                    fnames.append(fB)
-            elif which == 'filtered':
-                fE = self.get_filename('pl_sim_filtered',
-                                       output_dir, n+'_E')
-                fB = self.get_filename('pl_sim_filtered',
-                                       output_dir, n+'_B')
-                if EandB:
-                    fnames.append([fE, fB])
-                else:
-                    fnames.append(fE)
-                    fnames.append(fB)
-            elif which == 'input_Cl':
-                fn = self.get_filename('pcl_pl_sim_input', output_dir, n)
-                fnames.append(fn)
-            elif which == 'filtered_Cl':
-                fn = self.get_filename('pcl_pl_sim_filtered', output_dir, n)
-                fnames.append(fn)
+            if f1 == f2:
+                ax.axhline(1., color="k", ls="--")
             else:
-                raise ValueError(f"Unknown kind {which}")
-        return fnames
+                ax.axhline(0, color="k", ls="--")
+
+            ax.set_xlim(lmin, lmax)
+
+    plt.savefig(file_name, bbox_inches="tight")
+
+
+def plot_transfer_validation(meta, map_set_1, map_set_2,
+                             cls_theory, cls_theory_binned,
+                             cls_mean_dict, cls_std_dict):
+    """
+    Plot the transfer function validation power spectra and save to disk.
+    """
+    nmt_binning = meta.read_nmt_binning()
+    lb = nmt_binning.get_effective_ells()
+
+    for val_type in ["tf_val", "cosmo"]:
+        plt.figure(figsize=(16, 16))
+        grid = plt.GridSpec(9, 3, hspace=0.3, wspace=0.3)
+
+        for id1, id2 in [(i, j) for i in range(3) for j in range(3)]:
+            f1, f2 = "TEB"[id1], "TEB"[id2]
+            spec = f2 + f1 if id1 > id2 else f1 + f2
+
+            main = plt.subplot(grid[3*id1:3*(id1+1)-1, id2])
+            sub = plt.subplot(grid[3*(id1+1)-1, id2])
+
+            # Plot theory
+            ell = cls_theory[val_type]["l"]
+            rescaling = 1 if val_type == "tf_val" \
+                else ell * (ell + 1) / (2*np.pi)
+            main.plot(ell, rescaling*cls_theory[val_type][spec], color="k")
+
+            offset = 0.5
+            rescaling = 1 if val_type == "tf_val" else lb*(lb + 1) / (2*np.pi)
+
+            # Plot filtered & unfiltered (decoupled)
+            if not meta.validate_beam:
+                main.errorbar(
+                    lb - offset, rescaling*cls_mean_dict[val_type,
+                                                         "unfiltered",
+                                                         spec],
+                    rescaling*cls_std_dict[val_type, "unfiltered", spec],
+                    color="navy", marker=".", markerfacecolor="white",
+                    label=r"Unfiltered decoupled $C_\ell$", ls="None"
+                )
+            main.errorbar(
+                lb + offset, rescaling*cls_mean_dict[val_type,
+                                                     "filtered",
+                                                     spec],
+                rescaling*cls_std_dict[val_type, "filtered", spec],
+                color="darkorange", marker=".", markerfacecolor="white",
+                label=r"Filtered decoupled $C_\ell$", ls="None"
+            )
+
+            if f1 == f2:
+                main.set_yscale("log")
+
+            # Plot residuals
+            sub.axhspan(-2, 2, color="gray", alpha=0.2)
+            sub.axhspan(-1, 1, color="gray", alpha=0.7)
+            sub.axhline(0, color="k")
+
+            if not meta.validate_beam:
+                residual_unfiltered = (
+                    (cls_mean_dict[val_type, "unfiltered", spec]
+                     - cls_theory_binned[val_type, spec])
+                    / cls_std_dict[val_type, "unfiltered", spec]
+                )
+                sub.plot(
+                    lb - offset,
+                    residual_unfiltered * np.sqrt(meta.tf_est_num_sims),
+                    color="navy", marker=".", markerfacecolor="white",
+                    ls="None"
+                )
+            residual_filtered = (
+                (cls_mean_dict[val_type, "filtered", spec]
+                 - cls_theory_binned[val_type, spec])
+                / cls_std_dict[val_type, "filtered", spec]
+            )
+            sub.plot(lb + offset,
+                     residual_filtered * np.sqrt(meta.tf_est_num_sims),
+                     color="darkorange", marker=".",
+                     markerfacecolor="white", ls="None")
+
+            # Multipole range
+            main.set_xlim(2, meta.lmax)
+            sub.set_xlim(*main.get_xlim())
+
+            # Suplot y range
+            sub.set_ylim((-5., 5.))
+
+            # Cosmetix
+            main.set_title(f1+f2, fontsize=14)
+            if spec == "TT":
+                main.legend(fontsize=13)
+            main.set_xticklabels([])
+            if id1 != 2:
+                sub.set_xticklabels([])
+            else:
+                sub.set_xlabel(r"$\ell$", fontsize=13)
+
+            if id2 == 0:
+                if isinstance(rescaling, float):
+                    main.set_ylabel(r"$C_\ell$", fontsize=13)
+                else:
+                    main.set_ylabel(r"$\ell(\ell+1)C_\ell/2\pi$",
+                                    fontsize=13)
+                sub.set_ylabel(r"$\Delta C_\ell / (\sigma/\sqrt{N_\mathrm{sims}})$",  # noqa
+                               fontsize=13)
+
+        plot_dir = meta.plot_dir_from_output_dir(meta.coupling_directory)
+        plot_suffix = (f"__{map_set_1}_{map_set_2}" if meta.validate_beam
+                       else "")
+        plt.savefig(f"{plot_dir}/decoupled_{val_type}{plot_suffix}.pdf",
+                    bbox_inches="tight")
 
 
 def get_binary_mask_from_nhits(nhits_map, nside, zero_threshold=1e-3):

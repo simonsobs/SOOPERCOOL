@@ -17,42 +17,56 @@ def filter(args):
         Arguments from the command line.
     """
     meta = BBmeta(args.globals)
-    filter_map = meta.get_filter_function()
 
     # Read the mask
     mask = meta.read_mask("binary")
 
-    meta.timer.start(f"Filter {meta.tf_est_num_sims} sims for TF estimation.")
     if args.transfer:
+
+        meta.timer.start(
+            f"Filter {meta.tf_est_num_sims} sims for TF estimation."
+        )
+
+        filtering_tags = meta.get_filtering_tags()
+        filter_funcs = {
+            ftag: meta.get_filter_function(ftag)
+            for ftag in filtering_tags
+        }
+
         for cl_type in ["cosmo", "tf_est", "tf_val"]:
             cases_list = ["pureE", "pureB"] if cl_type == "tf_est" else [None]
             for id_sim in range(meta.tf_est_num_sims):
                 for case in cases_list:
-                    map_file = meta.get_map_filename_transfer2(id_sim,
-                                                               cl_type,
-                                                               pure_type=case)
-                    map = hp.read_map(map_file, field=[0, 1, 2])
-                    if meta.filtering_type == "toast":
-                        sbatch_job_name = 'sbatch_tf__{}_{}'.format(
-                            cl_type, str(Path(map_file).name))
-                        kwargs = {"instrument": meta.toast['tf_instrument'],
-                                  "band": meta.toast['tf_band'],
-                                  "sbatch_job_name": sbatch_job_name}
-                    else:
-                        kwargs = {}
-                    filter_map(map, map_file, mask, kwargs)
-        if meta.filtering_type == "toast":
-            if meta.toast['slurm']:
-                meta.timer.stop(
-                    f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
-                    verbose=True)
+                    for ftag in filtering_tags:
+                        map_file = meta.get_map_filename_transfer(
+                            id_sim,
+                            cl_type,
+                            pure_type=case,
+                            filter_tag=ftag
+                        )
+                        map = hp.read_map(map_file, field=[0, 1, 2])
+                        filter_map = filter_funcs[ftag]
+                        if meta.tags_settings[ftag]["filtering_type"] == "toast": # noqa
+                            sbatch_job_name = 'sbatch_tf__{}_{}'.format(
+                                cl_type, str(Path(map_file).name)
+                            )
+                            filter_map(
+                                map, map_file, mask,
+                                sbatch_job_name=sbatch_job_name
+                            )
+                        else:
+                            filter_map(map, map_file, mask)
+
+        filtering_type_list = [
+            meta.tags_settings[ftag]["filtering_type"]
+            for ftag in filtering_tags
+        ]
+        if "toast" in filtering_type_list:
+            if meta.slurm:
                 # Running with SLURM job scheduller
-                cmd = (
-                    "find '{}' -type f "
-                    "-name 'sbatch_tf__*.sh' "
-                    " -exec sbatch {{}} \\;").format(
-                        Path(meta.toast['scripts_dir']).resolve())
-                if meta.toast['slurm_autosubmit']:
+                cmd = "find '{}' -type f -name 'sbatch_tf__*.sh' -exec sbatch {{}} \\;".format( # noqa
+                    Path(meta.scripts_dir).resolve())
+                if meta.slurm_autosubmit:
                     subprocess.run(cmd, shell=True, check=True)
                     print('Submitted {} sims to SLURM for TF estimation.'
                           .format(meta.tf_est_num_sims))
@@ -61,25 +75,23 @@ def filter(args):
                         msg='To submit these scripts to SLURM:\n    {}'
                         .format(cmd))
             else:
-                cmd = (
-                    "find '{}' -type f "
-                    "-name 'sbatch_tf__*.sh' "
-                    "-exec {{}} \\;").format(
-                        Path(meta.toast['scripts_dir']).resolve())
+                cmd = "find '{}' -type f -name 'sbatch_tf__*.sh' -exec {{}} \\;".format( # noqa
+                    Path(meta.scripts_dir).resolve())
                 subprocess.run(cmd, shell=True, check=True)
-                meta.timer.stop(
-                    f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
-                    verbose=True)
-        else:
-            meta.timer.stop(
-                f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
-                verbose=True)
+
+        meta.timer.stop(
+            f"Filter {meta.tf_est_num_sims} sims for TF estimation.",
+            verbose=True
+        )
 
     if args.sims or args.data:
         Nsims = meta.num_sims if args.sims else 1
         meta.timer.start(f"Filter {Nsims} sims.")
         for map_name in meta.maps_list:
             map_set, id_split = map_name.split("__")
+
+            ftag = meta.filtering_tag_from_map_set(map_set)
+            filter_map = meta.get_filter_function(ftag)
             for id_sim in range(Nsims):
                 map_file = meta.get_map_filename(
                     map_set,
@@ -87,31 +99,37 @@ def filter(args):
                     id_sim=id_sim if Nsims > 1 else None
                 )
                 map = hp.read_map(map_file, field=[0, 1, 2])
-                if meta.filtering_type == "toast":
+
+                if meta.tags_settings[ftag]["filtering_type"] == "toast":
                     if args.sims:
                         sbatch_job_name = 'sbatch_sims__{:04d}_{}'\
                             .format(id_sim, str(Path(map_file).name))
                     elif args.data:
                         sbatch_job_name = 'sbatch_data__{}'\
                             .format(str(Path(map_file).name))
-                    kwargs = {"instrument": meta.toast['tf_instrument'],
-                              "band": meta.toast['tf_band'],
-                              "sbatch_job_name": sbatch_job_name}
+                    filter_map(
+                        map, map_file, mask,
+                        sbatch_job_name=sbatch_job_name
+                    )
                 else:
-                    kwargs = {}
-                filter_map(map, map_file, mask, kwargs)
-        if meta.filtering_type == "toast":
+                    filter_map(map, map_file, mask)
+
+        filtering_tags = meta.get_filtering_tags()
+        filtering_type_list = [
+            meta.tags_settings[ftag]["filtering_type"]
+            for ftag in filtering_tags
+        ]
+        if "toast" in filtering_type_list:
             _type = 'sims' if args.sims else 'data'
-            if meta.toast['slurm']:
-                meta.timer.stop(f"Filter {Nsims} sims.", verbose=True)
+            if meta.slurm:
                 # Running with SLURM job scheduller
                 cmd = (
                     "find '{}' -type f "
                     "-name 'sbatch_{}__*.sh' "
                     "-exec sbatch {{}} \\;").format(
-                        Path(meta.toast['scripts_dir']).resolve(),
+                        Path(meta.scripts_dir).resolve(),
                         _type)
-                if meta.toast['slurm_autosubmit']:
+                if meta.slurm_autosubmit:
                     subprocess.run(cmd, shell=True, check=True)
                     print('Submitted {} sims to SLURM for TF estimation.'
                           .format(meta.tf_est_num_sims))
@@ -124,12 +142,11 @@ def filter(args):
                     "find '{}' -type f "
                     "-name 'sbatch_{}__*.sh' "
                     "-exec {{}} \\;").format(
-                        Path(meta.toast['scripts_dir']).resolve(),
+                        Path(meta.scripts_dir).resolve(),
                         _type)
                 subprocess.run(cmd, shell=True, check=True)
-                meta.timer.stop(f"Filter {Nsims} sims.", verbose=True)
-        else:
-            meta.timer.stop(f"Filter {Nsims} sims.", verbose=True)
+
+        meta.timer.stop(f"Filter {Nsims} sims.", verbose=True)
 
 
 if __name__ == "__main__":
