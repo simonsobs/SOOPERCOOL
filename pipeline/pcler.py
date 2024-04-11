@@ -275,7 +275,7 @@ def pcler(args):
                     map_filtered = hp.read_map(map_file_filtered,
                                                field=[0, 1, 2])
 
-                    # TO-DO: filter temperature only once !
+                    # TO-DO: include pureT simulation type in the future
                     field = {
                         "spin0": nmt.NmtField(mask, map[:1]),
                         "spin2": nmt.NmtField(mask, map[1:],
