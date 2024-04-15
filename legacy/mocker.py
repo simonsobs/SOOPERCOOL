@@ -117,8 +117,8 @@ def mocker(args):
             for id_split in range(n_splits):
                 if 'SAT' in map_set:
                     noise_map = generate_noise_map(
-                        nlth_deconvolved_dict["T"][freq_tag],
-                        nlth_deconvolved_dict["P"][freq_tag],
+                        nlth_deconvolved_dict[freq_tag]["TT"],
+                        nlth_deconvolved_dict[freq_tag]["EE"],
                         hitmap,
                         n_splits,
                         is_anisotropic=meta.anisotropic_noise
