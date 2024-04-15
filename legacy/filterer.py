@@ -52,7 +52,8 @@ def filter(args):
                             )
                             filter_map(
                                 map, map_file, mask,
-                                sbatch_job_name=sbatch_job_name
+                                extra_kwargs={"sbatch_job_name":
+                                              sbatch_job_name}
                             )
                         else:
                             filter_map(map, map_file, mask)
@@ -109,7 +110,7 @@ def filter(args):
                             .format(str(Path(map_file).name))
                     filter_map(
                         map, map_file, mask,
-                        sbatch_job_name=sbatch_job_name
+                        extra_kwargs={"sbatch_job_name": sbatch_job_name}
                     )
                 else:
                     filter_map(map, map_file, mask)
