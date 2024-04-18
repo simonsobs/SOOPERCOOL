@@ -261,7 +261,7 @@ def pcler(args):
             }
 
             for ftag in filtering_tags:
-                for pure_type in ["pureE", "pureB"]:
+                for pure_type in ["pureT", "pureE", "pureB"]:
                     map_file = meta.get_map_filename_transfer(
                         id_sim,
                         "tf_est",
@@ -301,9 +301,9 @@ def pcler(args):
                 )
 
                 np.savez(f"{cl_dir}/pcls_mat_tf_est_{ftag1}x{ftag2}_filtered_{id_sim:04d}.npz", # noqa
-                         **pcls_mat_filtered)
+                         pcls_mat=pcls_mat_filtered)
                 np.savez(f"{cl_dir}/pcls_mat_tf_est_{ftag1}x{ftag2}_unfiltered_{id_sim:04d}.npz", # noqa
-                         **pcls_mat_unfiltered)
+                         pcls_mat=pcls_mat_unfiltered)
             meta.timer.stop(
                 "pcler_tf_est",
                 text_to_output=f"Compute C_ell #{id_sim} for TF estimation",
@@ -324,15 +324,7 @@ def pcler(args):
 
                 cross_name = f"{ftag1}x{ftag2}"
                 couplings = np.load(f"{meta.coupling_directory}/couplings_{cross_name}_{ftype}.npz")  # noqa
-                inv_couplings[ftype][ftag1, ftag2] = {
-                    k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
-                                                                ncl*n_bins])
-                    for k1, k2, ncl in zip(["spin0xspin0", "spin0xspin2",
-                                            "spin2xspin0", "spin2xspin2"],
-                                           ["spin0xspin0", "spin0xspin2",
-                                            "spin0xspin2", "spin2xspin2"],
-                                           [1, 2, 2, 4])
-                }
+                inv_couplings[ftype][ftag1, ftag2] = couplings["inv_coupling"].reshape([n_bins*9, n_bins*9])  # noqa
         meta.timer.stop(
             "couplings_tf_val",
             text_to_output="Loading inverse coupling matrix for validation",
@@ -365,7 +357,6 @@ def pcler(args):
                             fields[ftag1], fields[ftag2],
                             nmt_binning
                         )
-
                         decoupled_pcls = ps_utils.decouple_pseudo_cls(
                             pcls, inv_couplings[ftype][ftag1, ftag2]
                         )

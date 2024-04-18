@@ -120,21 +120,20 @@ def decouple_pseudo_cls(coupled_pseudo_cells, coupling_inv):
         Inverse binned bandpower coupling matrix.
     """
     decoupled_pcls = {}
-    for spin_comb, coupled_pcl in coupled_pseudo_cells.items():
-        n_bins = coupled_pcl.shape[-1]
-        decoupled_pcl = coupling_inv[spin_comb] @ coupled_pcl.flatten()
-        if spin_comb == "spin0xspin0":
-            size = 1
-        elif spin_comb in ["spin0xspin2", "spin2xspin0"]:
-            size = 2
-        elif spin_comb == "spin2xspin2":
-            size = 4
-        decoupled_pcl = decoupled_pcl.reshape((size, n_bins))
+    stacked_pcls = np.concatenate(
+        np.vstack([
+            coupled_pseudo_cells["spin0xspin0"],
+            coupled_pseudo_cells["spin0xspin2"],
+            coupled_pseudo_cells["spin2xspin0"],
+            coupled_pseudo_cells["spin2xspin2"]
+        ])
+    )
+    decoupled_pcls_vec = coupling_inv @ stacked_pcls
 
-        decoupled_pcls[spin_comb] = decoupled_pcl
-
-    decoupled_pcls = field_pairs_from_spins(decoupled_pcls)
-
+    field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
+    nbins = coupled_pseudo_cells["spin0xspin0"].shape[-1]
+    for i, fp in enumerate(field_pairs):
+        decoupled_pcls[fp] = decoupled_pcls_vec[i*nbins:(i+1)*nbins]
     return decoupled_pcls
 
 
@@ -184,21 +183,36 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
         fields2 = fields
 
     n_bins = nmt_binning.get_n_bands()
-    pcls_mat_00 = np.zeros((1, 1, n_bins))
-    pcls_mat_02 = np.zeros((2, 2, n_bins))
-    pcls_mat_22 = np.zeros((4, 4, n_bins))
+    pcls_mat = np.zeros((9, 9, n_bins))
 
     index = 0
-    cases = ["pureE", "pureB"]
+    cases = ["pureT", "pureE", "pureB"]
+    tmp_pcls = {}
     for index, (pure_type1, pure_type2) in enumerate(product(cases, cases)):
         pcls = get_coupled_pseudo_cls(fields[pure_type1],
                                       fields2[pure_type2],
                                       nmt_binning)
-        pcls_mat_22[index] = pcls["spin2xspin2"]
-        pcls_mat_02[cases.index(pure_type2)] = pcls["spin0xspin2"]
+        tmp_pcls[pure_type1, pure_type2] = {
+            "TT": pcls["spin0xspin0"][0],
+            "TE": pcls["spin0xspin2"][0],
+            "TB": pcls["spin0xspin2"][1],
+            "EE": pcls["spin2xspin2"][0],
+            "EB": pcls["spin2xspin2"][1],
+            "BE": pcls["spin2xspin2"][2],
+            "BB": pcls["spin2xspin2"][3]
+        }
 
-    pcls_mat_00[0] = pcls["spin0xspin0"]
+    for idx, (pure_type1, pure_type2) in enumerate(product(cases, cases)):
+        pcls_mat[idx] = np.array([
+            tmp_pcls[pure_type1, pure_type2]["TT"],
+            tmp_pcls[pure_type1, pure_type2]["TE"],
+            tmp_pcls[pure_type1, pure_type2]["TB"],
+            tmp_pcls[pure_type2, pure_type1]["TE"],
+            tmp_pcls[pure_type2, pure_type1]["TB"],
+            tmp_pcls[pure_type1, pure_type2]["EE"],
+            tmp_pcls[pure_type1, pure_type2]["EB"],
+            tmp_pcls[pure_type1, pure_type2]["BE"],
+            tmp_pcls[pure_type1, pure_type2]["BB"]
+        ])
 
-    return {"spin0xspin0": pcls_mat_00,
-            "spin0xspin2": pcls_mat_02,
-            "spin2xspin2": pcls_mat_22}
+    return pcls_mat
