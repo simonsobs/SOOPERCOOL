@@ -34,7 +34,7 @@ def filter(args):
         }
 
         for cl_type in ["cosmo", "tf_est", "tf_val"]:
-            cases_list = ["pureE", "pureB"] if cl_type == "tf_est" else [None]
+            cases_list = ["pureE", "pureB", "pureT"] if cl_type == "tf_est" else [None] # noqa
             for id_sim in range(meta.tf_est_num_sims):
                 for case in cases_list:
                     for ftag in filtering_tags:
