@@ -32,7 +32,7 @@ def transfer_validator(args):
     """
     meta = BBmeta(args.globals)
 
-    fields = ["TT", "TE", "TB", "EE", "EB", "BE", "BB"]
+    fields = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
 
     nmt_binning = meta.read_nmt_binning()
     nl = nmt_binning.lmax+1
@@ -44,9 +44,7 @@ def transfer_validator(args):
 
     # First plot the transfer functions
     for ftag1, ftag2 in filtering_pairs:
-        tf_dict = read_transfer(
-            f"{meta.coupling_directory}/transfer_function_{ftag1}x{ftag2}.npz"
-        )
+        tf_dict = np.load(f"{meta.coupling_directory}/transfer_function_{ftag1}x{ftag2}.npz") # noqa
 
         utils.plot_transfer_function(
             lb, tf_dict, meta.lmin, meta.lmax,
@@ -105,39 +103,15 @@ def transfer_validator(args):
         bp_win = np.load(
             f"{meta.coupling_directory}/couplings_{ftag_label}_unfiltered.npz"
         )
-        for spin_comb in ["spin0xspin0", "spin0xspin2", "spin2xspin2"]:
-            bpw_mat = bp_win[f"bp_win_{spin_comb}"]
-            for val_type in val_types:
-                if spin_comb == "spin0xspin0":
-                    cls_vec = np.array([cls_theory[val_type]["TT"][:nl]])
-                    cls_vec = cls_vec.reshape(1, nl)
-                elif spin_comb == "spin0xspin2":
-                    cls_vec = np.array([cls_theory[val_type]["TE"][:nl],
-                                        cls_theory[val_type]["TB"][:nl]])
-                elif spin_comb == "spin2xspin2":
-                    cls_vec = np.array([cls_theory[val_type]["EE"][:nl],
-                                        cls_theory[val_type]["EB"][:nl],
-                                        cls_theory[val_type]["EB"][:nl],
-                                        cls_theory[val_type]["BB"][:nl]])
-
-                cls_vec_binned = np.einsum("ijkl,kl", bpw_mat, cls_vec)
-                if spin_comb == "spin0xspin0":
-                    cls_theory_binned[ftag1, ftag2, val_type, "TT"] = \
-                        cls_vec_binned[0]
-                elif spin_comb == "spin0xspin2":
-                    cls_theory_binned[ftag1, ftag2, val_type, "TE"] = \
-                        cls_vec_binned[0]
-                    cls_theory_binned[ftag1, ftag2, val_type, "TB"] = \
-                        cls_vec_binned[1]
-                elif spin_comb == "spin2xspin2":
-                    cls_theory_binned[ftag1, ftag2, val_type, "EE"] = \
-                        cls_vec_binned[0]
-                    cls_theory_binned[ftag1, ftag2, val_type, "EB"] = \
-                        cls_vec_binned[1]
-                    cls_theory_binned[ftag1, ftag2, val_type, "BE"] = \
-                        cls_vec_binned[2]
-                    cls_theory_binned[ftag1, ftag2, val_type, "BB"] = \
-                        cls_vec_binned[3]
+        bpw_mat = bp_win["bp_win"]
+        for val_type in val_types:
+            cls_vec = np.array([
+                cls_theory[val_type][k][:nl] for k in cross_fields
+            ])
+            cls_vec_binned = np.einsum("ijkl,kl", bpw_mat, cls_vec)
+            for i, fp in enumerate(cross_fields):
+                cls_theory_binned[ftag1, ftag2, val_type, fp] = \
+                    cls_vec_binned[i]
 
     for val_type in val_types:
         for ftag1, ftag2 in filtering_pairs:
