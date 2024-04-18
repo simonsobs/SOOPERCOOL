@@ -370,15 +370,18 @@ def beam_alms(alms, bl):
     return alms
 
 
-def generate_map_from_alms(alms, nside, pureE=False, pureB=False, bl=None):
+def generate_map_from_alms(alms, nside, pureE=False, pureB=False,
+                           pureT=False, bl=None):
     """
     """
     alms = beam_alms(alms, bl)
     Tlm, Elm, Blm = alms
     if pureE:
-        alms = [Tlm, Elm, Blm*0.]
+        alms = [Tlm*0., Elm, Blm*0.]
     elif pureB:
-        alms = [Tlm, Elm*0., Blm]
+        alms = [Tlm*0., Elm*0., Blm]
+    elif pureT:
+        alms = [Tlm, Elm*0., Blm*0.]
 
     return hp.alm2map(alms, nside, lmax=3*nside - 1)
 
@@ -428,43 +431,31 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
     """
     Plot the transfer function given an input dictionary.
     """
-    plt.figure(figsize=(20, 20))
-    grid = plt.GridSpec(7, 7, hspace=0.3, wspace=0.3)
+    plt.figure(figsize=(25, 25))
+    grid = plt.GridSpec(9, 9, hspace=0.3, wspace=0.3)
 
     for id1, f1 in enumerate(field_pairs):
         for id2, f2 in enumerate(field_pairs):
             ax = plt.subplot(grid[id1, id2])
 
-            if f1 == "TT" and f2 != "TT":
-                ax.axis("off")
-                continue
-            if f1 in ["TE", "TB"] and f2 not in ["TE", "TB"]:
-                ax.axis("off")
-                continue
-            if f1 in ["EE", "EB", "BE", "BB"] \
-                    and f2 not in ["EE", "EB", "BE", "BB"]:
-                ax.axis("off")
-                continue
-
             ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
 
             ax.errorbar(
-                lb, tf_dict[f1, f2], tf_dict[f1, f2, "std"],
+                lb, tf_dict[f"{f1}_to_{f2}"], tf_dict[f"{f1}_to_{f2}_std"],
                 marker=".", markerfacecolor="white",
                 color="navy")
 
-            if not ([id1, id2] in [[0, 0], [2, 1],
-                                   [2, 2], [6, 3],
-                                   [6, 4], [6, 5],
-                                   [6, 6]]):
-                ax.set_xticks([])
-            else:
+            if id1 == 8:
                 ax.set_xlabel(r"$\ell$", fontsize=14)
+            else:
+                ax.set_xticks([])
 
             if f1 == f2:
                 ax.axhline(1., color="k", ls="--")
             else:
                 ax.axhline(0, color="k", ls="--")
+                ax.ticklabel_format(axis="y", style="scientific", 
+                                    scilimits=(0, 0), useMathText=True)
 
             ax.set_xlim(lmin, lmax)
 

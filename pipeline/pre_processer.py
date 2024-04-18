@@ -140,6 +140,12 @@ def pre_processer(args):
                             pureB=True,
                             bl=bl
                         )
+                        sim_pureT = utils.generate_map_from_alms(
+                            [alms_T, alms_E, alms_B],
+                            meta.nside,
+                            pureT=True,
+                            bl=bl
+                        )
 
                         map_file_pureE = meta.get_map_filename_transfer(
                             id_sim, cl_type, pure_type="pureE",
@@ -150,9 +156,15 @@ def pre_processer(args):
                             filter_tag=ftag
                         )
 
+                        map_file_pureT = meta.get_map_filename_transfer(
+                            id_sim, cl_type, pure_type="pureT",
+                            filter_tag=ftag
+                        )
                         hp.write_map(map_file_pureE, sim_pureE, overwrite=True,
                                      dtype=np.float32)
                         hp.write_map(map_file_pureB, sim_pureB, overwrite=True,
+                                     dtype=np.float32)
+                        hp.write_map(map_file_pureT, sim_pureT, overwrite=True,
                                      dtype=np.float32)
 
                         if args.plots:
