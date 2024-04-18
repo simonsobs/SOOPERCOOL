@@ -454,7 +454,7 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
                 ax.axhline(1., color="k", ls="--")
             else:
                 ax.axhline(0, color="k", ls="--")
-                ax.ticklabel_format(axis="y", style="scientific", 
+                ax.ticklabel_format(axis="y", style="scientific",
                                     scilimits=(0, 0), useMathText=True)
 
             ax.set_xlim(lmin, lmax)
