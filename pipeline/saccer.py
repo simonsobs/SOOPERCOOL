@@ -102,7 +102,7 @@ def saccer(args):
 
                 s.add_tracer(**{
                     "tracer_type": "NuMap",
-                    "name": f"{ms}_s{spin}",
+                    "name": f"{ms}",
                     "quantity": qty,
                     "spin": spin,
                     "nu": [meta.freq_tag_from_map_set(ms)],
@@ -115,16 +115,13 @@ def saccer(args):
 
             cl_file = f"{cl_dir}/decoupled_cross_pcls_nobeam_{ms1}_{ms2}{sim_label}.npz" # noqa
             cells = np.load(cl_file)
-
             for fp in field_pairs:
 
                 f1, f2 = fp
-                spin1 = 0 if f1 == "T" else 2
-                spin2 = 0 if f2 == "T" else 2
                 s.add_ell_cl(**{
                     "data_type": f"cl_{data_types[f1]}{data_types[f2]}",
-                    "tracer1": f"{ms1}_s{spin1}",
-                    "tracer2": f"{ms2}_s{spin2}",
+                    "tracer1": f"{ms1}",
+                    "tracer2": f"{ms2}",
                     "ell": lb,
                     "x": cells[fp],
                     "window": np.ones_like(lb)  # TODO
