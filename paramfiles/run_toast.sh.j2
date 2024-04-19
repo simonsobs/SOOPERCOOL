@@ -1,18 +1,50 @@
 #!/usr/bin/env bash
-#SBATCH --time=INFINITE
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=4
-#SBATCH --cpus-per-task=4
+#SBATCH --account mp107b
+#SBATCH --qos preempt
+#SBATCH --constraint cpu
+#SBATCH --time 02:00:00
+#SBATCH --nodes 1
 #SBATCH --job-name={{ sbatch_job_name }}
 #SBATCH --output={{ sbatch_log }}
 
-CONDA_ENV='soconda'
-ntask=1
-thinfp=8
-sample_rate=40
-job_group_size=$ntask
+# Perlmutter-specific fixes
+export FI_CXI_OPTIMIZED_MRS="false"
+export MPI4PY_RC_RECV_MPROBE="False"
 
-nside="{{ nside }}"
+# Python environment
+ulimit -c unlimited
+export PYTHON_ENV="/global/u2/k/kwolz/micromamba/envs/toast"
+export PYTHONSTARTUP=""
+export PYTHONNOUSERSITE=1
+export HDF5_USE_FILE_LOCKING=FALSE
+
+# TOAST variables
+export TOAST_FUNCTIME=1
+export TOAST_LOGLEVEL=INFO
+
+# Parallelization
+export OMP_NUM_THREADS=8
+export OMP_PLACES=threads
+export OMP_PROC_BIND=spread
+
+let nnode=$SLURM_JOB_NUM_NODES
+# 128 cores, 258 hardware threads
+let ntask_node=128/$OMP_NUM_THREADS # 128/8 = 16
+let ntask=$nnode*$ntask_node
+let ncore=2*$OMP_NUM_THREADS
+let job_group_size=8
+
+echo "$(date) : Start"
+echo "Running with"
+echo "            nnode = ${nnode}"
+echo "  OMP_NUM_THREADS = ${OMP_NUM_THREADS}"
+echo "       ntask_node = ${ntask_node}"
+echo "            ntask = ${ntask}"
+echo "   job_group_size = ${job_group_size}"
+
+thinfp=64
+sample_rate=40
+nside="256"
 band="{{ band }}"
 telescope="{{ telescope }}"
 config="{{ config }}"
@@ -22,69 +54,88 @@ outdir="{{ outdir }}"
 hitsmap="{{ map_file }}"
 {% else %}
 scanmap="{{ map_file }}"
+scanmap_filtered="${scanmap/%.fits/_filtered.fits}"
 {% endif %}
 
+
+CONDA_EXE='micromamba'
+CONDA_ENV='toast'
+ntask=1
+thinfp=64
+sample_rate=40
+job_group_size=$ntask
+
 mkdir -p "$outdir"
+logfile=${outdir}/toast.log
 
-if [ -n "$SLURM_CPUS_PER_TASK" ] ; then
-    # $SLURM_CPUS_PER_TASK is defined means this is running with SLURM
-    export OMP_NUM_THREADS="$SLURM_CPUS_PER_TASK"
+ # Load python environment
+module load cpu
+module unload python
+eval "$(micromamba shell hook --shell bash)"
+micromamba activate $PYTHON_ENV
+
+if [[ -e $scanmap_filtered || -e cleared_$scanmap_filtered ]]
+then
+    echo "$(date) : $scanmap_filtered exists, skipping..."
+else
+    echo "$(date) : Writing $logfile ... "
+    srun -n $ntask -c $ncore --cpu_bind=cores \
+        toast_so_sim \
+            {% if nhits_map_only %}
+            {# Generate nhits map only  #}
+            --scan_map.disable \
+            --filterbin.no_write_map \
+            {% else %}
+            {# Scan given sky map  #}
+            --scan_map.enable \
+            --filterbin.no_write_hits \
+            --scan_map.file "$scanmap" \
+            --scan_map_pixels.enable \
+            --scan_map_pixels.nside "$nside" \
+            {% endif %}
+            {% if sim_noise %}
+            {# Enable noise simulation  #}
+            --sim_noise.enable \
+            --sim_atmosphere_coarse.enable \
+            {% else %}
+            {# Disable noise simulation  #}
+            --sim_noise.disable \
+            --sim_atmosphere_coarse.disable \
+            --sim_atmosphere.disable \
+            {% endif %}
+            {# Remaining common options #}
+            --thinfp "$thinfp" \
+            --config "$config" \
+            --schedule "$schedule" \
+            --bands "$band" \
+            --telescope "$telescope" \
+            --sample_rate "$sample_rate" \
+            --pixels_healpix_radec.nside "$nside" \
+            --out_dir "$outdir" \
+            --job_group_size "$job_group_size" \
+            --demodulate.enable \
+            --polyfilter1D.disable \
+            --save_hdf5.disable \
+            --mapmaker.disable \
+            --filterbin.enable \
+            --sim_sss.disable \
+            --sim_hwpss.disable \
+            --filterbin.no_write_cov \
+            --filterbin.no_write_rcond
+        >& $logfile
+
+    # move maps/directories if toast_so_sim exit without error
+    if [[ "$?" == 0 ]] ; then
+        echo -e "\n"
+        {% if nhits_map_only %}
+        echo "mv \"$outdir/filterbin_hits.fits\" \"$hitsmap\""
+        mv "$outdir/filterbin_hits.fits" "$hitsmap"
+        {% else %}
+        echo "mv \"$outdir/filterbin_filtered_map.fits\" \"${scanmap/%.fits/_filtered.fits}\""
+        mv "$outdir/filterbin_filtered_map.fits" "${scanmap/%.fits/_filtered.fits}"
+        {% endif %}
+        rm -r "$outdir"
+    fi
+    echo -e "\n\n\n"
 fi
-
-"$CONDA_EXE" run -n "$CONDA_ENV" \
-toast_so_sim \
-    {% if nhits_map_only %}
-    {# Generate nhits map only  #}
-    --scan_map.disable \
-    --filterbin.no_write_map \
-    {% else %}
-    {# Scan given sky map  #}
-    --scan_map.enable \
-    --filterbin.no_write_hits \
-    --scan_map.file "$scanmap" \
-    --scan_map_pixels.enable \
-    --scan_map_pixels.nside "$nside" \
-    {% endif %}
-    {% if sim_noise %}
-    {# Enable noise simulation  #}
-    --sim_noise.enable \
-    --sim_atmosphere_coarse.enable \
-    {% else %}
-    {# Disable noise simulation  #}
-    --sim_noise.disable \
-    --sim_atmosphere_coarse.disable \
-    --sim_atmosphere.disable \
-    {% endif %}
-    {# Remaining common options #}
-    --thinfp "$thinfp" \
-    --config "$config" \
-    --schedule "$schedule" \
-    --bands "$band" \
-    --telescope "$telescope" \
-    --sample_rate "$sample_rate" \
-    --pixels_healpix_radec.nside "$nside" \
-    --out_dir "$outdir" \
-    --job_group_size "$job_group_size" \
-    --demodulate.enable \
-    --polyfilter1D.disable \
-    --save_hdf5.disable \
-    --mapmaker.disable \
-    --filterbin.enable \
-    --filterbin.no_write_cov \
-    --filterbin.no_write_rcond
-
-
-# move maps/directories if toast_so_sim exit without error
-if [[ "$?" == 0 ]] ; then
-    echo -e "\n"
-    {% if nhits_map_only %}
-    echo "mv \"$outdir/filterbin_hits.fits\" \"$hitsmap\""
-    mv "$outdir/filterbin_hits.fits" "$hitsmap"
-    {% else %}
-    echo "mv \"$outdir/filterbin_filtered_map.fits\" \"${scanmap/%.fits/_filtered.fits}\""
-    mv "$outdir/filterbin_filtered_map.fits" "${scanmap/%.fits/_filtered.fits}"
-    {% endif %}
-    rm -r "$outdir"
-fi
-echo -e "\n\n\n"
 
