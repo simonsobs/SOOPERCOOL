@@ -40,7 +40,6 @@ map_sets:
   SAT1_f093:
     file_root: "cmb_sat1_f093"
     n_splits: 4          # Number of splits
-    n_splits: 4          # Number of splits
     freq_tag: 93         # Freq. tag (e.g. useful to coadd freqs)
     exp_tag: "SAT1"      # Experiment tag (useful to get noise-bias free cross-split spectra)
     filtering_tag: "mcut30"
