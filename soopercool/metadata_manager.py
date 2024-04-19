@@ -693,8 +693,6 @@ class BBmeta(object):
         This function outputs a dictionary with the inverse mode coupling
         matrices
         """
-        nmt_binning = self.read_nmt_binning()
-        n_bins = nmt_binning.get_n_bands()
         filter_flags = [""] if beamed else ["filtered", "unfiltered"]
         map_set_pairs = (self.get_ps_names_list(type="all", coadd=True)
                          if beamed else [("", "")])
@@ -705,22 +703,15 @@ class BBmeta(object):
                 map_label = f"{ms1}_{ms2}" if beamed else ""
                 fname = f"couplings_{map_label}{filter_flag}"
                 couplings = np.load(f"{self.coupling_directory}/{fname}.npz")
-                coupling_dict = {
-                    k1: couplings[f"inv_coupling_{k2}"].reshape([ncl*n_bins,
-                                                                ncl*n_bins])
-                    for k1, k2, ncl in zip(["spin0xspin0", "spin0xspin2",
-                                            "spin2xspin0", "spin2xspin2"],
-                                           ["spin0xspin0", "spin0xspin2",
-                                            "spin0xspin2", "spin2xspin2"],
-                                           [1, 2, 2, 4])
-                }
+                npairs, ndata, _, _ = np.shape(couplings['inv_coupling'])
+                c = couplings['inv_coupling'].reshape((npairs*ndata,
+                                                       npairs*ndata))
                 if beamed:
-                    inv_couplings[ms1, ms2] = coupling_dict
+                    inv_couplings[ms1, ms2] = c
                     if ms1 != ms2:
-                        inv_couplings[ms2, ms1] = coupling_dict
+                        inv_couplings[ms2, ms1] = c
                 else:
-                    inv_couplings[filter_flag] = coupling_dict
-
+                    inv_couplings[filter_flag] = c
         return inv_couplings
 
     @classmethod
