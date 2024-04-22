@@ -34,7 +34,16 @@ def saccer(args):
     meta = BBmeta(args.globals)
 
     nmt_binning = meta.read_nmt_binning()
+    ls = np.arange(nmt_binning.lmax+1)
     lb = nmt_binning.get_effective_ells()
+    n_bins = len(lb)
+    lwin = np.zeros((len(ls), n_bins))
+
+    for id_bin in range(n_bins):
+        weights = np.array(nmt_binning.get_weight_list(id_bin))
+        multipoles = np.array(nmt_binning.get_ell_list(id_bin))
+        for il, l in enumerate(multipoles):
+            lwin[l, id_bin] = weights[il]
 
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
 
@@ -92,9 +101,12 @@ def saccer(args):
 
         sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
 
+        s_wins = sacc.BandpowerWindow(ls, lwin)
+
         s = sacc.Sacc()
 
         for ms in map_sets:
+            f = float(meta.freq_tag_from_map_set(ms))
             for spin, qty in zip(
                 [0, 2],
                 ["cmb_temperature", "cmb_polarization"]
@@ -105,10 +117,10 @@ def saccer(args):
                     "name": f"{ms}",
                     "quantity": qty,
                     "spin": spin,
-                    "nu": [meta.freq_tag_from_map_set(ms)],
+                    "nu": [f-1., f, f+1],  # TODO
                     "ell": lb,
                     "beam": np.ones_like(lb),  # TODO,
-                    "bandpass": [1.]  # TODO
+                    "bandpass": [0., 1., 0.]  # TODO
                 })
 
         for i, (ms1, ms2) in enumerate(ps_names):
@@ -124,7 +136,7 @@ def saccer(args):
                     "tracer2": f"{ms2}",
                     "ell": lb,
                     "x": cells[fp],
-                    "window": np.ones_like(lb)  # TODO
+                    "window": s_wins
                 })
 
         s.add_covariance(full_cov)
