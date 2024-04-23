@@ -141,6 +141,8 @@ def get_beam_windows(meta, plot=False):
                                                      noise_model.get_beams())}
     beams_dict = {}
     for map_set in meta.map_sets_list:
+        if "SAT" not in meta.exp_tag_from_map_set(map_set):
+            continue
         freq_tag = meta.freq_tag_from_map_set(map_set)
         beams_dict[map_set] = beam_gaussian(lth, beam_arcmin[freq_tag])
         file_root = meta.file_root_from_map_set(map_set)
