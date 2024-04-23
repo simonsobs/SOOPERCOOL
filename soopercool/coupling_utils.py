@@ -121,8 +121,6 @@ def read_mcm(mcm_file, binned=False, full_mcm=False):
     _, n_bins, _, nl = mcm[f"spin0xspin0{suffix}"].shape
     if full_mcm:
         full_mcm = np.zeros((9, n_bins, 9, nl))
-        print(mcm[f"spin0xspin0{suffix}"].shape)
-        print(full_mcm[0, :, 0, :].shape)
         full_mcm[0, :, 0, :] = mcm[f"spin0xspin0{suffix}"][0, :, 0, :]
         full_mcm[1:3, :, 1:3, :] = mcm[f"spin0xspin2{suffix}"]
         full_mcm[3:5, :, 3:5, :] = mcm[f"spin0xspin2{suffix}"]
