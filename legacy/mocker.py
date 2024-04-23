@@ -37,8 +37,10 @@ def mocker(args):
         is_beam_deconvolved=False
     )
 
-    # Save the noise power spectra
+    # Save the SAT noise power spectra
     for ms in meta.map_sets_list:
+        if "SAT" not in meta.exp_tag_from_map_set(ms):
+            continue
         ftag = meta.freq_tag_from_map_set(ms)
         np.savez(f"{meta.mock_directory}/noise_{ms}.npz",
                  lth=lth, **nlth_deconvolved_dict[ftag])
