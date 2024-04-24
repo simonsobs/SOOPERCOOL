@@ -4,6 +4,7 @@ import numpy as np
 from soopercool import BBmeta, ps_utils
 import pymaster as nmt
 import warnings
+import os
 
 
 def pcler(args):
@@ -48,10 +49,15 @@ def pcler(args):
 
         for id_sim in range(Nsims):
             meta.timer.start("pcler")
+            if args.verbose:
+                print(f"{id_sim}/{Nsims}")
+                print(" Reading sims")
             fields = {}
 
             # Load namaster fields that will be used
             for map_name in meta.maps_list:
+                if args.verbose:
+                    print("  ", map_name)
                 map_set, id_split = map_name.split("__")
 
                 # Load maps
@@ -71,9 +77,18 @@ def pcler(args):
                     "spin0": field_spin0,
                     "spin2": field_spin2
                 }
+            if args.verbose:
+                print(f"{id_sim}/{Nsims}")
+                print(" Computing sim power spectra")
 
             for map_name1, map_name2 in meta.get_ps_names_list(type="all",
                                                                coadd=False):
+                sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
+                fname = f"{cl_dir}/decoupled_pcls_nobeam_{map_name1}_{map_name2}{sim_label}.npz"  # noqa
+
+                if os.path.isfile(fname):
+                    continue
+
                 map_set1, id_split1 = map_name1.split("__")
                 map_set2, id_split2 = map_name2.split("__")
                 pcls = ps_utils.get_coupled_pseudo_cls(
@@ -85,9 +100,7 @@ def pcler(args):
                 decoupled_pcls = ps_utils.decouple_pseudo_cls(
                     pcls, inv_couplings_beamed[map_set1, map_set2]
                 )
-
-                sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
-                np.savez(f"{cl_dir}/decoupled_pcls_nobeam_{map_name1}_{map_name2}{sim_label}.npz",  # noqa
+                np.savez(fname,
                          **decoupled_pcls, lb=nmt_binning.get_effective_ells())
             meta.timer.stop(
                 "pcler",
