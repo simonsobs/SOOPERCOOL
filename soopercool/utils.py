@@ -273,7 +273,11 @@ def m_filter_map_old(map, map_file, mask, m_cut):
         Maximum nonzero m-degree of the multipole expansion. All higher
         degrees are set to zero.
     """
-
+    map_file_filtered = map_file.replace('.fits', '_filtered.fits')
+    if os.path.isfile(map_file_filtered):
+        print(f"  Filtered map exists at {map_file_filtered}. Skip.")
+        return
+    print(f"  Filtering map at {map_file}")
     map_masked = map * mask
     nside = hp.get_nside(map)
     lmax = 3 * nside - 1
