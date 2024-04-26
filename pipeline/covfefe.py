@@ -49,7 +49,10 @@ def covFeFe(args):
         cl_dict[ms1, ms2] = np.array(cl_dict[ms1, ms2])
 
     full_cov_dict = {}
-    for ms1, ms2, ms3, ms4 in cov_names:
+
+    for id_mapset in range(len(cov_names)):
+        print(id_mapset, len(cov_names))
+        ms1, ms2, ms3, ms4 = cov_names[id_mapset]
 
         cl12 = cl_dict[ms1, ms2]
         cl34 = cl_dict[ms3, ms4]

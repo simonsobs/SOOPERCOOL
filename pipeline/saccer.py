@@ -3,6 +3,7 @@ from soopercool import BBmeta
 import sacc
 from itertools import product
 import numpy as np
+import soopercool.mpi_utils as mpi_utils
 
 
 def multi_eye(size, k_list):
@@ -97,7 +98,11 @@ def saccer(args):
     full_cov = np.triu(full_cov)
     full_cov += full_cov.T - np.diag(full_cov.diagonal())
 
-    for id_sim in range(Nsims):
+    # Initialize MPI
+    use_mpi4py = args.sims
+    mpi_utils.init(use_mpi4py)
+
+    for id_sim in mpi_utils.taskrange(Nsims - 1):
 
         sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
 

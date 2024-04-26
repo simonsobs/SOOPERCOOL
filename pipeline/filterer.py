@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 import healpy as hp
 from soopercool import BBmeta
+import soopercool.mpi_utils as mpi_utils
 
 
 def filter(args):
@@ -32,10 +33,19 @@ def filter(args):
             ftag: meta.get_filter_function(ftag)
             for ftag in filtering_tags
         }
+        filtering_type_list = [
+            meta.tags_settings[ftag]["filtering_type"]
+            for ftag in filtering_tags
+        ]
 
         for cl_type in ["cosmo", "tf_est", "tf_val"]:
             cases_list = ["pureE", "pureB", "pureT"] if cl_type == "tf_est" else [None] # noqa
-            for id_sim in range(meta.tf_est_num_sims):
+
+            # Initialize MPI for non-TOAST filters
+            use_mpi4py = "toast" not in filtering_type_list
+            mpi_utils.init(use_mpi4py)
+
+            for id_sim in mpi_utils.taskrange(meta.tf_est_num_sims - 1):
                 for case in cases_list:
                     for ftag in filtering_tags:
                         map_file = meta.get_map_filename_transfer(
@@ -58,10 +68,6 @@ def filter(args):
                         else:
                             filter_map(map, map_file, mask)
 
-        filtering_type_list = [
-            meta.tags_settings[ftag]["filtering_type"]
-            for ftag in filtering_tags
-        ]
         if "toast" in filtering_type_list:
             if meta.slurm:
                 # Running with SLURM job scheduller
@@ -93,7 +99,12 @@ def filter(args):
 
             ftag = meta.filtering_tag_from_map_set(map_set)
             filter_map = meta.get_filter_function(ftag)
-            for id_sim in range(Nsims):
+
+            # Initialize MPI for non-TOAST filters
+            use_mpi4py = "toast" not in ftag and args.sims
+            mpi_utils.init(use_mpi4py)
+
+            for id_sim in mpi_utils.taskrange(Nsims - 1):
                 map_file = meta.get_map_filename(
                     map_set,
                     id_split,

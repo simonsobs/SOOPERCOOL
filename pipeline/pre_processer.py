@@ -4,6 +4,7 @@ import numpy as np
 import os
 import healpy as hp
 import matplotlib.pyplot as plt
+import soopercool.mpi_utils as mpi_utils
 
 
 def pre_processer(args):
@@ -109,7 +110,11 @@ def pre_processer(args):
             beams[ftag] = bl
 
         meta.timer.start("Generating simulations for transfer")
-        for id_sim in range(meta.tf_est_num_sims):
+
+        # Initialize MPI
+        mpi_utils.init(switch=True)
+
+        for id_sim in mpi_utils.taskrange(meta.tf_est_num_sims - 1):
             meta.timer.start("Generate `cosmo` and `power_law` "
                              f"simulation n° {id_sim:04d}")
             for cl_type in ["cosmo", "tf_est", "tf_val"]:

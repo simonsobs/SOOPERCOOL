@@ -153,7 +153,8 @@ def pre_processer(args):
                 np.savetxt(beam_fname_T, np.transpose([ells_beam, bl_T]))
                 np.savetxt(beam_fname_pol, np.transpose([ells_beam, bl_pol]))
 
-        shutil.rmtree(f"{beam_dir}/simulated_maps")
+        if os.path.isdir(f"{beam_dir}/simulated_maps"):
+            shutil.rmtree(f"{beam_dir}/simulated_maps")
 
         if not args.noise:
             print("---------------------")

@@ -5,6 +5,7 @@ from soopercool import BBmeta, ps_utils
 import pymaster as nmt
 import warnings
 import os
+import soopercool.mpi_utils as mpi_utils
 
 
 def pcler(args):
@@ -47,7 +48,11 @@ def pcler(args):
         # Set the number of sims to loop over
         Nsims = meta.num_sims if args.sims else 1
 
-        for id_sim in range(Nsims):
+        # Initialize MPI
+        use_mpi4py - args.sims
+        mpi_utils.init(use_mpi4py)
+
+        for id_sim in mpi_utils.taskrange(Nsims - 1):
             meta.timer.start("pcler")
             if args.verbose:
                 print(f"{id_sim}/{Nsims}")
@@ -264,7 +269,11 @@ def pcler(args):
 
         filtering_tags = meta.get_filtering_tags()
         filtering_tag_pairs = meta.get_independent_filtering_pairs()
-        for id_sim in range(meta.tf_est_num_sims):
+
+        # Initialize MPI
+        mpi_utils.init(switch=True)
+
+        for id_sim in mpi_utils.taskrange(meta.tf_est_num_sims - 1):
             meta.timer.start("pcler_tf_est")
 
             fields = {ftag: {
@@ -343,7 +352,11 @@ def pcler(args):
             text_to_output="Loading inverse coupling matrix for validation",
             verbose=args.verbose
         )
-        for id_sim in range(meta.tf_est_num_sims):
+
+        # Initialize MPI
+        mpi_utils.init(switch=True)
+
+        for id_sim in mpi_utils.taskrange(meta.tf_est_num_sims - 1):
             for cl_type in ["tf_val", "cosmo"]:
                 for ftype in ["filtered", "unfiltered"]:
                     fields = {}
