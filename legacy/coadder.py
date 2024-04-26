@@ -2,6 +2,7 @@ from soopercool import BBmeta
 from itertools import product
 import numpy as np
 import argparse
+import soopercool.mpi_utils as mpi_utils
 
 
 def coadder(args):
@@ -33,8 +34,12 @@ def coadder(args):
     cross_split_list = meta.get_ps_names_list(type="all", coadd=False)
     cross_map_set_list = meta.get_ps_names_list(type="all", coadd=True)
 
+    # Initialize MPI
+    use_mpi4py = args.sims
+    mpi_utils.init(use_mpi4py)
+
     # Load split C_ells
-    for id_sim in range(Nsims):
+    for id_sim in mpi_utils.taskrange(Nsims - 1):
 
         sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
 

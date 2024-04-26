@@ -6,6 +6,7 @@ from soopercool import BBmeta, utils
 import warnings
 import os
 import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
+import soopercool.mpi_utils as mpi_utils
 
 
 def mocker(args):
@@ -97,7 +98,11 @@ def mocker(args):
 
     Nsims = meta.num_sims if args.sims else 1
 
-    for id_sim in range(Nsims):
+    # Initialize MPI
+    use_mpi4py = args.sims
+    mpi_utils.init(use_mpi4py)
+
+    for id_sim in mpi_utils.taskrange(Nsims - 1):
         alms_T, alms_E, alms_B = hp.synalm([ps_th[k] for k in hp_ordering],
                                            lmax=lmax_sim)
         if meta.null_e_modes:
