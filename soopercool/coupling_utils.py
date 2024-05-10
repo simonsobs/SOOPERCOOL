@@ -44,8 +44,7 @@ def get_transfer_with_error(mean_pcls_mat_filt,
 def get_transfer_dict(mean_pcls_mat_filt_dict,
                       mean_pcls_mat_unfilt_dict,
                       pcls_mat_dict,
-                      filtering_pairs,
-                      spin_pairs):
+                      filtering_pairs):
     """
     """
     tf_dict = {(ftag1, ftag2): {} for ftag1, ftag2 in filtering_pairs}
@@ -72,7 +71,7 @@ def get_transfer_dict(mean_pcls_mat_filt_dict,
     return tf_dict
 
 
-def read_pcls_matrices(pcls_mat_dir, filtering_pairs, spin_pairs, Nsims):
+def read_pcls_matrices(pcls_mat_dir, filtering_pairs, Nsims):
     """
     """
     pcls_mat_dict = {
@@ -87,7 +86,7 @@ def read_pcls_matrices(pcls_mat_dir, filtering_pairs, spin_pairs, Nsims):
     for id_sim in range(Nsims):
         for label in ["filtered", "unfiltered"]:
             for ftag1, ftag2 in filtering_pairs:
-                suffix = f"{ftag1}x{ftag2}_{label}_{id_sim:04d}"
+                suffix = f"{ftag1}_x_{ftag2}_{label}_{id_sim:04d}"
                 pcls_mat = np.load(
                     f"{pcls_mat_dir}/pcls_mat_tf_est_{suffix}.npz")
                 pcls_mat_dict[ftag1, ftag2][label] += [pcls_mat["pcls_mat"]]
@@ -95,7 +94,7 @@ def read_pcls_matrices(pcls_mat_dir, filtering_pairs, spin_pairs, Nsims):
     return pcls_mat_dict
 
 
-def load_mcms(coupling_dir, spin_pairs, ps_names=None, full_mcm=False):
+def load_mcms(coupling_dir, ps_names=None, full_mcm=False):
     """
     """
     file_root = "mcm"
@@ -137,7 +136,7 @@ def read_mcm(mcm_file, binned=False, full_mcm=False):
 
 
 def average_pcls_matrices(pcls_mat_dict, filtering_pairs,
-                          spin_pairs, filtered):
+                          filtered):
     """
     """
     label = "filtered" if filtered else "unfiltered"
@@ -181,7 +180,7 @@ def compute_couplings(mcm, nmt_binning, transfer=None):
     return bpw_windows, inv_coupling
 
 
-def get_couplings_dict(mcm_dict, nmt_binning, spin_pairs,
+def get_couplings_dict(mcm_dict, nmt_binning,
                        transfer_dict=None,
                        ps_names_and_ftags=None,
                        filtering_pairs=None):

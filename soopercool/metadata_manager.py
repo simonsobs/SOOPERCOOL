@@ -31,14 +31,14 @@ class BBmeta(object):
             setattr(self, key, self.config[key])
 
         # Set all the `_directory` attributes
-        self._set_directory_attributes()
+        # self._set_directory_attributes()
 
         # Set the general attributes (nside, lmax, etc...)
         self._set_general_attributes()
 
         # Copy the configuration file to output directory
-        with open(f"{self.output_dirs['root']}/config.yaml", "w") as f:
-            yaml.dump(self.config, f)
+        # with open(f"{self.output_dirs['root']}/config.yaml", "w") as f:
+        #    yaml.dump(self.config, f)
 
         # Basic sanity checks
         if self.lmax > 3*self.nside-1:
@@ -46,7 +46,7 @@ class BBmeta(object):
                              f"to 3*nside-1 = {3*self.nside-1}")
 
         # Path to binning
-        self.path_to_binning = f"{self.pre_process_directory}/{self.binning_file}"  # noqa
+        #self.path_to_binning = f"{self.pre_process_directory}/{self.binning_file}"  # noqa
 
         # Initialize method to parse map_sets metadata
         map_sets_attributes = list(self.map_sets[
@@ -59,36 +59,37 @@ class BBmeta(object):
         self.maps_list = self._get_map_list()
 
         # Determine if input hit counts map exists
-        self.use_input_nhits = (self.masks["input_nhits_path"] is not None)
+        # self.use_input_nhits = (self.masks["input_nhits_path"] is not None)
 
         # Initialize masks file_names
-        for mask_type in ["binary_mask", "galactic_mask", "point_source_mask",
-                          "analysis_mask", "nhits_map"]:
-            setattr(
-                self,
-                f"{mask_type}_name",
-                getattr(self, f"_get_{mask_type}_name")()
-            )
+        # for mask_type in ["binary_mask", "galactic_mask",
+        #                   "point_source_mask",
+        #                   "analysis_mask", "nhits_map"]:
+        #    setattr(
+        #        self,
+        #        f"{mask_type}_name",
+        #        getattr(self, f"_get_{mask_type}_name")()
+        #    )
 
         # Simulation
-        self._init_simulation_params()
+        # self._init_simulation_params()
 
         # Filtering
-        self._init_filtering_params()
+        # self._init_filtering_params()
 
         # Tf estimation
-        self.tf_est_sims_dir = f"{self.pre_process_directory}/tf_est_sims"
-        self.tf_val_sims_dir = f"{self.pre_process_directory}/tf_val_sims"
-        self.cosmo_sims_dir = f"{self.pre_process_directory}/cosmo_sims"
+        # self.tf_est_sims_dir = f"{self.pre_process_directory}/tf_est_sims"
+        # self.tf_val_sims_dir = f"{self.pre_process_directory}/tf_val_sims"
+        # self.cosmo_sims_dir = f"{self.pre_process_directory}/cosmo_sims"
 
         # Fiducial cls
-        self.cosmo_cls_file = f"{self.pre_process_directory}/cosmo_cls.npz"
-        self.tf_est_cls_file = f"{self.pre_process_directory}/tf_est_cls.npz"
-        self.tf_val_cls_file = f"{self.pre_process_directory}/tf_val_cls.npz"
-        self.noise_cls_file = {
-            map_set: f"{self.pre_process_directory}/noise_cls_{map_set}.npz"
-            for map_set in self.map_sets_list
-        }
+        # self.cosmo_cls_file = f"{self.pre_process_directory}/cosmo_cls.npz"
+        # self.tf_est_cls_file = f"{self.pre_process_directory}/tf_est_cls.npz"
+        # self.tf_val_cls_file = f"{self.pre_process_directory}/tf_val_cls.npz"
+        # self.noise_cls_file = {
+        #    map_set: f"{self.pre_process_directory}/noise_cls_{map_set}.npz"
+        #    for map_set in self.map_sets_list
+        # }
 
         # Initialize a timer
         self.timer = Timer()
@@ -136,7 +137,7 @@ class BBmeta(object):
         """
         out_list = [
             f"{map_set}__{id_split}" for map_set in self.map_sets_list
-                for id_split in range(self.n_splits_from_map_set(map_set))  # noqa
+                for id_split in range(self.n_bundles_from_map_set(map_set))  # noqa
         ]
         return out_list
 
@@ -272,8 +273,9 @@ class BBmeta(object):
     def read_beam(self, map_set):
         """
         """
-        file_root = self.file_root_from_map_set(map_set)
-        beam_file = f"{self.beam_directory}/beam_{file_root}.dat"
+        beam_dir = self.beam_dir_from_map_set(map_set)
+        beam_file = self.beam_file_from_map_set(map_set)
+        beam_file = f"{beam_dir}/{beam_file}"
         l, bl = np.loadtxt(beam_file, unpack=True)
         if self.beam_floor is not None:
             bl[bl < self.beam_floor] = self.beam_floor
@@ -408,7 +410,7 @@ class BBmeta(object):
     def get_filter_function(self, filter_tag):
         from soopercool.utils import m_filter_map, toast_filter_map
 
-        tag_settings = self.tags_settings[filter_tag]
+        tag_settings = self.filtering["tags_settings"][filter_tag]
         filtering_type = tag_settings["filtering_type"]
 
         if filtering_type == "m_filterer":
@@ -428,13 +430,13 @@ class BBmeta(object):
             filter_function = toast_filter_map
         else:
             raise NotImplementedError(
-                f"Filterer type {self.filtering_type} "
+                f"Filterer type {tag_settings['filtering_type']} "
                 "not implemented"
             )
 
-        def filter_operation(map, map_file, mask, extra_kwargs={}):
+        def filter_operation(map_file, mask_file, out_dir, extra_kwargs={}):
             return filter_function(
-                map, map_file, mask, **kwargs, **extra_kwargs)
+                map_file, mask_file, out_dir, **kwargs, **extra_kwargs)
 
         return filter_operation
 
@@ -646,8 +648,8 @@ class BBmeta(object):
             noise-biased spectra, while "cross" returns all unique
             noise-biased spectra. "all" is the union of both.
         """
-        n_splits_1 = self.n_splits_from_map_set(map_set_1)
-        n_splits_2 = self.n_splits_from_map_set(map_set_2)
+        n_splits_1 = self.n_bundles_from_map_set(map_set_1)
+        n_splits_2 = self.n_bundles_from_map_set(map_set_2)
         exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
         exp_tag_2 = self.exp_tag_from_map_set(map_set_2)
         if type == "cross":
@@ -720,6 +722,18 @@ class BBmeta(object):
                     inv_couplings[filter_flag] = coupling_dict
 
         return inv_couplings
+
+    @classmethod
+    def make_dir(cls, dir):
+        """
+        Make a directory if it does not exist.
+
+        Parameters
+        ----------
+        dir : str
+            Path to the directory.
+        """
+        os.makedirs(dir, exist_ok=True)
 
 
 class Timer:

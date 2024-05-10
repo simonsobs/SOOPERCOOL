@@ -183,11 +183,17 @@ def beam_hpix(ll, nside):
     return beam_gaussian(ll, fwhm_hp_amin)
 
 
-def create_binning(nside, delta_ell):
+def create_binning(nside, delta_ell, end_first_bin=None):
     """
     """
-    bin_low = np.arange(0, 3*nside, delta_ell)
-    bin_high = bin_low + delta_ell - 1
+    if end_first_bin is not None:
+        bin_low = np.arange(end_first_bin, 3*nside, delta_ell)
+        bin_high = bin_low + delta_ell - 1
+        bin_low = np.concatenate(([0], bin_low))
+        bin_high = np.concatenate(([end_first_bin-1], bin_high))
+    else:
+        bin_low = np.arange(0, 3*nside, delta_ell)
+        bin_high = bin_low + delta_ell - 1
     bin_high[-1] = 3*nside - 1
     bin_center = (bin_low + bin_high) / 2
 
@@ -209,7 +215,47 @@ def power_law_cl(ell, amp, delta_ell, power_law_index):
     return pl_ps
 
 
-def m_filter_map(map, map_file, mask, m_cut):
+def m_filter_map(map_file, mask_file, out_dir, m_cut):
+    """
+    Applies the m-cut mock filter to a given map with a given sky mask.
+
+    Parameters
+    ----------
+    map : array-like
+        Healpix TQU map to be filtered.
+    map_file : str
+        File path of the unfiltered map.
+    mask : array-like
+        Healpix map storing the sky mask.
+    m_cut : int
+        Maximum nonzero m-degree of the multipole expansion. All higher
+        degrees are set to zero.
+    """
+
+    map = hp.read_map(map_file, field=(0, 1, 2))
+    mask = hp.read_map(mask_file)
+    mask[mask != 0] = 1.
+
+    map_masked = map * mask
+    nside = hp.get_nside(map)
+    lmax = 3 * nside - 1
+
+    alms = hp.map2alm(map_masked, lmax=lmax)
+
+    n_modes_to_filter = (m_cut + 1) * (lmax + 1) - ((m_cut + 1) * m_cut) // 2
+    alms[:, :n_modes_to_filter] = 0.
+
+    filtered_map = hp.alm2map(alms, nside=nside, lmax=lmax)
+
+    fname = os.path.basename(map_file)
+    fname_out = fname.replace(".fits", "_filtered.fits")
+
+    hp.write_map(f"{out_dir}/{fname_out}",
+                 filtered_map, overwrite=True,
+                 dtype=np.float32)
+
+
+def m_filter_map_old(map, map_file, mask, m_cut):
     """
     Applies the m-cut mock filter to a given map with a given sky mask.
 
