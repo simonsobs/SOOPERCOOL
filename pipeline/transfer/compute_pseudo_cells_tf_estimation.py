@@ -55,9 +55,9 @@ def main(args):
                 filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}"
                 unfiltered_map_file = f"{unfiltered_map_dir}/{unfiltered_map_file}" # noqa
 
-                map = hp.read_map(filtered_map_file,
+                map = hp.read_map(unfiltered_map_file,
                                   field=[0, 1, 2])
-                map_filtered = hp.read_map(unfiltered_map_file,
+                map_filtered = hp.read_map(filtered_map_file,
                                            field=[0, 1, 2])
 
                 field = {
