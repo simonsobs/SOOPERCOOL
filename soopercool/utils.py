@@ -1,6 +1,5 @@
 import numpy as np
 import os
-import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 import healpy as hp
 import matplotlib.pyplot as plt
 from matplotlib import cm
@@ -54,6 +53,7 @@ def get_noise_cls(noise_kwargs, lmax, lmin=0, fsky=0.1,
     Load polarization noise from SO SAT noise model.
     Assume polarization noise is half of that.
     """
+    import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
     oof_dict = {"pessimistic": 0, "optimistic": 1}
     oof_mode = noise_kwargs["one_over_f_mode"]
     oof_mode = oof_dict[oof_mode]
@@ -127,6 +127,7 @@ def get_beam_windows(meta, plot=False):
     """
     Compute and save dictionary with beam window functions for each map set.
     """
+    import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
     oof_dict = {"pessimistic": 0, "optimistic": 1}
 
     noise_model = noise_calc.SOSatV3point1(

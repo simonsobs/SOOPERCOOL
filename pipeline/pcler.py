@@ -49,7 +49,7 @@ def pcler(args):
         Nsims = meta.num_sims if args.sims else 1
 
         # Initialize MPI
-        use_mpi4py - args.sims
+        use_mpi4py = args.sims
         mpi_utils.init(use_mpi4py)
 
         for id_sim in mpi_utils.taskrange(Nsims - 1):

@@ -5,14 +5,14 @@
 # Define the directories
 ## Let's start with directories of data products
 data_dirs:
-  root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/data_planck_PR3mask"
+  root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/data_wmap_planck_PR3mask"
   map_directory: "maps"
   beam_directory: "beams"
   bandpasses_directory: "bandpasses"
   mock_directory: "mock_data"
 ## Then directories in which we will store outputs
 output_dirs:
-  root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/outputs_planck_PR3mask"
+  root: "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/outputs_wmap_planck_PR3mask"
   mask_directory: "masks"
   pre_process_directory: "pre_processing"
   sims_directory: "sims"
@@ -37,6 +37,18 @@ output_dirs:
 #   exp_tag: ...                 #
 ##################################
 map_sets:
+  wmap_f023:
+    file_root: "wmap_f023"
+    n_splits: 9
+    freq_tag: 23
+    exp_tag: "wmap"
+    filtering_tag: "none"
+  wmap_f033:
+    file_root: "wmap_f033"
+    n_splits: 9
+    freq_tag: 33
+    exp_tag: "wmap"
+    filtering_tag: "none"
   planck_f030:
     file_root: "planck_f030"
     n_splits: 2
@@ -99,7 +111,7 @@ general_pars:
   lmax: 600
   deltal: 10
   binning_file: "binning.npz"
-  pure_B: True
+  pure_B: False
   # Where the beam window is lower than beam_floor, set it to beam_floor
   beam_floor: 1.e-2
 
