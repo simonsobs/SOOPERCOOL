@@ -29,8 +29,6 @@ python mcmer.py --globals ${paramfile} --plot
 
 
 # run in parallel with salloc -N 1 -C cpu -q interactive -t 00:30:00
-module load python
-mamba activate my_mpi4py_env
 
 echo "Generating transfer sims"  # 1m20 for 30 sims
 echo "-----------------------------"
