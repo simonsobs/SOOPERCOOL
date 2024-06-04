@@ -39,21 +39,24 @@ def main(args):
         for ftag in filtering_tags:
             for pure_type in ["pureT", "pureE", "pureB"]:
 
-                filtered_map_dir = tf_settings["filtered_map_dir"][ftag]
-                unfiltered_map_dir = tf_settings["unfiltered_map_dir"][ftag]
+                unfiltered_map_dir = tf_settings["unfiltered_map_dir"]
+                unfiltered_map_tmpl = tf_settings["unfiltered_map_template"]
 
-                filtered_map_tmpl = tf_settings["filtered_map_template"][ftag]
-                unfiltered_map_tmpl = tf_settings["unfiltered_map_template"][ftag] # noqa
-
-                filtered_map_file = filtered_map_tmpl.format(
-                    id_sim=id_sim, pure_type=pure_type
-                )
                 unfiltered_map_file = unfiltered_map_tmpl.format(
                     id_sim=id_sim, pure_type=pure_type
                 )
-
-                filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}"
                 unfiltered_map_file = f"{unfiltered_map_dir}/{unfiltered_map_file}" # noqa
+
+                if ftag is None:
+                    filtered_map_file = unfiltered_map_file
+                else:
+                    filtered_map_dir = tf_settings["filtered_map_dir"][ftag]
+                    filtered_map_tmpl = tf_settings["filtered_map_template"][ftag] # noqa
+                    filtered_map_file = filtered_map_tmpl.format(
+                        id_sim=id_sim, pure_type=pure_type
+                    )
+
+                    filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}" # noqa
 
                 map = hp.read_map(unfiltered_map_file,
                                   field=[0, 1, 2])
@@ -76,6 +79,9 @@ def main(args):
                 fields[ftag]["filtered"][pure_type] = field_filtered
 
         for ftag1, ftag2 in filtering_tag_pairs:
+            if ftag1 is None and ftag2 is None:
+                continue
+
             pcls_mat_filtered = ps_utils.get_pcls_mat_transfer(
                 fields[ftag1]["filtered"],
                 nmt_bins, fields2=fields[ftag2]["filtered"]

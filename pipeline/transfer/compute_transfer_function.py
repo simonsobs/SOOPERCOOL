@@ -18,6 +18,10 @@ def main(args):
     tf_settings = meta.transfer_settings
 
     filtering_pairs = meta.get_independent_filtering_pairs()
+    filtering_pairs = [
+        (ftag1, ftag2) for ftag1, ftag2 in filtering_pairs
+        if not (ftag1 is None and ftag2 is None)
+    ]
     pcls_mat_dict = cu.read_pcls_matrices(
         cells_dir, filtering_pairs,
         tf_settings["tf_est_num_sims"]
