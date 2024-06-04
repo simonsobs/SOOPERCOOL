@@ -64,7 +64,7 @@ def main(args):
     for hit_map in hit_maps:
         binary[hit_map == 0] = 0
         sum_hits += hit_map
-    sum_hits[binary == 0] == 0
+    sum_hits[binary == 0] = 0
 
     # Normalize and smooth hitmaps
     sum_hits = hp.smoothing(sum_hits, fwhm=np.deg2rad(1.))
