@@ -25,6 +25,11 @@ def main(args):
     filtering_tags = meta.get_filtering_tags()
     filtering_tag_pairs = meta.get_independent_filtering_pairs()
 
+    if None in filtering_tags and len(filtering_tags) < 1:
+        raise ValueError("There must be at least one filter \
+                          applied to the data to be able to \
+                          compute a transfer function for it")
+
     tf_settings = meta.transfer_settings
 
     for id_sim in range(tf_settings["tf_est_num_sims"]):
@@ -39,24 +44,20 @@ def main(args):
         for ftag in filtering_tags:
             for pure_type in ["pureT", "pureE", "pureB"]:
 
-                unfiltered_map_dir = tf_settings["unfiltered_map_dir"]
-                unfiltered_map_tmpl = tf_settings["unfiltered_map_template"]
+                unfiltered_map_dir = tf_settings["unfiltered_map_dir"][ftag]
+                unfiltered_map_tmpl = tf_settings["unfiltered_map_template"][ftag] # noqa
 
                 unfiltered_map_file = unfiltered_map_tmpl.format(
                     id_sim=id_sim, pure_type=pure_type
                 )
                 unfiltered_map_file = f"{unfiltered_map_dir}/{unfiltered_map_file}" # noqa
 
-                if ftag is None:
-                    filtered_map_file = unfiltered_map_file
-                else:
-                    filtered_map_dir = tf_settings["filtered_map_dir"][ftag]
-                    filtered_map_tmpl = tf_settings["filtered_map_template"][ftag] # noqa
-                    filtered_map_file = filtered_map_tmpl.format(
-                        id_sim=id_sim, pure_type=pure_type
-                    )
-
-                    filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}" # noqa
+                filtered_map_dir = tf_settings["filtered_map_dir"][ftag]
+                filtered_map_tmpl = tf_settings["filtered_map_template"][ftag]
+                filtered_map_file = filtered_map_tmpl.format(
+                    id_sim=id_sim, pure_type=pure_type
+                )
+                filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}"
 
                 map = hp.read_map(unfiltered_map_file,
                                   field=[0, 1, 2])
