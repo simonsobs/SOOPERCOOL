@@ -16,7 +16,6 @@ def main(args):
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
                                      binning["bin_high"] + 1)
-    n_bins = nmt_bins.get_n_bands()
 
     tf_settings = meta.transfer_settings
 
@@ -27,13 +26,8 @@ def main(args):
 
     tf_dict = {}
     for ftag1, ftag2 in filtering_pairs:
-        if ftag1 is None and ftag2 is None:
-            tf = np.zeros((9, 9, n_bins))
-            tf[np.arange(9), np.arange(9), :] = 1.
-            tf_dict[ftag1, ftag2] = tf
-        else:
-            tf = np.load(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
-            tf_dict[ftag1, ftag2] = tf["full_tf"]
+        tf = np.load(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
+        tf_dict[ftag1, ftag2] = tf["full_tf"]
 
     mcms_dict = cu.load_mcms(couplings_dir,
                              ps_names=ps_names, full_mcm=True)
