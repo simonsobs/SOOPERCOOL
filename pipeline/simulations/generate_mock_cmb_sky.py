@@ -31,12 +31,12 @@ def main(args):
     hp_ordering = ["TT", "TE", "TB", "EE", "EB", "BB"]
 
     for id_sim in range(meta.covariance["cov_num_sims"]):
+        alms = hp.synalm([clth[fp] for fp in hp_ordering])
         for ms in meta.map_sets_list:
 
-            alms = hp.synalm([clth[fp] for fp in hp_ordering])
-            alms = [hp.almxfl(alm, beams[ms]) for alm in alms]
+            alms_beamed = [hp.almxfl(alm, beams[ms]) for alm in alms]
 
-            map = hp.alm2map(alms, nside=meta.nside)
+            map = hp.alm2map(alms_beamed, nside=meta.nside)
 
             import matplotlib.pyplot as plt
             hp.mollview(map[1], title=f"{ms} - {id_sim}")
