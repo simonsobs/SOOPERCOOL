@@ -30,23 +30,13 @@ class BBmeta(object):
         for key in self.config:
             setattr(self, key, self.config[key])
 
-        # Set all the `_directory` attributes
-        # self._set_directory_attributes()
-
         # Set the general attributes (nside, lmax, etc...)
         self._set_general_attributes()
-
-        # Copy the configuration file to output directory
-        # with open(f"{self.output_dirs['root']}/config.yaml", "w") as f:
-        #    yaml.dump(self.config, f)
 
         # Basic sanity checks
         if self.lmax > 3*self.nside-1:
             raise ValueError("lmax should be lower or equal "
                              f"to 3*nside-1 = {3*self.nside-1}")
-
-        # Path to binning
-        #self.path_to_binning = f"{self.pre_process_directory}/{self.binning_file}"  # noqa
 
         # Initialize method to parse map_sets metadata
         map_sets_attributes = list(self.map_sets[
@@ -57,39 +47,6 @@ class BBmeta(object):
         # A list of the maps used in the analysis
         self.map_sets_list = self._get_map_sets_list()
         self.maps_list = self._get_map_list()
-
-        # Determine if input hit counts map exists
-        # self.use_input_nhits = (self.masks["input_nhits_path"] is not None)
-
-        # Initialize masks file_names
-        # for mask_type in ["binary_mask", "galactic_mask",
-        #                   "point_source_mask",
-        #                   "analysis_mask", "nhits_map"]:
-        #    setattr(
-        #        self,
-        #        f"{mask_type}_name",
-        #        getattr(self, f"_get_{mask_type}_name")()
-        #    )
-
-        # Simulation
-        # self._init_simulation_params()
-
-        # Filtering
-        # self._init_filtering_params()
-
-        # Tf estimation
-        # self.tf_est_sims_dir = f"{self.pre_process_directory}/tf_est_sims"
-        # self.tf_val_sims_dir = f"{self.pre_process_directory}/tf_val_sims"
-        # self.cosmo_sims_dir = f"{self.pre_process_directory}/cosmo_sims"
-
-        # Fiducial cls
-        # self.cosmo_cls_file = f"{self.pre_process_directory}/cosmo_cls.npz"
-        # self.tf_est_cls_file = f"{self.pre_process_directory}/tf_est_cls.npz"
-        # self.tf_val_cls_file = f"{self.pre_process_directory}/tf_val_cls.npz"
-        # self.noise_cls_file = {
-        #    map_set: f"{self.pre_process_directory}/noise_cls_{map_set}.npz"
-        #    for map_set in self.map_sets_list
-        # }
 
         # Initialize a timer
         self.timer = Timer()
