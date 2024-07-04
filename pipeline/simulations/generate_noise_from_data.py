@@ -2,7 +2,6 @@ import argparse
 from soopercool import BBmeta
 import numpy as np
 import healpy as hp
-import matplotlib.pyplot as plt
 
 
 def build_noise_ps_matrix(nl_dict, map_sets_list):
@@ -71,7 +70,7 @@ def main(args):
             )
 
             for ms in meta.map_sets_list:
-                fname = f"white_noise_{ms}_bundle{id_bundle}_{id_sim:04d}.fits"
+                fname = f"homogeneous_noise_{ms}_bundle{id_bundle}_{id_sim:04d}.fits" # noqa
                 hp.write_map(f"{noise_sims_dir}/{fname}", noise_maps[ms],
                              overwrite=True,
                              dtype=np.float32)
