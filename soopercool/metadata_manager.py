@@ -23,8 +23,7 @@ class BBmeta(object):
         """
 
         # Load the configuration file
-        with open(fname_config) as f:
-            self.config = yaml.load(f, Loader=yaml.FullLoader)
+        self.config = self._yaml_loader(fname_config)
 
         # Set the high-level parameters as attributes
         for key in self.config:
@@ -50,6 +49,16 @@ class BBmeta(object):
 
         # Initialize a timer
         self.timer = Timer()
+
+    def _yaml_loader(self, config):
+        """
+        Custom yaml loader to load the configuration file.
+        """
+        def path_constructor(loader, node):
+            return "/".join(loader.construct_sequence(node))
+        yaml.SafeLoader.add_constructor("!path", path_constructor)
+        with open(config, "r") as f:
+            return yaml.load(f, Loader=yaml.SafeLoader)
 
     def _set_directory_attributes(self):
         """
