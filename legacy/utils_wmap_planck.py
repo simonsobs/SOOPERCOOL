@@ -4,6 +4,12 @@ import healpy as hp
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import camb
+from pathlib import Path
+
+"""
+Some collection of extended utilities (Kevin, 12 June 2024) that were use for 
+WMAP and Planck runs, as well as noise level comparisons.
+"""
 
 
 def get_theory_cls(cosmo_params, lmax, lmin=0):
@@ -21,7 +27,7 @@ def get_theory_cls(cosmo_params, lmax, lmin=0):
         "BB": powers["total"][:, 2][lmin:lmax+1]
     }
     for spec in ["EB", "TB"]:
-        cl_th[spec] = np.zeros_like(lth)
+        cl_th[spec] = np.zeros_like(lth, dtype=np.float32)
 
     return lth, cl_th
 
@@ -123,7 +129,7 @@ def random_src_mask(mask, nsrcs, mask_radius_arcmin):
     return ps_mask
 
 
-def get_beam_windows(meta, plot=False):
+def get_beam_windows_SAT(meta, plot=False):
     """
     Compute and save dictionary with beam window functions for each map set.
     """
@@ -159,6 +165,40 @@ def get_beam_windows(meta, plot=False):
         plt.savefig(f"{meta.beam_directory}/beams.png")
 
 
+def get_beam_exp(ll, experiment, freq_ghz):
+    """
+    Reads the beam for a given experiment ("wmap", "planck", "sat")
+    """
+    if "sat" in str(experiment).lower():
+        fwhm = {27: 91., 39: 63., 93: 30., 145: 17., 225: 11., 280: 9.}
+        if int(freq_ghz) not in fwhm:
+            raise ValueError(f"{freq_ghz} GHz is not a SAT channel.")
+        return beam_gaussian(ll, fwhm[int(freq_ghz)])
+    elif "wmap" in str(experiment).lower():
+        bands = {23: "K1", 33: "Ka1"}
+        if int(freq_ghz) not in bands:
+            raise ValueError(f"{freq_ghz} GHz is not a WMAP channel.")
+        fdir = "/global/cfs/cdirs/cmb/data/wmap9/dr5/ancillary/beams/"
+        fdir += f"wmap_ampl_bl_{bands[int(freq_ghz)]}_9yr_v5p1.txt"
+        
+        if int(freq_ghz) not in bands:
+            raise ValueError(f"{freq_ghz} GHz is not a Planck channel.")
+    elif "planck" in str(experiment).lower():
+        fdir = "/pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/data_planck/beams/"
+        fdir += f"beam_pol_planck_f{str(freq_ghz).zfill(3)}.dat"
+    else:
+        raise ValueError(f"Your experiment {experiment} has yet to be built!")
+
+    l, b = np.loadtxt(fdir, unpack=True, usecols=(0, 1))
+    lmax_file = int(l[-1])
+    bl = np.full_like(ll, b[-1], dtype=np.float32)
+    if lmax_file < ll[-1]:
+        bl[ll <= lmax_file] = b[ll[ll <= lmax_file]]
+    else:
+        bl = b[ll]
+    return bl
+
+
 def beam_gaussian(ll, fwhm_amin):
     """
     Returns the SHT of a Gaussian beam.
@@ -169,7 +209,7 @@ def beam_gaussian(ll, fwhm_amin):
         float or array: beam sampled at `l`.
     """
     sigma_rad = np.radians(fwhm_amin / 2.355 / 60)
-    return np.exp(-0.5 * ll * (ll + 1) * sigma_rad**2)
+    return np.exp(-0.5 * ll * (ll + 1) * sigma_rad**2).astype(np.float32)
 
 
 def beam_hpix(ll, nside):
@@ -186,26 +226,30 @@ def beam_hpix(ll, nside):
     return beam_gaussian(ll, fwhm_hp_amin)
 
 
-def create_binning(nside, delta_ell, end_first_bin=None):
+def create_binning(nside, delta_ell):
     """
     """
-    if end_first_bin is not None:
-        bin_low = np.arange(end_first_bin, 3*nside, delta_ell)
-        bin_high = bin_low + delta_ell - 1
-        bin_low = np.concatenate(([0], bin_low))
-        bin_high = np.concatenate(([end_first_bin-1], bin_high))
-    else:
-        bin_low = np.arange(0, 3*nside, delta_ell)
-        bin_high = bin_low + delta_ell - 1
+    bin_low = np.arange(0, 3*nside, delta_ell)
+    bin_high = bin_low + delta_ell - 1
     bin_high[-1] = 3*nside - 1
     bin_center = (bin_low + bin_high) / 2
 
     return bin_low, bin_high, bin_center
 
 
-def power_law_cl(ell, amp, delta_ell, power_law_index):
+def power_law_cl(ell, amp, delta_ell, power_law_index,
+                 nside_pixwin=None, smooth_arcmin=None):
     """
     """
+    if nside_pixwin is not None:
+        pixwin = beam_hpix(ell, nside_pixwin)**2.
+    else:
+        pixwin = 1.
+    if smooth_arcmin is not None:
+        beam = beam_gaussian(ell, smooth_arcmin)**2.
+    else:
+        beam = 1.
+
     pl_ps = {}
     for spec in ["TT", "TE", "TB", "EE", "EB", "BB"]:
         if isinstance(amp, dict):
@@ -214,50 +258,12 @@ def power_law_cl(ell, amp, delta_ell, power_law_index):
             A = amp
         # A is power spectrum amplitude at pivot ell == 1 - delta_ell
         pl_ps[spec] = A / (ell + delta_ell) ** power_law_index
+        pl_ps[spec] *= pixwin * beam
 
     return pl_ps
 
 
-def m_filter_map(map_file, mask_file, out_dir, m_cut):
-    """
-    Applies the m-cut mock filter to a given map with a given sky mask.
-
-    Parameters
-    ----------
-    map : array-like
-        Healpix TQU map to be filtered.
-    map_file : str
-        File path of the unfiltered map.
-    mask : array-like
-        Healpix map storing the sky mask.
-    m_cut : int
-        Maximum nonzero m-degree of the multipole expansion. All higher
-        degrees are set to zero.
-    """
-    map = hp.read_map(map_file, field=(0, 1, 2))
-    mask = hp.read_map(mask_file)
-    mask[mask != 0] = 1.
-
-    map_masked = map * mask
-    nside = hp.get_nside(map)
-    lmax = 3 * nside - 1
-
-    alms = hp.map2alm(map_masked, lmax=lmax)
-
-    n_modes_to_filter = (m_cut + 1) * (lmax + 1) - ((m_cut + 1) * m_cut) // 2
-    alms[:, :n_modes_to_filter] = 0.
-
-    filtered_map = hp.alm2map(alms, nside=nside, lmax=lmax)
-
-    fname = os.path.basename(map_file)
-    fname_out = fname.replace(".fits", "_filtered.fits")
-
-    hp.write_map(f"{out_dir}/{fname_out}",
-                 filtered_map, overwrite=True,
-                 dtype=np.float32)
-
-
-def m_filter_map_old(map, map_file, mask, m_cut):
+def m_filter_map(map, map_file, mask, m_cut):
     """
     Applies the m-cut mock filter to a given map with a given sky mask.
 
@@ -274,9 +280,9 @@ def m_filter_map_old(map, map_file, mask, m_cut):
         degrees are set to zero.
     """
     map_file_filtered = map_file.replace('.fits', '_filtered.fits')
-    if os.path.isfile(map_file_filtered):
-        print(f"  Filtered map exists at {map_file_filtered}. Skip.")
-        return
+    # if os.path.isfile(map_file_filtered):
+    #     print(f"  Filtered map exists at {map_file_filtered}. Skip.")
+    #     return
     print(f"  Filtering map at {map_file}")
     map_masked = map * mask
     nside = hp.get_nside(map)
@@ -510,6 +516,10 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
                                     scilimits=(0, 0), useMathText=True)
 
             ax.set_xlim(lmin, lmax)
+            if id1 == id2:
+                ax.set_ylim(0, 1)
+            else:
+                ax.set_ylim(-0.01, 0.01)
 
     plt.savefig(file_name, bbox_inches="tight")
 
@@ -561,6 +571,7 @@ def plot_transfer_validation(meta, map_set_1, map_set_2,
                 color="darkorange", marker=".", markerfacecolor="white",
                 label=r"Filtered decoupled $C_\ell$", ls="None"
             )
+            
 
             if f1 == f2:
                 main.set_yscale("log")
@@ -595,6 +606,7 @@ def plot_transfer_validation(meta, map_set_1, map_set_2,
             # Multipole range
             main.set_xlim(2, meta.lmax)
             sub.set_xlim(*main.get_xlim())
+            main.set_ylim(1e-5, 1e-2)
 
             # Suplot y range
             sub.set_ylim((-5., 5.))
@@ -702,3 +714,149 @@ def get_spin_derivatives(map):
     cmap.set_under("w")
 
     return first, second
+
+
+def read_map_from_alm(id_sim, freq_ghz, nside, beam_window, sims_dir):
+    """
+    """
+    nside = int(nside)
+    id_str = str(id_sim).zfill(4)
+    freq_str = str(int(freq_ghz)).zfill(3) + "GHz"
+    lmax_str = "lmax" + str(int(3*nside - 1))
+    alm_dir = f"{sims_dir}/{id_str}/alm_{freq_str}_{lmax_str}_{id_str}.fits"
+    alm_smooth = hp.smoothalm(hp.read_alm(alm_dir, hdu=(1,2,3)), 
+                              beam_window=beam_window)
+
+    return hp.alm2map(alm_smooth, nside)
+
+
+def load_lensing_cl(nside, beam_arcmin=30.):
+    """
+    """
+    import healpy as hp
+    cls_theory = {}
+    theory_fname = "/global/cfs/cdirs/sobs/users/krach/BBSims/CMB_r0_20201207/reference_spectra/Cls_Planck2018_r0.fits"
+    cl_cmb = hp.read_cl(theory_fname)
+    crosses = ["TT", "EE", "BB", "TE"]
+    beam_smooth = beam_gaussian(np.arange(3*nside), beam_arcmin)
+    beam_pixwin = beam_hpix(np.arange(3*nside), 512)
+
+    for i, cf in enumerate(crosses):
+        cls_theory[cf] = (
+            cl_cmb[i, :3*nside] * beam_pixwin**2 * beam_smooth**2
+        )
+    for cf in ["ET", "TB", "BT", "BE", "EB"]:
+        cls_theory[cf] = np.zeros(3*nside)
+    return cls_theory
+
+
+def get_noise_spectrum_adrien(ll, N_yr=1, N_instr=2, fsky=0.058, filtered=True):
+    """
+    """
+    assert ll[0] < 2, "Input multipoles must start at either 0 or 1."
+    nls_theory = {}
+    if filtered:
+        Nwhite_muKsq, ell_knee, alpha = (8.67e-4, 110, -3.5)
+    else:
+        Nwhite_muKsq, ell_knee, alpha = (7.05e-4, 90, -2.0)
+    N_instr = 2
+    N_yr = 5
+    eff = 0.85*0.2
+    sky_ratio = fsky / 0.04
+    N_hrs = 80
+    A = N_hrs*sky_ratio / (N_instr*N_yr*365*24*eff)
+    msk = ll > 1.
+    ll = ll[msk]
+    for spec in ["EE", "EB", "BB"]:
+        nls_theory[spec] = np.array(
+            [0., 0.] + list(A* Nwhite_muKsq*(1. + (ll/ell_knee)**alpha))
+        )
+    for spec in ["TT", "TE", "TB"]:
+        nls_theory[spec] = np.zeros(len(ll) + 2)
+    return nls_theory
+
+
+def get_noise_spectrum(ll, fsky_eff=0.058, has_oof=True, N_tubes=[0.,2.,1.],
+                       survey_years=1., freq_ghz=93, sensitivity="goal",
+                       oof_mode="optimistic"):
+    """
+    """
+    import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
+    assert ll[0] < 2, "Input multipoles must start at either 0 or 1."
+    
+    oof_dict = {"pessimistic": 0, "optimistic": 1}
+
+    f_idx = {"27": 0, "39":1, "93":2, "145":3, "225": 4, "280": 5}
+    f_str = str(int(freq_ghz))
+
+    nls_theory = {}
+    noise_model = noise_calc.SOSatV3point1(
+        sensitivity_mode=sensitivity,
+        N_tubes=N_tubes,
+        one_over_f_mode=oof_dict[oof_mode],
+        survey_years=survey_years
+    )
+    lth, _, nlth_P = noise_model.get_noise_curves(
+        fsky_eff,
+        ll[-1] + 1,
+        delta_ell=1,
+        deconv_beam=False
+    )
+    if not has_oof:
+        nlth_P = np.array([len(nl)*[nl[-1]] for nl in nlth_P])
+    lth = np.concatenate(([0, 1], lth))[ll[0]:]
+    nlth_P = np.array(
+        [np.concatenate(([0, 0], nl))[ll[0]:] for nl in nlth_P]
+    )
+    for spec in ["EE", "EB", "BB"]:
+        nls_theory[spec] = nlth_P[f_idx[f_str]]
+    for spec in ["TT", "TE", "TB"]:
+        nls_theory[spec] = np.zeros_like(lth)
+    return nls_theory
+
+
+def make_noise_sim(nls_theory_dict, id_sim, id_bundle, nbundle, nside, noise_sims_dir,
+                   overwrite=True):
+    """
+    """
+    id_str = str(nbundle*id_sim + id_bundle).zfill(4)
+    np.random.seed(4000 + nbundle*id_sim + id_bundle)
+    Nell = [nls_theory_dict[spec]
+            for spec in ["TT", "TE", "TB", "EE", "EB", "BB"]]
+    maps = hp.synfast(Nell, nside)
+    fname = noise_sims_dir.replace("[id_sim]", id_str)
+
+    Path("/".join(fname.split("/")[:-1])).mkdir(parents=False, exist_ok=True)
+    if overwrite:
+        hp.write_map(fname, maps, overwrite=True, dtype=np.float32)
+    elif not os.path.isfile(fname):
+        hp.write_map(fname, maps, dtype=np.float32)
+
+
+def read_gaussian_noise_sim(id_sim, id_bundle, nbundle, nside, noise_sims_dir):
+    """
+    """
+    id_str = str(nbundle*id_sim + id_bundle).zfill(4)
+    fname = noise_sims_dir.replace("[id_sim]", id_str)
+
+    return np.sqrt(nbundle) * hp.ud_grade(hp.read_map(fname, field=range(3)),
+                                          nside_out=nside)
+
+
+def read_planck_noise_sim(id_sim, id_bundle, nside, noise_sims_dir):
+    """
+    """
+    sim_str = str(id_sim).zfill(4)
+    bundle_str = str(int(id_bundle))
+    fname = noise_sims_dir.replace("[id_sim]", sim_str).replace("[id_bundle]", bundle_str)
+
+    return hp.ud_grade(hp.read_map(fname, field=range(3)), nside_out=nside)
+
+
+def read_signal_sim(id_sim, nside, signal_sims_dir):
+    """
+    """
+    id_str = str(id_sim).zfill(4)
+    fname = signal_sims_dir.replace("[id_sim]", id_str)
+
+    return 1.e6*hp.ud_grade(hp.read_map(fname, field=range(3)), nside_out=nside)

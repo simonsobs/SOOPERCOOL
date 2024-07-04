@@ -4,61 +4,42 @@ import argparse
 from itertools import product
 import sacc
 import numpy as np
-from soopercool import ps_utils
+import pymaster as nmt
 
 
 def load_bpwins(coupling_file):
     """
     """
     bp_win = np.load(coupling_file)
-    bpw_mat = {}
-    for spin_pair in ["spin0xspin0", "spin0xspin2", "spin2xspin2"]:
-        bpw_mat[spin_pair] = bp_win[f"bp_win_{spin_pair}"]
-
-    return bpw_mat
+    return bp_win["bp_win"]
 
 
 def binned_theory_from_unbinned(clth, bpw_mat):
     """
     """
-    clth_binned_dict = {}
-    for spin_pair, modes in zip(
-        ["spin0xspin0", "spin0xspin2", "spin2xspin2"],
-        [["TT"], ["TE", "TB"], ["EE", "EB", "BE", "BB"]]
-    ):
+    modes = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
+    clth_vec = np.concatenate(
+        [clth[mode] for mode in modes]
+    ).reshape(len(modes), -1)
+    clth_binned = np.einsum("ijkl,kl->ij", bpw_mat, clth_vec)
+    print(clth_binned.shape)
 
-        clth_vec = np.concatenate(
-            [clth[mode] for mode in modes]
-        ).reshape(len(modes), -1)
-        clth_binned = np.einsum("ijkl,kl", bpw_mat[spin_pair], clth_vec)
-        clth_binned_dict[spin_pair] = clth_binned
-
-    clth_binned = ps_utils.field_pairs_from_spins(clth_binned_dict)
-
-    to_update = []
-    for k, v in clth_binned.items():
-        if not (k[::-1] in clth_binned):
-            to_update.append((k[::-1], v))
-
-    for k, v in to_update:
-        clth_binned[k] = v
-
-    return clth_binned
+    cl_out = {}
+    for i, m in enumerate(modes):
+        cl_out[m] = clth_binned[i]
+    return cl_out
 
 
-def multipole_min_from_tf(tf_file, snr_cut=3.):
+def multipole_min_from_tf(tf_file, field_pairs, snr_cut=3.):
     """
     """
     tf = np.load(tf_file)
     idx_bad_tf = {}
-    for spin_pair in ["spin0xspin0", "spin0xspin2", "spin2xspin2"]:
-        tf_mean = tf[f"tf_{spin_pair}"][0, 0]
-        tf_std = tf[f"tf_std_{spin_pair}"][0, 0]
-        snr = tf_mean / tf_std
-        idx = np.where(snr < 3.)[0]
-        idx_bad_tf[spin_pair] = idx.max()
-
-    idx_bad_tf["spin2xspin0"] = idx_bad_tf["spin0xspin2"]
+    for fp in field_pairs:
+        name = f"{fp}_to_{fp}"
+        snr = tf[name] / tf[f"{name}_std"]
+        idx = np.where(snr < snr_cut)[0]
+        idx_bad_tf[fp] = idx.max()
 
     return idx_bad_tf
 
@@ -115,17 +96,24 @@ def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
         plt.show()
 
 
-def sacc_plotter(args):
+def main(args):
     """
     This script will read the spectra and covariance
     stored in the `sacc` files and plot the power
     spectra.
     """
     meta = BBmeta(args.globals)
-    sacc_dir = meta.sacc_directory
-    coupling_dir = meta.coupling_directory
 
-    nmt_binning = meta.read_nmt_binning()
+    out_dir = meta.output_directory
+    sacc_dir = f"{out_dir}/saccs"
+    coupling_dir = f"{out_dir}/couplings"
+
+    plot_dir = f"{out_dir}/plots/sacc_spectra"
+    BBmeta.make_dir(plot_dir)
+
+    binning = np.load(meta.binning_file)
+    nmt_binning = nmt.NmtBin.from_edges(binning["bin_low"],
+                                        binning["bin_high"] + 1)
     lb = nmt_binning.get_effective_ells()
 
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
@@ -134,9 +122,12 @@ def sacc_plotter(args):
     spins = {"T": 0, "E": 2, "B": 2}
     types = {"T": "0", "E": "e", "B": "b"}
 
-    Nsims = meta.num_sims if args.sims else 1
+    if args.data:
+        Nsims = 1
+    elif args.sims:
+        Nsims = meta.covariance["cov_num_sims"]
 
-    psth = meta.load_fiducial_cl(cl_type="cosmo")
+    psth = np.load(meta.covariance["fiducial_cmb"])
     ps_th = {}
     for field_pair in field_pairs:
         if field_pair in psth:
@@ -148,26 +139,22 @@ def sacc_plotter(args):
     idx_bad_tf = {}
     bpw_mats = {}
 
+    transfer_dir = meta.transfer_settings["transfer_directory"]
     for ftag1, ftag2 in meta.get_independent_filtering_pairs():
         idx = multipole_min_from_tf(
-            f"{coupling_dir}/transfer_function_{ftag1}x{ftag2}.npz",
+            f"{transfer_dir}/transfer_function_{ftag1}_x_{ftag2}.npz",
+            field_pairs=field_pairs,
             snr_cut=3
         )
         idx_bad_tf[ftag1, ftag2] = idx
 
-        bpw_file = f"couplings_{ftag1}x{ftag2}_unfiltered.npz"
-        bpw_mats[ftag1, ftag2] = load_bpwins(f"{coupling_dir}/{bpw_file}")
-
-    # Bandpower window functions
-    fields_to_spin = {
-        "T": "spin0",
-        "E": "spin2",
-        "B": "spin2"
-    }
+    for ms1, ms2 in ps_names:
+        bpw_file = f"couplings_{ms1}_{ms2}.npz"
+        bpw_mats[ms1, ms2] = load_bpwins(f"{coupling_dir}/{bpw_file}")
 
     clth_binned = {
-        (ftag1, ftag2): binned_theory_from_unbinned(ps_th, bpw_mat)
-        for (ftag1, ftag2), bpw_mat in bpw_mats.items()
+        (ms1, ms2): binned_theory_from_unbinned(ps_th, bpw_mat)
+        for (ms1, ms2), bpw_mat in bpw_mats.items()
     }
 
     plot_data = {
@@ -192,14 +179,12 @@ def sacc_plotter(args):
 
             for fp in field_pairs:
                 mask_th = (psth["l"] <= 2 * meta.nside - 1)
-                x_th, y_th = psth["l"][mask_th], psth[fp][mask_th]
+                x_th, y_th = psth["l"][mask_th], ps_th[fp][mask_th]
 
-                s1, s2 = fields_to_spin[fp[0]], fields_to_spin[fp[1]]
-
-                idx_bad = idx_bad_tf[ftag1, ftag2][f"{s1}x{s2}"]
+                idx_bad = idx_bad_tf[ftag1, ftag2][fp]
                 mask = ((np.arange(len(lb)) > idx_bad) &
                         (lb <= 2 * meta.nside - 1))
-                th_binned = clth_binned[ftag1, ftag2][fp][mask]
+                th_binned = clth_binned[ms1, ms2][fp][mask]
 
                 plot_data[ms1, ms2, fp]["x_th"] = x_th
                 plot_data[ms1, ms2, fp]["y_th"] = y_th
@@ -216,7 +201,6 @@ def sacc_plotter(args):
 
             for fp in field_pairs:
                 f1, f2 = fp
-                s1, s2 = fields_to_spin[f1], fields_to_spin[f2]
 
                 ell, cl, cov = s.get_ell_cl(
                     f"cl_{types[f1]}{types[f2]}",
@@ -224,7 +208,7 @@ def sacc_plotter(args):
                     f"{ms2}_s{spins[f2]}",
                     return_cov=True)
 
-                idx_bad = idx_bad_tf[ftag1, ftag2][f"{s1}x{s2}"]
+                idx_bad = idx_bad_tf[ftag1, ftag2][fp]
                 mask = (
                     (np.arange(len(ell)) > idx_bad) &
                     (ell <= 2 * meta.nside - 1))
@@ -236,11 +220,6 @@ def sacc_plotter(args):
                 plot_data[ms1, ms2, fp]["err"] = err
                 plot_data[ms1, ms2, fp]["title"] = f"{ms1} x {ms2} - {fp}"
                 plot_data[ms1, ms2, fp]["ylabel"] = fp
-
-    plot_dir = meta.plot_dir_from_output_dir(
-            meta.cell_sims_directory_rel if args.sims
-            else meta.cell_data_directory_rel
-    )
 
     for ms1, ms2 in ps_names:
         for fp in field_pairs:
@@ -275,4 +254,4 @@ if __name__ == '__main__':
     mode.add_argument("--sims", action="store_true")
     mode.add_argument("--data", action="store_true")
     args = parser.parse_args()
-    sacc_plotter(args)
+    main(args)
