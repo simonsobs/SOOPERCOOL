@@ -1,8 +1,8 @@
-output_directory: "outputs_refactor_end_to_end"
+output_directory: &out_dir outputs
 
 map_sets:
   SATp3_f090:
-    map_dir: "outputs_refactor_high_dec/bundled_maps" #"/home/laposta/Documents/development/test_bundling/bundling/coadded_cmb_maps_4splits_hp_nside256"
+    map_dir: "~/Documents/development/soopercool_refactoring/SOOPERCOOL/pipeline/outputs_refactor_high_dec/bundled_maps" #"/home/laposta/Documents/development/test_bundling/bundling/coadded_cmb_maps_4splits_hp_nside256"
     beam_dir: "/home/laposta/Documents/development/cloned_repo/SOOPERCOOL/data_256/beams"
     map_template: "coadd_f090_bundle{id_bundle}_{map|hits}.fits"
     beam_file: "beam_cmb_sat1_f093.dat"
@@ -12,7 +12,7 @@ map_sets:
     filtering_tag: "mcut30_90"
 
   SATp3_f150:
-    map_dir: "outputs_refactor_high_dec/bundled_maps" #"/home/laposta/Documents/development/test_bundling/bundling/coadded_cmb_maps_4splits_hp_nside256"
+    map_dir: "~/Documents/development/soopercool_refactoring/SOOPERCOOL/pipeline/outputs_refactor_high_dec/bundled_maps" #"/home/laposta/Documents/development/test_bundling/bundling/coadded_cmb_maps_4splits_hp_nside256"
     beam_dir: "/home/laposta/Documents/development/cloned_repo/SOOPERCOOL/data_256/beams"
     map_template: "coadd_f150_bundle{id_bundle}_{map|hits}.fits"
     beam_file: "beam_cmb_sat1_f145.dat"
@@ -25,7 +25,7 @@ map_sets:
 # Masking metadata #
 ####################
 masks:
-  analysis_mask: "outputs_refactor/masks/analysis_mask.fits"
+  analysis_mask: !path [*out_dir, masks/analysis_mask.fits]
 
   # Path to products (binary)
   galactic_mask: "/home/laposta/Documents/development/forked_repo/BBMASTER/pipeline/outputs_old/masks/planck_galactic_mask_gal070.fits"
@@ -47,7 +47,7 @@ general_pars:
   nside: 256
   lmin: 30
   lmax: 600
-  binning_file: "outputs_refactor/binning/binning_nside256_deltal21.npz"
+  binning_file: !path [*out_dir, binning/binning_nside256_deltal21.npz]
   pure_B: True
   # Where the beam window is lower than beam_floor, set it to beam_floor
   beam_floor: 1.e-5
@@ -92,7 +92,7 @@ filtering:
       tf_band: "SAT_f090"                                  # Band used for transfer function calculation
 
 transfer_settings:
-  transfer_directory: "outputs_refactor/transfer_functions"
+  transfer_directory: !path [*out_dir, transfer_functions]
 
   # For estimation
   ## Number of sims for tf estimation and validation
@@ -113,14 +113,14 @@ transfer_settings:
 
   ## Path to the sims for TF estimation
   unfiltered_map_dir:
-    mcut30_90: "outputs_refactor/tf_est_sims"
-    mcut30_150: "outputs_refactor/tf_est_sims"
+    mcut30_90: !path [*out_dir, tf_est_sims]
+    mcut30_150: !path [*out_dir, tf_est_sims]
   unfiltered_map_template:
     mcut30_90: "{pure_type}_power_law_tf_est_{id_sim:04d}_SATp3_f090.fits"
     mcut30_150: "{pure_type}_power_law_tf_est_{id_sim:04d}_SATp3_f150.fits"
   filtered_map_dir:
-    mcut30_90: "outputs_refactor/mcut30_filtered_tf_est_sims"
-    mcut30_150: "outputs_refactor/mcut30_filtered_tf_est_sims"
+    mcut30_90: !path [*out_dir, filtered_tf_est_sims]
+    mcut30_150: !path [*out_dir, filtered_tf_est_sims]
   filtered_map_template:
     mcut30_90: "{pure_type}_power_law_tf_est_{id_sim:04d}_SATp3_f090_filtered.fits"
     mcut30_150: "{pure_type}_power_law_tf_est_{id_sim:04d}_SATp3_f150_filtered.fits"
@@ -144,11 +144,13 @@ transfer_settings:
 covariance:
   cov_num_sims: 10
 
-  noise_sims_dir: "outputs_refactor/noise_sims"
-  noise_sims_template: "white_noise_{map_set}_bundle{id_bundle}_{id_sim:04d}.fits"
+  noise_sims_dir: !path [*out_dir, noise_sims]
+  noise_sims_template: "homogeneous_noise_{map_set}_bundle{id_bundle}_{id_sim:04d}.fits"
 
-  signal_sims_dir: "outputs_refactor/cmb_sims"
-  signal_sims_template: "cmb_{map_set}_{id_sim:04d}.fits"
+  signal_sims_dir: !path [*out_dir, filtered_cmb_sims]
+  signal_sims_template: "cmb_{map_set}_{id_sim:04d}_filtered.fits"
+
+  fiducial_cmb: !path [*out_dir, cmb_sims/cl_theory.npz]
 
   # If needed, cosmological parameters
   cosmo:
