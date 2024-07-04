@@ -234,7 +234,6 @@ def m_filter_map(map_file, mask_file, out_dir, m_cut):
         Maximum nonzero m-degree of the multipole expansion. All higher
         degrees are set to zero.
     """
-
     map = hp.read_map(map_file, field=(0, 1, 2))
     mask = hp.read_map(mask_file)
     mask[mask != 0] = 1.
