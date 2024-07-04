@@ -22,6 +22,8 @@ def main(args):
         meta.covariance["cosmo"],
         lmax=lmax_sim  # ensure cl accuracy up to lmax
     )
+    np.savez(f"{sims_dir}/cl_theory.npz",
+             l=lth, **clth)
 
     beams = {
         ms: meta.read_beam(ms)[1]
