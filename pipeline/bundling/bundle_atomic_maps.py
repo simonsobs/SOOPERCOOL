@@ -1,7 +1,6 @@
 import argparse
 from soopercool import BBmeta
 
-
 from pixell import enmap, enplot
 import numpy as np
 import glob
@@ -237,18 +236,23 @@ def main(args):
             )
             for field, plot in zip("TQU", plots):
                 enplot.write(
-                    f"{plot_dir}/coadd_{ftag}_bundle{id_bundle}_allwaf_{field}.png",
+                    f"{plot_dir}/coadd_{ftag}_bundle{id_bundle}_allwaf_{field}.png",  # noqa
                     plot)
             # Plot hits
             plot_hit = enplot.get_plots(coadded_hits[ftag, id_bundle],
                                         range=[100000], colorbar=1, ticks=5)[0]
-            enplot.write(f"{plot_dir}/coadd_{ftag}_bundle{id_bundle}_allwaf_hits.png", plot_hit) 
-            file_name = f"{maps_dir}/TQU_CAR_coadd_{ftag}_bundle{id_bundle}_allwaf.fits" 
+            enplot.write(
+                f"{plot_dir}/coadd_{ftag}_bundle{id_bundle}_allwaf_hits.png",
+                plot_hit
+            )
+            file_name = f"{maps_dir}/TQU_CAR_coadd_{ftag}_bundle{id_bundle}_allwaf.fits"  # noqa
             enmap.write_map(file_name, coadded_maps[ftag, id_bundle])
-            enmap.write_map(file_name.replace("TQU", "weights"), coadded_weights[ftag, id_bundle]) 
-            enmap.write_map(file_name.replace("TQU", "hits"), coadded_hits[ftag, id_bundle]) 
+            enmap.write_map(file_name.replace("TQU", "weights"),
+                            coadded_weights[ftag, id_bundle])
+            enmap.write_map(file_name.replace("TQU", "hits"),
+                            coadded_hits[ftag, id_bundle])
 
-            with open(f"{maps_dir}/atomic_map_list_{ftag}_bundle{id_bundle}.txt", "w") as f: 
+            with open(f"{maps_dir}/atomic_map_list_{ftag}_bundle{id_bundle}.txt", "w") as f:  # noqa
                 for fname in to_coadd_full[ftag, id_bundle]:
                     f.write(f"{fname.replace(args.map_dir+'/', '')}\n")
 
@@ -258,17 +262,22 @@ def main(args):
                     range=[100000, 100, 100], colorbar=1, ticks=5
                 )
                 for field, plot in zip("TQU", plots):
-                    enplot.write(f"{plot_dir}/coadd_{ftag}_bundle{id_bundle}_waf{id_waf}_{field}.png", plot)
+                    enplot.write(f"{plot_dir}/coadd_{ftag}_bundle{id_bundle}_waf{id_waf}_{field}.png", plot)  # noqa
                 # Plot hits
-                plot_hit = enplot.get_plots(coadded_hits[ftag, id_waf, id_bundle],
-                                            range=[100000], colorbar=1, ticks=5)[0]
-                enplot.write(f"{plot_dir}/coadd_{ftag}_bundle{id_bundle}_waf{id_waf}_hits.png", plot_hit)
-                file_name = f"{maps_dir}/TQU_CAR_coadd_{ftag}_bundle{id_bundle}_waf{id_waf}.fits"
+                plot_hit = enplot.get_plots(
+                    coadded_hits[ftag, id_waf, id_bundle],
+                    range=[100000], colorbar=1, ticks=5)[0]
+                enplot.write(f"{plot_dir}/coadd_{ftag}_bundle{id_bundle}_waf{id_waf}_hits.png", plot_hit)  # noqa
+                file_name = f"{maps_dir}/TQU_CAR_coadd_{ftag}_bundle{id_bundle}_waf{id_waf}.fits"  # noqa
                 enmap.write_map(file_name, coadded_maps[ftag, id_bundle])
-                enmap.write_map(file_name.replace("TQU", "weights"), coadded_weights[ftag, id_waf, id_bundle])
-                enmap.write_map(file_name.replace("TQU", "hits"), coadded_hits[ftag, id_waf, id_bundle])
+                enmap.write_map(
+                    file_name.replace("TQU", "weights"),
+                    coadded_weights[ftag, id_waf, id_bundle]
+                )
+                enmap.write_map(file_name.replace("TQU", "hits"),
+                                coadded_hits[ftag, id_waf, id_bundle])
 
-                with open(f"{maps_dir}/atomic_map_list_{ftag}_waf{id_waf}_bundle{id_bundle}.txt", "w") as f:
+                with open(f"{maps_dir}/atomic_map_list_{ftag}_waf{id_waf}_bundle{id_bundle}.txt", "w") as f:  # noqa
                     for fname in to_coadd[ftag, id_waf][id_bundle]:
                         f.write(f"{fname.replace(args.map_dir+'/', '')}\n")
 
@@ -277,24 +286,39 @@ def main(args):
     import healpy as hp
     for ftag in freq_tags:
         for id_bundle in range(n_bundles):
-            TQU_hp = reproject.map2healpix(coadded_maps[ftag, id_bundle], nside=256)
-            hits_hp = reproject.map2healpix(coadded_hits[ftag, id_bundle], nside=256, extensive=True, method="spline")
-            hp.write_map(f"{maps_dir}/coadd_{ftag}_bundle{id_bundle}_map.fits", TQU_hp, overwrite=True, dtype=np.float32)
-            hp.write_map(f"{maps_dir}/coadd_{ftag}_bundle{id_bundle}_hits.fits", hits_hp, overwrite=True, dtype=np.float32)
+            TQU_hp = reproject.map2healpix(coadded_maps[ftag, id_bundle],
+                                           nside=256)
+            hits_hp = reproject.map2healpix(
+                coadded_hits[ftag, id_bundle], nside=256, extensive=True,
+                method="spline"
+            )
+            hp.write_map(f"{maps_dir}/coadd_{ftag}_bundle{id_bundle}_map.fits",
+                         TQU_hp, overwrite=True, dtype=np.float32)
+            hp.write_map(
+                f"{maps_dir}/coadd_{ftag}_bundle{id_bundle}_hits.fits",
+                hits_hp, overwrite=True, dtype=np.float32
+            )
 
             for id_waf in range(7):
-                TQU_hp = reproject.map2healpix(coadded_maps[ftag, id_waf, id_bundle], nside=256)
-                hits_hp = reproject.map2healpix(coadded_hits[ftag, id_waf, id_bundle], nside=256, extensive=True, method="spline")
-                hp.write_map(f"{maps_dir}/coadd_{ftag}_wafer{id_waf}_bundle{id_bundle}_map.fits", TQU_hp, overwrite=True, dtype=np.float32)
-                hp.write_map(f"{maps_dir}/coadd_{ftag}_wafer{id_waf}_bundle{id_bundle}_hits.fits", hits_hp, overwrite=True, dtype=np.float32)
-                
+                TQU_hp = reproject.map2healpix(
+                    coadded_maps[ftag, id_waf, id_bundle], nside=256
+                )
+                hits_hp = reproject.map2healpix(
+                    coadded_hits[ftag, id_waf, id_bundle], nside=256,
+                    extensive=True, method="spline"
+                )
+                hp.write_map(f"{maps_dir}/coadd_{ftag}_wafer{id_waf}_bundle{id_bundle}_map.fits", TQU_hp, overwrite=True, dtype=np.float32)  # noqa
+                hp.write_map(f"{maps_dir}/coadd_{ftag}_wafer{id_waf}_bundle{id_bundle}_hits.fits", hits_hp, overwrite=True, dtype=np.float32)  # noqa
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
     parser.add_argument("--n_bundles", type=int, help="Number of bundles.")
-    parser.add_argument("--ftags", help="Frequency tags separated by commas ','")
+    parser.add_argument("--ftags",
+                        help="Frequency tags separated by commas ','")
     parser.add_argument("--map_dir", help="Path to the atomic root dir.")
-    parser.add_argument("--seed", type=int, help="Seed for the random number generator.")
+    parser.add_argument("--seed", type=int,
+                        help="Seed for the random number generator.")
     args = parser.parse_args()
     main(args)
