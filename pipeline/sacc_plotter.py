@@ -22,8 +22,6 @@ def binned_theory_from_unbinned(clth, bpw_mat):
         [clth[mode] for mode in modes]
     ).reshape(len(modes), -1)
     clth_binned = np.einsum("ijkl,kl->ij", bpw_mat, clth_vec)
-    print(clth_binned.shape)
-
     cl_out = {}
     for i, m in enumerate(modes):
         cl_out[m] = clth_binned[i]
@@ -39,7 +37,7 @@ def multipole_min_from_tf(tf_file, field_pairs, snr_cut=3.):
         name = f"{fp}_to_{fp}"
         snr = tf[name] / tf[f"{name}_std"]
         idx = np.where(snr < snr_cut)[0]
-        idx_bad_tf[fp] = idx.max()
+        idx_bad_tf[fp] = idx.max() if idx.size > 0 else 0
 
     return idx_bad_tf
 

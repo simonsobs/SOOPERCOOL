@@ -41,15 +41,20 @@ def main(args):
             type_options = [
                 f for f in re.findall(r"\{.*?\}", map_template)
                 if "|" in f
-            ][0]
-            # Select the hitmap
-            option = type_options.replace("{", "")
-            option = option.replace("}", "").split("|")[1]
+            ]
+            if not type_options:
+                raise ValueError("The map directory must contain both maps "
+                                 "and hits files, indicated by a "
+                                 "corresponding suffix.")
+            else:
+                # Select the hitmap
+                option = type_options[0].replace("{", "")
+                option = option.replace("}", "").split("|")[1]
 
-            map_file = map_file.replace(
-                type_options,
-                option
-            )
+                map_file = map_file.replace(
+                    type_options[0],
+                    option
+                )
 
             print(f"Reading hitmap for {map_set} - bundle {id_bundle}")
             if verbose:
