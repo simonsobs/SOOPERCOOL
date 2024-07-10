@@ -1,6 +1,7 @@
 from soopercool import BBmeta
 from soopercool import ps_utils as pu
 from soopercool import map_utils as mu
+from soopercool import mpi_utils as mpi
 import argparse
 import numpy as np
 import pymaster as nmt
@@ -11,7 +12,7 @@ def main(args):
     """
     meta = BBmeta(args.globals)
     # do_plots = not args.no_plots
-    # verbose = args.verbose
+    verbose = args.verbose
 
     out_dir = meta.output_directory
     cells_dir = f"{out_dir}/cells_sims"
@@ -32,7 +33,9 @@ def main(args):
     for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
         inv_couplings_beamed[ms1, ms2] = np.load(f"{couplings_dir}/couplings_{ms1}_{ms2}.npz")["inv_coupling"].reshape([n_bins*9, n_bins*9]) # noqa
 
-    for id_sim in range(meta.covariance["cov_num_sims"]):
+    mpi.init(True)
+
+    for id_sim in mpi.taskrange(meta.covariance["cov_num_sims"] - 1):
         base_dir = f"{sims_dir}/{id_sim:04d}"
 
         # Create namaster fields
@@ -54,6 +57,9 @@ def main(args):
                                                            coadd=False):
             map_set1, id_split1 = map_name1.split("__")
             map_set2, id_split2 = map_name2.split("__")
+            if verbose:
+                print(f"# {id_sim+1} | ({map_set1}, split {id_split1}) x "
+                      f"({map_set2}, split {id_split2})")
             pcls = pu.get_coupled_pseudo_cls(
                     fields[map_set1, id_split1],
                     fields[map_set2, id_split2],

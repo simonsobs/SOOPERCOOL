@@ -1,4 +1,5 @@
 from soopercool import BBmeta
+from soopercool import mpi_utils as mpi
 from itertools import product
 import numpy as np
 import argparse
@@ -15,6 +16,7 @@ def main(args):
     """
     meta = BBmeta(args.globals)
     # do_plots = not args.no_plots
+    verbose = args.verbose
 
     out_dir = meta.output_directory
     cells_dir = f"{out_dir}/cells_sims"
@@ -34,7 +36,9 @@ def main(args):
     cross_map_set_list = meta.get_ps_names_list(type="all", coadd=True)
 
     # Load split C_ells
-    for id_sim in range(meta.covariance["cov_num_sims"]):
+    mpi.init(True)
+
+    for id_sim in mpi.taskrange(meta.covariance["cov_num_sims"] - 1):
         # Initialize output dictionary
         cells_coadd = {
             "cross": {
@@ -51,6 +55,8 @@ def main(args):
 
         # Loop over all map set pairs
         for map_name1, map_name2 in cross_split_list:
+            if verbose:
+                print(f"# {id_sim} | {map_name1} x {map_name2}")
 
             map_set1, _ = map_name1.split("__")
             map_set2, _ = map_name2.split("__")
@@ -101,6 +107,7 @@ if __name__ == "__main__":
     parser.add_argument("--globals", type=str, help="Path to the yaml file")
     parser.add_argument("--no-plots", action="store_true",
                         help="Do not make plots")
+    parser.add_argument("--verbose", action="store_true", help="Verbose mode.")
     mode = parser.add_mutually_exclusive_group()
 
     args = parser.parse_args()

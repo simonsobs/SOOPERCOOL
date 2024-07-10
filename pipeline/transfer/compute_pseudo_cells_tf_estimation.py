@@ -4,12 +4,14 @@ import healpy as hp
 import pymaster as nmt
 import numpy as np
 from soopercool import ps_utils
+from soopercool import mpi_utils as mpi
 
 
 def main(args):
     """
     """
     meta = BBmeta(args.globals)
+    verbose = args.verbose
     out_dir = meta.output_directory
 
     pcls_tf_est_dir = f"{out_dir}/cells_tf_est"
@@ -32,7 +34,9 @@ def main(args):
 
     tf_settings = meta.transfer_settings
 
-    for id_sim in range(tf_settings["tf_est_num_sims"]):
+    mpi.init(True)
+
+    for id_sim in mpi.taskrange(tf_settings["tf_est_num_sims"] - 1):
 
         fields = {
             ftag: {
@@ -42,6 +46,8 @@ def main(args):
         }
 
         for ftag in filtering_tags:
+            if verbose:
+                print(f"# {id_sim+1} | {ftag}")
             for pure_type in ["pureT", "pureE", "pureB"]:
 
                 unfiltered_map_dir = tf_settings["unfiltered_map_dir"][ftag]
@@ -101,5 +107,6 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
     main(args)

@@ -1,5 +1,6 @@
 import argparse
 from soopercool import BBmeta, utils
+from soopercool import mpi_utils as mpi
 import numpy as np
 import healpy as hp
 import matplotlib.pyplot as plt
@@ -9,7 +10,7 @@ def main(args):
     """
     """
     meta = BBmeta(args.globals)
-    # verbose = args.verbose
+    verbose = args.verbose
     do_plots = not args.no_plots
 
     out_dir = meta.output_directory
@@ -42,14 +43,17 @@ def main(args):
     else:
         beams = {None: None}
 
-    for id_sim in range(Nsims):
+    mpi.init(True)
 
+    for id_sim in mpi.taskrange(Nsims - 1):
         almsTEB = hp.synalm(
             [cl_power_law_tf_est[k] for k in hp_ordering],
             lmax=lmax_sim
         )
 
         for beam_label, bl in beams.items():
+            if verbose:
+                print(f"# {id_sim} | {beam_label}")
 
             suffix = ""
             if tf_settings["do_not_beam_est_sims"]:

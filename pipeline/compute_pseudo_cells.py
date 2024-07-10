@@ -15,6 +15,7 @@ def main(args):
     # verbose = args.verbose
 
     out_dir = meta.output_directory
+    print(out_dir)
     cells_dir = f"{out_dir}/cells"
     couplings_dir = f"{out_dir}/couplings"
 

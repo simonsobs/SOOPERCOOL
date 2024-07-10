@@ -1,5 +1,6 @@
 import argparse
 from soopercool import BBmeta
+from soopercool import mpi_utils as mpi
 import healpy as hp
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,6 +10,7 @@ def main(args):
     """
     """
     meta = BBmeta(args.globals)
+    verbose = args.verbose
 
     do_plots = not args.no_plots
 
@@ -26,11 +28,15 @@ def main(args):
 
     binary = hp.read_map(f"{masks_dir}/binary_mask.fits")
 
-    for id_sim in range(meta.covariance["cov_num_sims"]):
+    mpi.init(True)
+
+    for id_sim in mpi.taskrange(meta.covariance["cov_num_sims"] - 1):
 
         base_dir = f"{sims_dir}/{id_sim:04d}"
         BBmeta.make_dir(base_dir)
         for ms in meta.map_sets_list:
+            if verbose:
+                print(f"# {id_sim} | {ms}")
 
             fname = signal_map_template.format(id_sim=id_sim, map_set=ms)
             cmb = hp.read_map(f"{signal_map_dir}/{fname}", field=[0, 1, 2])
@@ -65,5 +71,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
     parser.add_argument("--no-plots", action="store_true", help="Do not plot the maps.") # noqa
+    parser.add_argument("--verbose", action="store_true", help="Verbose mode.")
     args = parser.parse_args()
     main(args)
