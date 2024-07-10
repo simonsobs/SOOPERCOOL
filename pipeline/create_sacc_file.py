@@ -1,5 +1,6 @@
 import argparse
 from soopercool import BBmeta
+from soopercool import mpi_utils as mpi
 import sacc
 from itertools import product
 import numpy as np
@@ -33,6 +34,7 @@ def main(args):
     """
 
     meta = BBmeta(args.globals)
+    verbose = args.verbose
 
     out_dir = meta.output_directory
     sacc_dir = f"{out_dir}/saccs"
@@ -43,7 +45,16 @@ def main(args):
     binning = np.load(meta.binning_file)
     nmt_binning = nmt.NmtBin.from_edges(binning["bin_low"],
                                         binning["bin_high"] + 1)
+    ls = np.arange(nmt_binning.lmax+1)
     lb = nmt_binning.get_effective_ells()
+    n_bins = len(lb)
+    lwin = np.zeros((len(ls), n_bins))
+
+    for id_bin in range(n_bins):
+        weights = np.array(nmt_binning.get_weight_list(id_bin))
+        multipoles = np.array(nmt_binning.get_ell_list(id_bin))
+        for il, l in enumerate(multipoles):
+            lwin[l, id_bin] = weights[il]
 
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
 
@@ -96,13 +107,22 @@ def main(args):
     full_cov = np.triu(full_cov)
     full_cov += full_cov.T - np.diag(full_cov.diagonal())
 
-    for id_sim in range(Nsims):
+    use_mpi4py = args.sims
+    mpi.init(use_mpi4py)
+
+    for id_sim in mpi.taskrange(Nsims - 1):
 
         sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
+
+        s_wins = sacc.BandpowerWindow(ls, lwin)
 
         s = sacc.Sacc()
 
         for ms in map_sets:
+            f = float(meta.freq_tag_from_map_set(ms))
+            if verbose:
+                print(f"# {id_sim} | {ms}")
+
             for spin, qty in zip(
                 [0, 2],
                 ["cmb_temperature", "cmb_polarization"]
@@ -110,13 +130,13 @@ def main(args):
 
                 s.add_tracer(**{
                     "tracer_type": "NuMap",
-                    "name": f"{ms}_s{spin}",
+                    "name": f"{ms}",
                     "quantity": qty,
                     "spin": spin,
-                    "nu": [meta.freq_tag_from_map_set(ms)],
+                    "nu": [f-1., f, f+1],  # Delta bandpasses. TODO: generalize
                     "ell": lb,
-                    "beam": np.ones_like(lb),  # TODO,
-                    "bandpass": [1.]  # TODO
+                    "beam": np.ones_like(lb),  # Unit beam. TODO: generalize
+                    "bandpass": [0., 1., 0.]  # Deltas. TODO: generalize
                 })
 
         for i, (ms1, ms2) in enumerate(ps_names):
@@ -127,15 +147,13 @@ def main(args):
             for fp in field_pairs:
 
                 f1, f2 = fp
-                spin1 = 0 if f1 == "T" else 2
-                spin2 = 0 if f2 == "T" else 2
                 s.add_ell_cl(**{
                     "data_type": f"cl_{data_types[f1]}{data_types[f2]}",
-                    "tracer1": f"{ms1}_s{spin1}",
-                    "tracer2": f"{ms2}_s{spin2}",
+                    "tracer1": f"{ms1}",
+                    "tracer2": f"{ms2}",
                     "ell": lb,
                     "x": cells[fp],
-                    "window": np.ones_like(lb)  # TODO
+                    "window": s_wins
                 })
 
         s.add_covariance(full_cov)
@@ -152,6 +170,8 @@ if __name__ == "__main__":
     )
 
     parser.add_argument("--globals", type=str, help="Path to the yaml file")
+    parser.add_argument("--verbose", action="store_true", help="Verbose mode.")
+
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--sims", action="store_true")
     mode.add_argument("--data", action="store_true")

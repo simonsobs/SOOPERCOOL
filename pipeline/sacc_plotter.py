@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 from soopercool import BBmeta
+from soopercool import mpi_utils as mpi
 import argparse
 from itertools import product
 import sacc
@@ -85,7 +86,7 @@ def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
                  markeredgewidth=1.75)
 
         sub.set_xlim(*xlim)
-        sub.set_ylim(-4.5, 4.5)
+        sub.set_ylim(-10, 10)
 
     if save_file:
         plt.savefig(save_file, bbox_inches="tight")
@@ -101,6 +102,7 @@ def main(args):
     spectra.
     """
     meta = BBmeta(args.globals)
+    verbose = args.verbose
 
     out_dir = meta.output_directory
     sacc_dir = f"{out_dir}/saccs"
@@ -117,7 +119,6 @@ def main(args):
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
     ps_names = meta.get_ps_names_list(type="all", coadd=True)
 
-    spins = {"T": 0, "E": 2, "B": 2}
     types = {"T": "0", "E": "e", "B": "b"}
 
     if args.data:
@@ -188,8 +189,11 @@ def main(args):
                 plot_data[ms1, ms2, fp]["y_th"] = y_th
                 plot_data[ms1, ms2, fp]["th_binned"] = th_binned
 
-    for id_sim in range(Nsims):
-        sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
+    use_mpi4py = args.sims
+    mpi.init(use_mpi4py)
+
+    for id_sim in mpi.taskrange(Nsims - 1):
+        sim_label = f"_{id_sim:04d}" if args.sims else ""
 
         s = sacc.Sacc.load_fits(f"{sacc_dir}/cl_and_cov_sacc{sim_label}.fits")
 
@@ -202,8 +206,8 @@ def main(args):
 
                 ell, cl, cov = s.get_ell_cl(
                     f"cl_{types[f1]}{types[f2]}",
-                    f"{ms1}_s{spins[f1]}",
-                    f"{ms2}_s{spins[f2]}",
+                    ms1,
+                    ms2,
                     return_cov=True)
 
                 idx_bad = idx_bad_tf[ftag1, ftag2][fp]
@@ -220,14 +224,18 @@ def main(args):
                 plot_data[ms1, ms2, fp]["ylabel"] = fp
 
     for ms1, ms2 in ps_names:
+        if verbose:
+            print(f"# {id_sim} | {ms1} x {ms2}")
         for fp in field_pairs:
 
             plot_data[ms1, ms2, fp]["y"] = np.mean(
                 plot_data[ms1, ms2, fp]["y"], axis=0
             )
             plot_data[ms1, ms2, fp]["err"] /= np.sqrt(Nsims)
-
-            plot_name = f"{ms1}_{ms2}_{fp}.pdf"
+            if args.sims:
+                plot_name = f"plot_cells_sims_{ms1}_{ms2}_{fp}.pdf"
+            if args.data:
+                plot_name = f"plot_cells_data_{ms1}_{ms2}_{fp}.pdf"
 
             plot_spectrum(
                 plot_data[ms1, ms2, fp]["x"],
@@ -248,6 +256,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Sacc plotter')
     parser.add_argument("--globals", type=str,
                         help="Path to the global configuration file")
+    parser.add_argument("--verbose", action="store_true", help="Verbose mode.")
+
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--sims", action="store_true")
     mode.add_argument("--data", action="store_true")
