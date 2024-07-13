@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 from soopercool import BBmeta
-from soopercool import mpi_utils as mpi
 import argparse
 from itertools import product
 import sacc
@@ -86,7 +85,7 @@ def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
                  markeredgewidth=1.75)
 
         sub.set_xlim(*xlim)
-        sub.set_ylim(-10, 10)
+        sub.set_ylim(-4.5, 4.5)
 
     if save_file:
         plt.savefig(save_file, bbox_inches="tight")
@@ -189,10 +188,7 @@ def main(args):
                 plot_data[ms1, ms2, fp]["y_th"] = y_th
                 plot_data[ms1, ms2, fp]["th_binned"] = th_binned
 
-    use_mpi4py = args.sims
-    mpi.init(use_mpi4py)
-
-    for id_sim in mpi.taskrange(Nsims - 1):
+    for id_sim in range(Nsims):
         sim_label = f"_{id_sim:04d}" if args.sims else ""
 
         s = sacc.Sacc.load_fits(f"{sacc_dir}/cl_and_cov_sacc{sim_label}.fits")
