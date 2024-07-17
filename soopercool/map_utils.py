@@ -1,18 +1,39 @@
 import numpy as np
 import healpy as hp
+from pixell import enmap
 import matplotlib.pyplot as plt
 
 
-def read_map(map_file, field=0):
-    """
-    """
-    return np.array(hp.read_map(map_file, field=field))
+def _check_pix_type(pix_type):
+    if not (pix_type in ['hp', 'car']):
+        raise ValueError(f"Unknown pixelisation type {pix_type}.")
 
 
-def write_map(map_file, map, dtype=None):
+def read_map(map_file, field=0, pix_type='hp'):
     """
     """
-    hp.write_map(map_file, map, overwrite=True, dtype=dtype)
+    _check_pix_type(pix_type)
+    if pix_type == 'hp':
+        return np.array(hp.read_map(map_file, field=field))
+    else:
+        # Read all maps
+        mp = enmap.read_map(map_file)
+        # Slice up
+        if isinstance(field, int):
+            field = [field]
+        elif isinstance(field, str):
+            raise KeyError("Can't select CAR maps based on column name")
+        return mp[field]
+
+
+def write_map(map_file, map, dtype=None, pix_type='hp'):
+    """
+    """
+    _check_pix_type(pix_type)
+    if pix_type == 'hp':
+        hp.write_map(map_file, map, overwrite=True, dtype=dtype)
+    else:
+        map.write(map_file, fmt=dtype)
 
 
 def plot_map(map, title=None, file_name=None, lims=None):
