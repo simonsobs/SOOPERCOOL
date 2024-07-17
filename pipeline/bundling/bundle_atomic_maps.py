@@ -1,5 +1,6 @@
 import argparse
 from soopercool import BBmeta
+from soopercool import map_utils as mu
 
 from pixell import enmap, enplot
 import numpy as np
@@ -77,12 +78,12 @@ def coadd_maps(map_list, res=10):
 
     shape, wcs = car.geometry
     for f in map_list:
-        m = enmap.read_map(f)
+        m = mu.read_map(f, pix_type='car')
         car = enmap.insert(car, m, op=np.ndarray.__iadd__)
-        w = enmap.read_map(f.replace("wmap", "weights"))
+        w = mu.read_map(f.replace("wmap", "weights"), pix_type='car')
         w = np.moveaxis(w.diagonal(), -1, 0)
         wcar = enmap.insert(wcar, w, op=np.ndarray.__iadd__)
-        h = enmap.read_map(f.replace("wmap", "hits"))[0]
+        h = mu.read_map(f.replace("wmap", "hits"), pix_type='car')[0]
         hits = enmap.insert(hits, h, op=np.ndarray.__iadd__)
     wcar[wcar == 0] = np.inf
     return car / wcar, wcar, hits
@@ -160,7 +161,7 @@ def main(args):
         keep[ftag] = []
         for id_waf in range(7):
             for fname in fname_list[ftag, id_waf]:
-                m = enmap.read_map(fname)
+                m = mu.read_map(fname, pix_type='car')
 
                 binary = enmap.insert(template_CAR.copy(), m[0])
                 binary[binary != 0] = 1
@@ -246,11 +247,12 @@ def main(args):
                 plot_hit
             )
             file_name = f"{maps_dir}/TQU_CAR_coadd_{ftag}_bundle{id_bundle}_allwaf.fits"  # noqa
-            enmap.write_map(file_name, coadded_maps[ftag, id_bundle])
-            enmap.write_map(file_name.replace("TQU", "weights"),
-                            coadded_weights[ftag, id_bundle])
-            enmap.write_map(file_name.replace("TQU", "hits"),
-                            coadded_hits[ftag, id_bundle])
+            mu.write_map(file_name, coadded_maps[ftag, id_bundle],
+                         pix_type='car')
+            mu.write_map(file_name.replace("TQU", "weights"),
+                         coadded_weights[ftag, id_bundle], pix_type='car')
+            mu.write_map(file_name.replace("TQU", "hits"),
+                         coadded_hits[ftag, id_bundle], pix_type='car')
 
             with open(f"{maps_dir}/atomic_map_list_{ftag}_bundle{id_bundle}.txt", "w") as f:  # noqa
                 for fname in to_coadd_full[ftag, id_bundle]:
@@ -269,13 +271,15 @@ def main(args):
                     range=[100000], colorbar=1, ticks=5)[0]
                 enplot.write(f"{plot_dir}/coadd_{ftag}_bundle{id_bundle}_waf{id_waf}_hits.png", plot_hit)  # noqa
                 file_name = f"{maps_dir}/TQU_CAR_coadd_{ftag}_bundle{id_bundle}_waf{id_waf}.fits"  # noqa
-                enmap.write_map(file_name, coadded_maps[ftag, id_bundle])
-                enmap.write_map(
+                mu.write_map(file_name, coadded_maps[ftag, id_bundle],
+                             pix_type='car')
+                mu.write_map(
                     file_name.replace("TQU", "weights"),
-                    coadded_weights[ftag, id_waf, id_bundle]
-                )
-                enmap.write_map(file_name.replace("TQU", "hits"),
-                                coadded_hits[ftag, id_waf, id_bundle])
+                    coadded_weights[ftag, id_waf, id_bundle],
+                    pix_type='car')
+                mu.write_map(file_name.replace("TQU", "hits"),
+                             coadded_hits[ftag, id_waf, id_bundle],
+                             pix_type='car')
 
                 with open(f"{maps_dir}/atomic_map_list_{ftag}_waf{id_waf}_bundle{id_bundle}.txt", "w") as f:  # noqa
                     for fname in to_coadd[ftag, id_waf][id_bundle]:
@@ -292,12 +296,11 @@ def main(args):
                 coadded_hits[ftag, id_bundle], nside=256, extensive=True,
                 method="spline"
             )
-            hp.write_map(f"{maps_dir}/coadd_{ftag}_bundle{id_bundle}_map.fits",
-                         TQU_hp, overwrite=True, dtype=np.float32)
-            hp.write_map(
+            mu.write_map(f"{maps_dir}/coadd_{ftag}_bundle{id_bundle}_map.fits",
+                         TQU_hp, dtype=np.float32, pix_type='hp')
+            mu.write_map(
                 f"{maps_dir}/coadd_{ftag}_bundle{id_bundle}_hits.fits",
-                hits_hp, overwrite=True, dtype=np.float32
-            )
+                hits_hp, dtype=np.float32, pix_type='hp')
 
             for id_waf in range(7):
                 TQU_hp = reproject.map2healpix(
@@ -307,8 +310,10 @@ def main(args):
                     coadded_hits[ftag, id_waf, id_bundle], nside=256,
                     extensive=True, method="spline"
                 )
-                hp.write_map(f"{maps_dir}/coadd_{ftag}_wafer{id_waf}_bundle{id_bundle}_map.fits", TQU_hp, overwrite=True, dtype=np.float32)  # noqa
-                hp.write_map(f"{maps_dir}/coadd_{ftag}_wafer{id_waf}_bundle{id_bundle}_hits.fits", hits_hp, overwrite=True, dtype=np.float32)  # noqa
+                mu.write_map(f"{maps_dir}/coadd_{ftag}_wafer{id_waf}_bundle{id_bundle}_map.fits",  # noqa
+                             TQU_hp, dtype=np.float32, pix_type='car')
+                hp.write_map(f"{maps_dir}/coadd_{ftag}_wafer{id_waf}_bundle{id_bundle}_hits.fits",  # noqa
+                             hits_hp, dtype=np.float32, pix_type='car')
 
 
 if __name__ == "__main__":

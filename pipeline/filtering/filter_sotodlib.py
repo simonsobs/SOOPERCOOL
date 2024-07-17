@@ -75,7 +75,7 @@ def main(args):
 
         out_fname = args.map_template.format(sim_id=sim_id).replace(".fits", "_filtered.fits")  # noqa
         out_file = f"{fsims_dir}/{out_fname}"
-        enmap.write_map(out_file, fsim, dtype=np.float32, overwrite=True)
+        mu.write_map(out_file, fsim, dtype=np.float32, pix_type='car')
 
 
 b = """
