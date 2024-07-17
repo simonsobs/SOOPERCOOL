@@ -1,10 +1,10 @@
 import argparse
 from soopercool import BBmeta
-import healpy as hp
 import pymaster as nmt
 import numpy as np
 from soopercool import ps_utils
 from soopercool import mpi_utils as mpi
+from soopercool import map_utils as mu
 
 
 def main(args):
@@ -22,7 +22,7 @@ def main(args):
                                      binning["bin_high"] + 1)
 
     mask_file = meta.masks["analysis_mask"]
-    mask = hp.read_map(mask_file)
+    mask = mu.read_map(mask_file)
 
     filtering_tags = meta.get_filtering_tags()
     filtering_tag_pairs = meta.get_independent_filtering_pairs()
@@ -65,9 +65,9 @@ def main(args):
                 )
                 filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}"
 
-                map = hp.read_map(unfiltered_map_file,
+                map = mu.read_map(unfiltered_map_file,
                                   field=[0, 1, 2])
-                map_filtered = hp.read_map(filtered_map_file,
+                map_filtered = mu.read_map(filtered_map_file,
                                            field=[0, 1, 2])
 
                 field = {

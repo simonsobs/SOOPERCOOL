@@ -1,6 +1,7 @@
 import argparse
 from soopercool import BBmeta, utils
 from soopercool import mpi_utils as mpi
+from soopercool import mpi_utils as mu
 import numpy as np
 import healpy as hp
 import matplotlib.pyplot as plt
@@ -73,12 +74,8 @@ def main(args):
 
             for f in "TEB":
                 fname = f"pure{f}_power_law_tf_est_{id_sim:04d}{suffix}.fits"
-                hp.write_map(
-                    f"{sim_dir}/{fname}",
-                    sims[f"pure{f}"],
-                    overwrite=True,
-                    dtype=np.float32
-                )
+                mu.write_map(f"{sim_dir}/{fname}",
+                             sims[f"pure{f}"], dtype=np.float32)
 
     if do_plots:
         ps_hp_order = ["TT", "EE", "BB", "TE", "EB", "TB"]
@@ -91,11 +88,9 @@ def main(args):
                 for id_sim in range(Nsims):
                     fname = f"pure{f}_power_law_tf_est_{id_sim:04d}{suffix}"
                     alms = hp.map2alm(
-                        hp.read_map(
+                        mu.read_map(
                             f"{sim_dir}/{fname}.fits",
-                            field=[0, 1, 2]
-                        )
-                    )
+                            field=[0, 1, 2]))
                     cls = hp.alm2cl(alms)
 
                     for i, fp in enumerate(ps_hp_order):

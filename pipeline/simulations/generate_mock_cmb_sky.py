@@ -2,6 +2,7 @@ import argparse
 from soopercool import BBmeta
 import healpy as hp
 from soopercool import utils
+from soopercool import map_utils as mu
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -44,8 +45,8 @@ def main(args):
             alms_beamed = [hp.almxfl(alm, beams[ms]) for alm in alms]
 
             map = hp.alm2map(alms_beamed, nside=meta.nside)
-            hp.write_map(f"{sims_dir}/cmb_{ms}_{id_sim:04d}.fits", map,
-                         overwrite=True, dtype=np.float32)
+            mu.write_map(f"{sims_dir}/cmb_{ms}_{id_sim:04d}.fits", map,
+                         dtype=np.float32)
             hp.write_cl(f"{sims_dir}/cl_{ms}_{id_sim:04d}.fits",
                         hp.anafast(map), overwrite=True, dtype=np.float32)
 

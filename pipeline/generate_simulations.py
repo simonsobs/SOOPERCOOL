@@ -44,7 +44,8 @@ def main(args):
 
                 fname = noise_map_template.format(id_sim=id_sim, map_set=ms,
                                                   id_bundle=id_bundle)
-                noise = mu.read_map(f"{noise_map_dir}/{fname}", field=[0, 1, 2])
+                noise = mu.read_map(f"{noise_map_dir}/{fname}",
+                                    field=[0, 1, 2])
 
                 split_map = cmb + noise
 

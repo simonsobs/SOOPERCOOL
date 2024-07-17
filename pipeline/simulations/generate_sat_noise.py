@@ -3,6 +3,7 @@ from soopercool import BBmeta
 import healpy as hp
 import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 from soopercool import mpi_utils as mpi
+from soopercool import map_utils as mu
 import numpy as np
 
 
@@ -95,10 +96,9 @@ def main(args):
                     nlth[ms][1]["TT"], nlth[ms][1]["EE"],
                     n_bundles, meta.nside, seed
                 )
-                hp.write_map(
+                mu.write_map(
                     f"{sims_dir}/{id_sim:04d}/noise_sims_{ms}_{id_sim:04d}_bundle{id_bundle}.fits",  # noqa
-                    noise, overwrite=True, dtype=np.float32
-                )
+                    noise, dtype=np.float32)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 import argparse
 from soopercool import BBmeta
+from soopercool import map_utils as mu
 import numpy as np
 import healpy as hp
 
@@ -71,8 +72,7 @@ def main(args):
 
             for ms in meta.map_sets_list:
                 fname = f"homogeneous_noise_{ms}_bundle{id_bundle}_{id_sim:04d}.fits" # noqa
-                hp.write_map(f"{noise_sims_dir}/{fname}", noise_maps[ms],
-                             overwrite=True,
+                mu.write_map(f"{noise_sims_dir}/{fname}", noise_maps[ms],
                              dtype=np.float32)
 
 
