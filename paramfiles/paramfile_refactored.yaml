@@ -44,6 +44,7 @@ masks:
 ####################################
 ## General parameters
 general_pars:
+  pix_type: hp
   nside: 256
   lmin: 30
   lmax: 600

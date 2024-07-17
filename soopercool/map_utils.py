@@ -9,6 +9,12 @@ def _check_pix_type(pix_type):
         raise ValueError(f"Unknown pixelisation type {pix_type}.")
 
 
+def ud_grade(map_in, nside_out, power=None, pix_type='hp'):
+    if pix_type != 'hp':
+        raise ValueError("Can't U/D-grade non-HEALPix maps")
+    return hp.ud_grade(map_in, nside_out=nside_out, power=power)
+
+
 def read_map(map_file, field=0, pix_type='hp'):
     """
     """

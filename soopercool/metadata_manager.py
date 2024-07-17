@@ -2,7 +2,6 @@ import soopercool.map_utils as mu
 import yaml
 import numpy as np
 import os
-import healpy as hp
 import time
 
 
@@ -170,10 +169,12 @@ class BBmeta(object):
             Type of mask to load.
             Can be "binary", "galactic", "point_source" or "analysis".
         """
-        return hp.ud_grade(
-            mu.read_map(getattr(self, f"{mask_type}_mask_name")),
-            nside_out=self.nside
-        )
+        mask = mu.read_map(getattr(self, f"{mask_type}_mask_name"),
+                           pix_type=self.pix_type)
+        if self.pix_type == 'hp':
+            mask = mu.ud_grade(mask, nside_out=self.nside,
+                               pix_type=self.pix_type)
+        return mask
 
     def save_mask(self, mask_type, mask):
         """
@@ -188,15 +189,18 @@ class BBmeta(object):
             Mask to save.
         """
         return mu.write_map(getattr(self, f"{mask_type}_mask_name"), mask,
-                            dtype=np.float32)
+                            dtype=np.float32, pix_type=self.pix_type)
 
     def read_hitmap(self):
         """
         Read the hitmap. For now, we assume that all tags
         share the same hitmap.
         """
-        hitmap = mu.read_map(self.nhits_map_name)
-        return hp.ud_grade(hitmap, self.nside, power=-2)
+        hitmap = mu.read_map(self.nhits_map_name, pix_type=self.pix_type)
+        if self.pix_type == 'hp':
+            hitmap = mu.ud_grade(hitmap, self.nside, power=-2,
+                                 pix_type=self.pix_type)
+        return hitmap
 
     def save_hitmap(self, map, overwrite=True):
         """
@@ -209,7 +213,7 @@ class BBmeta(object):
         """
         mu.write_map(
             os.path.join(self.mask_directory, self.masks["nhits_map"]),
-            map, dtype=np.float32)
+            map, dtype=np.float32, pix_type=self.pix_type)
 
     def read_nmt_binning(self):
         """
@@ -416,49 +420,6 @@ class BBmeta(object):
         print("==============================================================")
         print('')
 
-    def get_nhits_map_from_toast_schedule(self, filter_tag):
-        from soopercool.utils import toast_filter_map
-        import subprocess
-
-        tag_settings = self.tags_settings[filter_tag]
-
-        if tag_settings["filtering_type"] != "toast":
-            raise NotImplementedError(f"Filterer type {tag_settings['filtering_type']} " # noqa
-                                      "not implemented")
-        kwargs = {
-            "map": None,
-            "map_file": self.masks["input_nhits_path"],
-            "mask": None,
-            "template": tag_settings["template"],
-            "config": tag_settings["config"],
-            "schedule": tag_settings["schedule"],
-            "nside": self.nside,
-            "instrument": tag_settings["tf_instrument"],
-            "band": tag_settings["tf_band"],
-            "sbatch_job_name": "get_nhits_map",
-            "sbatch_dir": self.scripts_dir,
-            "nhits_map_only": True
-        }
-        sbatch_file = toast_filter_map(**kwargs)
-
-        if self.slurm:
-            # Running with SLURM job scheduller
-            cmd = "sbatch {}".format(str(sbatch_file.resolve()))
-            if self.slurm_autosubmit:
-                subprocess.run(cmd, shell=True, check=True)
-                raise Exception(
-                    'Submitted SLURM script for nhits map calculation. \
-                    Please run the script again after SLURM job finished.')
-            else:
-                self.print_banner(
-                    msg='To submit these scripts to SLURM:\n    {}'.format(cmd)
-                    )
-                raise Exception(
-                    'Pleas __rerun__ the script after SLURM job finished.')
-        else:
-            # Run the script directly
-            subprocess.run(str(sbatch_file.resolve()), shell=True, check=True)
-
     def get_map_filename_transfer(self, id_sim, cl_type,
                                   pure_type=None, filter_tag=None):
         """
@@ -490,7 +451,7 @@ class BBmeta(object):
         """
         field = [1, 2] if pol_only else [0, 1, 2]
         fname = self.get_map_filename(map_set, id_split, id_sim)
-        return mu.read_map(fname, field=field)
+        return mu.read_map(fname, field=field, pix_type=self.pix_type)
 
     def read_map_transfer(self, id_sim, signal=None, e_or_b=None,
                           pol_only=False):
