@@ -1,11 +1,12 @@
+import numpy as np
 import healpy as hp
 import matplotlib.pyplot as plt
 
 
-def read_map(map_file, ncomp):
+def read_map(map_file, field=0):
     """
     """
-    return hp.read_map(map_file, field=[i for i in range(ncomp)])
+    return np.array(hp.read_map(map_file, field=field))
 
 
 def write_map(map_file, map, dtype=None):

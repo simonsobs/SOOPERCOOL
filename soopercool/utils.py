@@ -1,3 +1,4 @@
+import soopercool.map_utils as mu
 import numpy as np
 import os
 import healpy as hp
@@ -234,8 +235,8 @@ def m_filter_map(map_file, mask_file, out_dir, m_cut):
         Maximum nonzero m-degree of the multipole expansion. All higher
         degrees are set to zero.
     """
-    map = hp.read_map(map_file, field=(0, 1, 2))
-    mask = hp.read_map(mask_file)
+    map = mu.read_map(map_file, field=(0, 1, 2))
+    mask = mu.read_map(mask_file)
     mask[mask != 0] = 1.
 
     map_masked = map * mask
@@ -252,9 +253,8 @@ def m_filter_map(map_file, mask_file, out_dir, m_cut):
     fname = os.path.basename(map_file)
     fname_out = fname.replace(".fits", "_filtered.fits")
 
-    hp.write_map(f"{out_dir}/{fname_out}",
-                 filtered_map, overwrite=True,
-                 dtype=np.float32)
+    mu.write_map(f"{out_dir}/{fname_out}",
+                 filtered_map, dtype=np.float32)
 
 
 def m_filter_map_old(map, map_file, mask, m_cut):
@@ -289,9 +289,8 @@ def m_filter_map_old(map, map_file, mask, m_cut):
 
     filtered_map = hp.alm2map(alms, nside=nside, lmax=lmax)
 
-    hp.write_map(map_file.replace('.fits', '_filtered.fits'),
-                 filtered_map, overwrite=True,
-                 dtype=np.float32)
+    mu.write_map(map_file.replace('.fits', '_filtered.fits'),
+                 filtered_map, dtype=np.float32)
 
 
 def toast_filter_map(map, map_file, mask,

@@ -60,7 +60,7 @@ def main(args):
             if verbose:
                 print(f"    file_name: {map_dir}/{map_file}")
 
-            hits = mu.read_map(f"{map_dir}/{map_file}", ncomp=1)
+            hits = mu.read_map(f"{map_dir}/{map_file}")
             hit_maps.append(hits)
 
     # Create binary and normalized hitmap
@@ -96,7 +96,7 @@ def main(args):
         print("Reading galactic mask ...")
         if verbose:
             print(f"    file_name: {masks_settings['galactic_mask']}")
-        gal_mask = mu.read_map(masks_settings["galactic_mask"], ncomp=1)
+        gal_mask = mu.read_map(masks_settings["galactic_mask"])
         if do_plots:
             mu.plot_map(gal_mask,
                         title="Galactic mask",
@@ -107,7 +107,7 @@ def main(args):
         print("Reading external mask ...")
         if verbose:
             print(f"    file_name: {masks_settings['external_mask']}")
-        ext_mask = mu.read_map(masks_settings["external_mask"], ncomp=1)
+        ext_mask = mu.read_map(masks_settings["external_mask"])
         if do_plots:
             mu.plot_map(
                 ext_mask,
@@ -126,7 +126,7 @@ def main(args):
         print("Reading point source mask ...")
         if verbose:
             print(f"    file_name: {masks_settings['point_source_mask']}")
-        ps_mask = mu.read_map(masks_settings["point_source_mask"], ncomp=1)
+        ps_mask = mu.read_map(masks_settings["point_source_mask"])
         ps_mask = nmt.mask_apodization(
             ps_mask,
             masks_settings["apod_radius_point_source"],

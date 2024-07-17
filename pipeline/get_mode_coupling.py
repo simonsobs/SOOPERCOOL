@@ -24,7 +24,7 @@ def main(args):
     nl = 3 * meta.nside
     nspec = 7
 
-    mask = mu.read_map(meta.masks["analysis_mask"], ncomp=1)
+    mask = mu.read_map(meta.masks["analysis_mask"])
 
     field_spin0 = nmt.NmtField(mask, None, spin=0)
     field_spin2 = nmt.NmtField(mask, None, spin=2, purify_b=meta.pure_B)

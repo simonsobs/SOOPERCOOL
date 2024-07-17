@@ -1,3 +1,4 @@
+import soopercool.map_utils as mu
 import yaml
 import numpy as np
 import os
@@ -170,11 +171,11 @@ class BBmeta(object):
             Can be "binary", "galactic", "point_source" or "analysis".
         """
         return hp.ud_grade(
-            hp.read_map(getattr(self, f"{mask_type}_mask_name")),
+            mu.read_map(getattr(self, f"{mask_type}_mask_name")),
             nside_out=self.nside
         )
 
-    def save_mask(self, mask_type, mask, overwrite=False):
+    def save_mask(self, mask_type, mask):
         """
         Save the mask given a mask type.
 
@@ -185,18 +186,16 @@ class BBmeta(object):
             Can be "binary", "galactic", "point_source" or "analysis".
         mask : array-like
             Mask to save.
-        overwrite : bool, optional
-            Overwrite the mask if it already exists.
         """
-        return hp.write_map(getattr(self, f"{mask_type}_mask_name"), mask,
-                            overwrite=overwrite, dtype=np.float32)
+        return mu.write_map(getattr(self, f"{mask_type}_mask_name"), mask,
+                            dtype=np.float32)
 
     def read_hitmap(self):
         """
         Read the hitmap. For now, we assume that all tags
         share the same hitmap.
         """
-        hitmap = hp.read_map(self.nhits_map_name)
+        hitmap = mu.read_map(self.nhits_map_name)
         return hp.ud_grade(hitmap, self.nside, power=-2)
 
     def save_hitmap(self, map, overwrite=True):
@@ -208,10 +207,9 @@ class BBmeta(object):
         map : array-like
             Mask to save.
         """
-        hp.write_map(
+        mu.write_map(
             os.path.join(self.mask_directory, self.masks["nhits_map"]),
-            map, dtype=np.float32, overwrite=overwrite
-        )
+            map, dtype=np.float32)
 
     def read_nmt_binning(self):
         """
@@ -492,7 +490,7 @@ class BBmeta(object):
         """
         field = [1, 2] if pol_only else [0, 1, 2]
         fname = self.get_map_filename(map_set, id_split, id_sim)
-        return hp.read_map(fname, field=field)
+        return mu.read_map(fname, field=field)
 
     def read_map_transfer(self, id_sim, signal=None, e_or_b=None,
                           pol_only=False):
@@ -520,7 +518,7 @@ class BBmeta(object):
             raise ValueError("You have to set to None either `signal` or "
                              "`e_or_b`")
         fname = self.get_map_filename_transfer(id_sim, signal, e_or_b)
-        return hp.read_map_transfer(fname, field=field)
+        return mu.read_map(fname, field=field)
 
     def get_ps_names_list(self, type="all", coadd=False):
         """

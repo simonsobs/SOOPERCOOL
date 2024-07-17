@@ -1,5 +1,6 @@
 import argparse
 from soopercool import BBmeta, utils
+from soopercool import map_utils as mu
 import numpy as np
 import os
 import healpy as hp
@@ -214,7 +215,7 @@ def pre_processer(args):
             if not os.path.isfile(fname_mask):
                 wget.download(url, fname_mask)
                 print("\n")
-            mask = hp.read_map(fname_mask, field=['N_OBS'])
+            mask = mu.read_map(fname_mask, field=['N_OBS'])
 
             print("Beams")
             print("Downloading WMAP beam window functions")
@@ -297,7 +298,7 @@ def pre_processer(args):
                 else:
                     print("reading input maps at", fname_in)
                     # read TQU, convert to muK
-                    map_in = to_muk * hp.read_map(fname_in, field=[0, 1, 2])
+                    map_in = to_muk * mu.read_map(fname_in, field=[0, 1, 2])
                     if args.planck:
                         print("removing dipole")
                         map_in[0] -= dipole_template[nside_in]
@@ -329,8 +330,7 @@ def pre_processer(args):
                 map_out *= binary_mask
 
                 print("writing maps to disk")
-                hp.write_map(fname_out, map_out,
-                             overwrite=True, dtype=np.float32)
+                mu.write_map(fname_out, map_out, dtype=np.float32)
 
                 if args.plots:
                     print("plotting maps")
@@ -415,7 +415,7 @@ def pre_processer(args):
 
                     print("reading input maps at", fname_in)
                     # read TQU, convert to muK
-                    map_in = to_muk * hp.read_map(fname_in, field=[0, 1, 2])
+                    map_in = to_muk * mu.read_map(fname_in, field=[0, 1, 2])
 
                     if process_sims:
                         if not args.noise:
@@ -440,8 +440,8 @@ def pre_processer(args):
                     print("masking")
                     map_out *= binary_mask
                     print("writing maps to disk")
-                    hp.write_map(fname_out, map_out,
-                                 overwrite=True, dtype=np.float32)
+                    mu.write_map(fname_out, map_out, dtype=np.float32)
+
         meta.timer.stop("Process simulations")
         print("---------------------")
 

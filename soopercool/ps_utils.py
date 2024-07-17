@@ -1,7 +1,7 @@
+import soopercool.map_utils as mu
 from itertools import product
 import pymaster as nmt
 import numpy as np
-import healpy as hp
 
 
 def get_validation_power_spectra(meta, id_sim, mask, nmt_binning,
@@ -28,7 +28,7 @@ def get_validation_power_spectra(meta, id_sim, mask, nmt_binning,
                     map_files = [mf.replace(".fits", "_filtered.fits")
                                  for mf in map_files]
 
-                maps = [hp.read_map(m, field=[0, 1, 2])
+                maps = [mu.read_map(m, field=[0, 1, 2])
                         for m in map_files]
 
                 field = [{
