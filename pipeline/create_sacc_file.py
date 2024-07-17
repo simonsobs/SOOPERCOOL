@@ -15,6 +15,8 @@ def multi_eye(size, k_list):
 
 def thin_covariance(cov, n_bins, n_fields, order=None):
     """
+    Return covariance that contains sub- and superdiagonals up to order |k|,
+    e.g. k=0 keeps only the diagonal.
     """
     if order is None:
         return cov
@@ -87,7 +89,7 @@ def main(args):
                         ifp2*len(lb):(ifp2+1)*len(lb)] = cov_dict[fp1+fp2]
 
             covs[ms1, ms2, ms3, ms4] = thin_covariance(
-                cov, len(lb), len(field_pairs), order=3
+                cov, len(lb), len(field_pairs), order=0
             )
 
     full_cov_size = len(ps_names)*len(lb)*len(field_pairs)
