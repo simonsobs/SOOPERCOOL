@@ -93,15 +93,20 @@ def main(args):
         cells_coadd["noise"][(map_set1, map_set2)] = {}
         for field_pair in field_pairs:
             for type in ["cross", "auto"]:
-                cells_coadd[type][map_set1, map_set2][field_pair] = \
-                    np.mean(
-                        cells_coadd[type][map_set1, map_set2][field_pair],
-                        axis=0
-                    )
+                if len(cells_coadd[type][map_set1, map_set2][field_pair]) != 0:
+                    cells_coadd[type][map_set1, map_set2][field_pair] = \
+                        np.mean(
+                            cells_coadd[type][map_set1, map_set2][field_pair],
+                            axis=0
+                        )
 
-            cells_coadd["noise"][(map_set1, map_set2)][field_pair] = \
-                cells_coadd["auto"][map_set1, map_set2][field_pair] - \
-                cells_coadd["cross"][map_set1, map_set2][field_pair]
+            if len(cells_coadd["auto"][map_set1, map_set2][field_pair]) == 0:
+                cells_coadd["noise"][map_set1, map_set2][field_pair] = np.zeros_like(cells_coadd["cross"][map_set1, map_set2][field_pair])  # noqa
+                cells_coadd["auto"][map_set1, map_set2][field_pair] = np.zeros_like(cells_coadd["cross"][map_set1, map_set2][field_pair])  # noqa
+            else:
+                cells_coadd["noise"][(map_set1, map_set2)][field_pair] = \
+                    cells_coadd["auto"][map_set1, map_set2][field_pair] - \
+                    cells_coadd["cross"][map_set1, map_set2][field_pair]
 
         for type in ["cross", "auto", "noise"]:
             cells_to_save = {
@@ -166,6 +171,7 @@ def main(args):
                     f"{plot_dir}/pcls_{map_set1}_{map_set2}_{fp}.png",
                     bbox_inches="tight"
                 )
+                plt.close()
 
 
 if __name__ == "__main__":

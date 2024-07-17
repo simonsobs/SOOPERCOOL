@@ -39,8 +39,10 @@ def main(args):
         cb2db = lb*(lb+1)/2./np.pi
         field_pairs = ["TT", "EE", "BB", "TE"]
 
-        plot_dir = f"{out_dir}/plots/cells"
-        BBmeta.make_dir(plot_dir)
+        cl_plot_dir = f"{out_dir}/plots/cells"
+        map_plot_dir = f"{out_dir}/plots/maps"
+        BBmeta.make_dir(cl_plot_dir)
+        BBmeta.make_dir(map_plot_dir)
 
         fiducial_cmb = meta.covariance["fiducial_cmb"]
         fiducial_dust = meta.covariance["fiducial_dust"]
@@ -67,6 +69,17 @@ def main(args):
 
         m = mu.read_map(f"{map_dir}/{map_file}", field=[0, 1, 2],
                         pix_type=meta.pix_type)
+        if do_plots:
+            for i, f in enumerate(["T", "Q", "U"]):
+                hp.mollview(m[i],
+                            cmap="RdYlBu_r",
+                            title=f"({map_set}, bundle {id_bundle}) | {f}",
+                            min=-300 if f == "T" else -10,
+                            max=300 if f == "T" else 10)
+                plt.savefig(f"{map_plot_dir}/map_{map_set}_"
+                            f"bundle{id_bundle}_{f}.png")
+                plt.close()
+
         field_spin0 = nmt.NmtField(mask, m[:1])
         field_spin2 = nmt.NmtField(mask, m[1:], purify_b=meta.pure_B)
 
@@ -120,10 +133,10 @@ def main(args):
                 plt.ylabel(r"$D_\ell$", fontsize=15)
                 plt.xlabel(r"$\ell$", fontsize=15)
                 plt.legend(fontsize=13)
-                plt.savefig(f"{plot_dir}/pcls_{map_set1}_"
+                plt.savefig(f"{cl_plot_dir}/pcls_{map_set1}_"
                             f"bundle{id_bundle1}_{map_set2}_"
                             f"bundle{id_bundle2}_{fp}.png")
-                plt.clf()
+                plt.close()
 
 
 if __name__ == "__main__":
