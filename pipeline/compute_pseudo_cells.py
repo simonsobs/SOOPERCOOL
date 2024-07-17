@@ -20,7 +20,8 @@ def main(args):
 
     BBmeta.make_dir(cells_dir)
 
-    mask = mu.read_map(meta.masks["analysis_mask"])
+    mask = mu.read_map(meta.masks["analysis_mask"],
+                       pix_type=meta.pix_type)
 
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
@@ -64,7 +65,8 @@ def main(args):
 
         map_file = map_file.replace(type_options, option)
 
-        m = mu.read_map(f"{map_dir}/{map_file}", field=[0, 1, 2])
+        m = mu.read_map(f"{map_dir}/{map_file}", field=[0, 1, 2],
+                        pix_type=meta.pix_type)
         field_spin0 = nmt.NmtField(mask, m[:1])
         field_spin2 = nmt.NmtField(mask, m[1:], purify_b=meta.pure_B)
 

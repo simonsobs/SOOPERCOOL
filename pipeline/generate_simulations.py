@@ -26,7 +26,8 @@ def main(args):
     noise_map_template = meta.covariance["noise_sims_template"]
     signal_map_template = meta.covariance["signal_sims_template"]
 
-    binary = mu.read_map(f"{masks_dir}/binary_mask.fits")
+    binary = mu.read_map(f"{masks_dir}/binary_mask.fits",
+                         pix_type=meta.pix_type)
 
     mpi.init(True)
 
@@ -39,13 +40,15 @@ def main(args):
                 print(f"# {id_sim} | {ms}")
 
             fname = signal_map_template.format(id_sim=id_sim, map_set=ms)
-            cmb = mu.read_map(f"{signal_map_dir}/{fname}", field=[0, 1, 2])
+            cmb = mu.read_map(f"{signal_map_dir}/{fname}", field=[0, 1, 2],
+                              pix_type=meta.pix_type)
             for id_bundle in range(meta.n_bundles_from_map_set(ms)):
 
                 fname = noise_map_template.format(id_sim=id_sim, map_set=ms,
                                                   id_bundle=id_bundle)
                 noise = mu.read_map(f"{noise_map_dir}/{fname}",
-                                    field=[0, 1, 2])
+                                    field=[0, 1, 2],
+                                    pix_type=meta.pix_type)
 
                 split_map = cmb + noise
 

@@ -22,7 +22,7 @@ def main(args):
                                      binning["bin_high"] + 1)
 
     mask_file = meta.masks["analysis_mask"]
-    mask = mu.read_map(mask_file)
+    mask = mu.read_map(mask_file, pix_type=meta.pix_type)
 
     filtering_tags = meta.get_filtering_tags()
     filtering_tag_pairs = meta.get_independent_filtering_pairs()
@@ -66,9 +66,10 @@ def main(args):
                 filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}"
 
                 map = mu.read_map(unfiltered_map_file,
-                                  field=[0, 1, 2])
+                                  field=[0, 1, 2], pix_type=meta.pix_type)
                 map_filtered = mu.read_map(filtered_map_file,
-                                           field=[0, 1, 2])
+                                           field=[0, 1, 2],
+                                           pix_type=meta.pix_type)
 
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1]),

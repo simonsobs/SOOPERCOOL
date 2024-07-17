@@ -90,7 +90,8 @@ def main(args):
                     alms = hp.map2alm(
                         mu.read_map(
                             f"{sim_dir}/{fname}.fits",
-                            field=[0, 1, 2]))
+                            field=[0, 1, 2],
+                            pix_type=meta.pix_type))
                     cls = hp.alm2cl(alms)
 
                     for i, fp in enumerate(ps_hp_order):
