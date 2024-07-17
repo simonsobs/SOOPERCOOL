@@ -479,7 +479,7 @@ class BBmeta(object):
             raise ValueError("You have to set to None either `signal` or "
                              "`e_or_b`")
         fname = self.get_map_filename_transfer(id_sim, signal, e_or_b)
-        return mu.read_map(fname, field=field)
+        return mu.read_map(fname, field=field, pix_type=self.pix_type)
 
     def get_ps_names_list(self, type="all", coadd=False):
         """
