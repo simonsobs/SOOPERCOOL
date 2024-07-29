@@ -2,7 +2,6 @@ import argparse
 from soopercool import BBmeta
 import soopercool.SO_Noise_Calculator_Public_v3_1_2 as noise_calc
 import numpy as np
-import os
 
 
 def beam_gaussian(ll, fwhm_amin):
@@ -56,14 +55,10 @@ def main(args):
 
         fname = f"{beam_dir}/beam_{ms}.dat"
 
-        if not os.path.exists(fname):
-            if verbose:
-                print(f"Written to {fname}.")
-            l, bl = get_sat_beam(freq_tag, lmax_sim)
-            np.savetxt(fname, np.transpose([l, bl]))
-        else:
-            if verbose:
-                print(f"beam_{ms} exists, do nothing.")
+        if verbose:
+            print(f"Written to {fname}.")
+        l, bl = get_sat_beam(freq_tag, lmax_sim)
+        np.savetxt(fname, np.transpose([l, bl]))
 
 
 if __name__ == "__main__":
