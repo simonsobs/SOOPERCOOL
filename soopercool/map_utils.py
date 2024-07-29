@@ -15,12 +15,15 @@ def ud_grade(map_in, nside_out, power=None, pix_type='hp'):
     return hp.ud_grade(map_in, nside_out=nside_out, power=power)
 
 
-def read_map(map_file, field=0, pix_type='hp'):
+def read_map(map_file, field=0, pix_type='hp', convert_K_to_muK=False):
     """
     """
+    conv = 1
+    if convert_K_to_muK:
+        conv = 1.e6
     _check_pix_type(pix_type)
     if pix_type == 'hp':
-        return np.array(hp.read_map(map_file, field=field))
+        return conv*np.array(hp.read_map(map_file, field=field))
     else:
         # Read all maps
         mp = enmap.read_map(map_file)
@@ -29,12 +32,15 @@ def read_map(map_file, field=0, pix_type='hp'):
             field = [field]
         elif isinstance(field, str):
             raise KeyError("Can't select CAR maps based on column name")
-        return mp[field]
+        return conv*mp[field]
 
 
-def write_map(map_file, map, dtype=None, pix_type='hp'):
+def write_map(map_file, map, dtype=None, pix_type='hp',
+              convert_muK_to_K=False):
     """
     """
+    if convert_muK_to_K:
+        map *= 1.e-6
     _check_pix_type(pix_type)
     if pix_type == 'hp':
         hp.write_map(map_file, map, overwrite=True, dtype=dtype)

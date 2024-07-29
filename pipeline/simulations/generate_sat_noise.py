@@ -98,7 +98,8 @@ def main(args):
                 )
                 mu.write_map(
                     f"{sims_dir}/{id_sim:04d}/noise_sims_{ms}_{id_sim:04d}_bundle{id_bundle}.fits",  # noqa
-                    noise, dtype=np.float32)
+                    noise, dtype=np.float32, convert_muK_to_K=True
+                )
 
 
 if __name__ == "__main__":

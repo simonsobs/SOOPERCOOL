@@ -66,10 +66,12 @@ def main(args):
                 filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}"
 
                 map = mu.read_map(unfiltered_map_file,
-                                  field=[0, 1, 2], pix_type=meta.pix_type)
+                                  field=[0, 1, 2], pix_type=meta.pix_type,
+                                  convert_K_to_muK=True)
                 map_filtered = mu.read_map(filtered_map_file,
                                            field=[0, 1, 2],
-                                           pix_type=meta.pix_type)
+                                           pix_type=meta.pix_type,
+                                           convert_K_to_muK=True)
 
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1]),

@@ -75,7 +75,8 @@ def main(args):
             for f in "TEB":
                 fname = f"pure{f}_power_law_tf_est_{id_sim:04d}{suffix}.fits"
                 mu.write_map(f"{sim_dir}/{fname}",
-                             sims[f"pure{f}"], dtype=np.float32)
+                             sims[f"pure{f}"], dtype=np.float32,
+                             convert_muK_to_K=True)
 
     if do_plots:
         ps_hp_order = ["TT", "EE", "BB", "TE", "EB", "TB"]
@@ -91,7 +92,9 @@ def main(args):
                         mu.read_map(
                             f"{sim_dir}/{fname}.fits",
                             field=[0, 1, 2],
-                            pix_type=meta.pix_type))
+                            pix_type=meta.pix_type,
+                            convert_K_to_muK=True),
+                    )
                     cls = hp.alm2cl(alms)
 
                     for i, fp in enumerate(ps_hp_order):

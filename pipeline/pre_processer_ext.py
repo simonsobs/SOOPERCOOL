@@ -69,7 +69,7 @@ def pre_processer(args):
         npipe_dir = "/global/cfs/cdirs/cmb/data/planck2020/npipe"
         splits = ['A', 'B']
         splits_dict = {'A': 0, 'B': 1}
-        to_muk = 1e6
+        convert_to_K = 1
 
         print("Beams")
         beam_windows_dir = f"{beam_dir}/simulated_maps/npipe_aux/beam_window_functions"  # noqa
@@ -175,7 +175,7 @@ def pre_processer(args):
             dipole_template[2048] = dipole_amplitude * np.dot([x, y, z], hp.pix2vec(2048, np.arange(hp.nside2npix(2048))))  # noqa
 
     elif args.wmap:
-        to_muk = 1e3
+        convert_to_K = 1.e-3
         bands_dict = {'023': 'K1', '033': 'Ka1'}
         wmap_dir = f"{prep_dir}/external_data/maps"
 
@@ -297,8 +297,9 @@ def pre_processer(args):
                                     alm_file['alm_B']])
                 else:
                     print("reading input maps at", fname_in)
-                    # read TQU, convert to muK
-                    map_in = to_muk * mu.read_map(fname_in, field=[0, 1, 2])
+                    # read TQU, convert to K
+                    map_in = convert_to_K * mu.read_map(fname_in,
+                                                        field=[0, 1, 2])
                     if args.planck:
                         print("removing dipole")
                         map_in[0] -= dipole_template[nside_in]
@@ -414,8 +415,9 @@ def pre_processer(args):
                         continue
 
                     print("reading input maps at", fname_in)
-                    # read TQU, convert to muK
-                    map_in = to_muk * mu.read_map(fname_in, field=[0, 1, 2])
+                    # read TQU, convert to K
+                    map_in = convert_to_K * mu.read_map(fname_in,
+                                                        field=[0, 1, 2])
 
                     if process_sims:
                         if not args.noise:

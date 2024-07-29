@@ -68,7 +68,7 @@ def main(args):
         map_file = map_file.replace(type_options, option)
 
         m = mu.read_map(f"{map_dir}/{map_file}", field=[0, 1, 2],
-                        pix_type=meta.pix_type)
+                        pix_type=meta.pix_type, convert_K_to_muK=True)
         if do_plots:
             for i, f in enumerate(["T", "Q", "U"]):
                 hp.mollview(m[i],

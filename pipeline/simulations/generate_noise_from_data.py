@@ -96,7 +96,7 @@ def main(args):
 
                 fname = f"homogeneous_noise_{ms}_bundle{id_bundle}_{id_sim:04d}.fits" # noqa
                 mu.write_map(f"{noise_sims_dir}/{fname}", noise_maps[ms],
-                             dtype=np.float32)
+                             dtype=np.float32, convert_muK_to_K=True)
                 for ip, fp in enumerate(["TT", "EE", "BB", "TE"]):
                     plt.title(f"{ms} | {fp}")
                     plt.plot(hp.anafast(noise_maps)[ip], c="navy",

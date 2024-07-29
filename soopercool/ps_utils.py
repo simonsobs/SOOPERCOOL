@@ -28,7 +28,7 @@ def get_validation_power_spectra(meta, id_sim, mask, nmt_binning,
                     map_files = [mf.replace(".fits", "_filtered.fits")
                                  for mf in map_files]
 
-                maps = [mu.read_map(m, field=[0, 1, 2])
+                maps = [mu.read_map(m, field=[0, 1, 2], convert_K_to_muK=True)
                         for m in map_files]
 
                 field = [{

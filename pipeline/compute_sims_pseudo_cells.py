@@ -46,7 +46,7 @@ def main(args):
             map_fname = f"{base_dir}/cov_sims_{map_set}_bundle{id_bundle}.fits"
 
             m = mu.read_map(map_fname, field=[0, 1, 2],
-                            pix_type=meta.pix_type)
+                            pix_type=meta.pix_type, convert_K_to_muK=True)
             field_spin0 = nmt.NmtField(mask, m[:1])
             field_spin2 = nmt.NmtField(mask, m[1:], purify_b=meta.pure_B)
 

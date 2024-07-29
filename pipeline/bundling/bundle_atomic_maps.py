@@ -212,7 +212,7 @@ def main(args):
     coadded_maps = {}
     coadded_weights = {}
     coadded_hits = {}
-    unit_conv = 1e6 * 13.2  # pW to uK
+    unit_conv = 13.2  # pW to K
     for ftag in freq_tags:
         for id_bundle in range(n_bundles):
             meta.timer.start("coadding")

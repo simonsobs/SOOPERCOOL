@@ -202,7 +202,7 @@ class BBmeta(object):
                                  pix_type=self.pix_type)
         return hitmap
 
-    def save_hitmap(self, map, overwrite=True):
+    def save_hitmap(self, map):
         """
         Save the hitmap to disk.
 
@@ -432,7 +432,8 @@ class BBmeta(object):
 
         return f"{path_to_maps}/{file_name}"
 
-    def read_map(self, map_set, id_split, id_sim=None, pol_only=False):
+    def read_map(self, map_set, id_split, id_sim=None, pol_only=False,
+                 convert_K_to_muK=False):
         """
         Read a map given a map set and split index.
         Can also read a given covariance simulation if `id_sim` is provided.
@@ -448,13 +449,16 @@ class BBmeta(object):
             If None, return the data map.
         pol_only : bool, optional
             Return only the polarization maps.
+        convert_K_to_muK: bool, optional
+            Convert maps from K to muK units upon loading.
         """
         field = [1, 2] if pol_only else [0, 1, 2]
         fname = self.get_map_filename(map_set, id_split, id_sim)
-        return mu.read_map(fname, field=field, pix_type=self.pix_type)
+        return mu.read_map(fname, field=field, pix_type=self.pix_type,
+                           convert_K_to_muK=convert_K_to_muK)
 
     def read_map_transfer(self, id_sim, signal=None, e_or_b=None,
-                          pol_only=False):
+                          pol_only=False, convert_K_to_muK=False):
         """
         Read a map given a simulation index.
         Can also read a pure-E or pure-B simulation if `e_or_b` is provided.
@@ -473,13 +477,16 @@ class BBmeta(object):
             If None, assumes validation mode.
         pol_only : bool, optional
             Return only the polarization maps.
+        convert_K_to_muK: bool, optional
+            Convert maps from K to muK units upon loading.
         """
         field = [1, 2] if pol_only else [0, 1, 2]
         if (not signal and not e_or_b) or (signal and e_or_b):
             raise ValueError("You have to set to None either `signal` or "
                              "`e_or_b`")
         fname = self.get_map_filename_transfer(id_sim, signal, e_or_b)
-        return mu.read_map(fname, field=field, pix_type=self.pix_type)
+        return mu.read_map(fname, field=field, pix_type=self.pix_type,
+                           convert_K_to_muK=convert_K_to_muK)
 
     def get_ps_names_list(self, type="all", coadd=False):
         """
