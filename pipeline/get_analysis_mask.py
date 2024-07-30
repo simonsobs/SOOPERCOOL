@@ -4,7 +4,6 @@ from soopercool import BBmeta
 from soopercool import map_utils as mu
 from soopercool import utils as su
 import numpy as np
-import healpy as hp
 
 
 def main(args):
@@ -60,35 +59,52 @@ def main(args):
             if verbose:
                 print(f"    file_name: {map_dir}/{map_file}")
 
-            hits = mu.read_map(f"{map_dir}/{map_file}")
+            hits = mu.read_map(f"{map_dir}/{map_file}", pix_type=meta.pix_type)
+            print("HERE", type(hits))
             hit_maps.append(hits)
 
     # Create binary and normalized hitmap
-    binary = np.ones_like(hit_maps[0])
-    sum_hits = np.zeros_like(hit_maps[0])
+    binary = hit_maps[0].copy()
+    sum_hits = hit_maps[0].copy()
+    binary[:] = 1
+    sum_hits[:] = 0
     for hit_map in hit_maps:
         binary[hit_map == 0] = 0
         sum_hits += hit_map
     sum_hits[binary == 0] = 0
 
     # Normalize and smooth hitmaps
-    sum_hits = hp.smoothing(sum_hits, fwhm=np.deg2rad(1.))
+    sum_hits = mu.smooth_map(sum_hits, fwhm_deg=1, pix_type=meta.pix_type)
     sum_hits /= np.amax(sum_hits)
 
     # Save products
-    mu.write_map(f"{masks_dir}/binary_mask.fits",
-                 binary, dtype=np.int32)
-    mu.write_map(f"{masks_dir}/normalized_hits.fits",
-                 sum_hits, dtype=np.float32)
+    mu.write_map(
+        f"{masks_dir}/binary_mask.fits",
+        binary,
+        dtype=np.int32,
+        pix_type=meta.pix_type
+    )
+    mu.write_map(
+        f"{masks_dir}/normalized_hits.fits",
+        sum_hits,
+        dtype=np.float32,
+        pix_type=meta.pix_type
+    )
 
     if do_plots:
-        mu.plot_map(binary,
-                    title="Binary mask",
-                    file_name=f"{plot_dir}/binary_mask")
+        mu.plot_map(
+            binary,
+            file_name=f"{plot_dir}/binary_mask",
+            pix_type=meta.pix_type,
+            lims=[-binary.max(), binary.max()]
+        )
 
-        mu.plot_map(sum_hits,
-                    title="Normalized hitcount",
-                    file_name=f"{plot_dir}/normalized_hits")
+        mu.plot_map(
+            sum_hits,
+            file_name=f"{plot_dir}/normalized_hits",
+            pix_type=meta.pix_type,
+            lims=[-1, 1]
+        )
 
     analysis_mask = binary.copy()
 
@@ -96,58 +112,79 @@ def main(args):
         print("Reading galactic mask ...")
         if verbose:
             print(f"    file_name: {masks_settings['galactic_mask']}")
-        gal_mask = mu.read_map(masks_settings["galactic_mask"])
+        gal_mask = mu.read_map(masks_settings["galactic_mask"],
+                               pix_type=meta.pix_type,
+                               geometry=analysis_mask.geometry)
         if do_plots:
-            mu.plot_map(gal_mask,
-                        title="Galactic mask",
-                        file_name=f"{plot_dir}/galactic_mask")
+            mu.plot_map(
+                gal_mask,
+                file_name=f"{plot_dir}/galactic_mask",
+                pix_type=meta.pix_type,
+                lims=[-1, 1]
+            )
         analysis_mask *= gal_mask
 
     if masks_settings["external_mask"] is not None:
         print("Reading external mask ...")
         if verbose:
             print(f"    file_name: {masks_settings['external_mask']}")
-        ext_mask = mu.read_map(masks_settings["external_mask"])
+        ext_mask = mu.read_map(masks_settings["external_mask"],
+                               pix_type=meta.pix_type,
+                               geometry=analysis_mask.geometry)
         if do_plots:
             mu.plot_map(
                 ext_mask,
-                title="External mask",
-                file_name=f"{plot_dir}/external_mask")
+                file_name=f"{plot_dir}/external_mask",
+                pix_type=meta.pix_type,
+                lims=[-1, 1]
+            )
         analysis_mask *= ext_mask
 
-    import pymaster as nmt
-    analysis_mask = nmt.mask_apodization(
+    analysis_mask = mu.apodize_mask(
         analysis_mask,
-        masks_settings["apod_radius"],
-        apotype=masks_settings["apod_type"]
+        apod_radius_deg=masks_settings["apod_radius"],
+        apod_type=masks_settings["apod_type"],
+        pix_type=meta.pix_type
     )
 
     if masks_settings["point_source_mask"] is not None:
         print("Reading point source mask ...")
         if verbose:
             print(f"    file_name: {masks_settings['point_source_mask']}")
-        ps_mask = mu.read_map(masks_settings["point_source_mask"])
-        ps_mask = nmt.mask_apodization(
+        ps_mask = mu.read_map(masks_settings["point_source_mask"],
+                              pix_type=meta.pix_type,
+                              geometry=analysis_mask.geometry)
+        ps_mask = mu.apodize_mask(
             ps_mask,
-            masks_settings["apod_radius_point_source"],
-            apotype=masks_settings["apod_type"]
+            apod_radius_deg=masks_settings["apod_radius_point_source"],
+            apod_type=masks_settings["apod_type"],
+            pix_type=meta.pix_type
         )
         if do_plots:
             mu.plot_map(
                 ps_mask,
-                title="Point source mask",
-                file_name=f"{plot_dir}/point_source_mask")
+                file_name=f"{plot_dir}/point_source_mask",
+                pix_type=meta.pix_type,
+                lims=[-1, 1]
+            )
 
         analysis_mask *= ps_mask
 
     # Weight with hitmap
     analysis_mask *= sum_hits
-    mu.write_map(f"{masks_dir}/analysis_mask.fits",
-                 analysis_mask, dtype=np.float32)
+    mu.write_map(
+        f"{masks_dir}/analysis_mask.fits",
+        analysis_mask,
+        pix_type=meta.pix_type
+    )
 
     if do_plots:
-        mu.plot_map(analysis_mask, title="Analysis mask",
-                    file_name=f"{plot_dir}/analysis_mask")
+        mu.plot_map(
+            analysis_mask,
+            file_name=f"{plot_dir}/analysis_mask",
+            pix_type=meta.pix_type,
+            lims=[-1, 1]
+        )
 
     # Compute and plot spin derivatives
     first, second = su.get_spin_derivatives(analysis_mask)
