@@ -60,7 +60,7 @@ def smooth_map(map, fwhm_deg, pix_type="hp"):
         return enmap.smooth_gauss(map, np.deg2rad(sigma_deg))
 
 
-def _plot_map_hp(map, lims=None, file_name=None):
+def _plot_map_hp(map, lims=None, file_name=None, title=None):
     """
     """
     ncomp = map.shape[0] if len(map.shape) == 2 else 1
@@ -83,7 +83,14 @@ def _plot_map_hp(map, lims=None, file_name=None):
     for i in range(ncomp):
         if ncomp != 1:
             f = "TQU"[i]
-        hp.mollview(map[i], cmap=cmap, **range_args[i], cbar=True)
+        print("np.shape(map)", np.shape(np.atleast_2d(map)))
+        hp.mollview(
+            np.atleast_2d(map)[i],
+            cmap=cmap,
+            title=title,
+            **range_args[i],
+            cbar=True
+        )
         if file_name:
             if ncomp == 1:
                 plt.savefig(f"{file_name}.png", bbox_inches="tight")
@@ -132,16 +139,15 @@ def _plot_map_car(map, lims=None, file_name=None):
             enplot.show(plot[i])
 
 
-def plot_map(map, file_name=None, lims=None,
-             pix_type="hp"):
+def plot_map(map, file_name=None, lims=None, title=None, pix_type="hp"):
     """
     """
     _check_pix_type(pix_type)
 
     if pix_type == "hp":
-        _plot_map_hp(map, lims, file_name)
+        _plot_map_hp(map, lims, file_name=file_name, title=title)
     else:
-        _plot_map_car(map, lims, file_name)
+        _plot_map_car(map, lims, file_name=file_name)
 
 
 def apodize_mask(mask, apod_radius_deg, apod_type, pix_type="hp"):

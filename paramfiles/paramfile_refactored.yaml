@@ -1,9 +1,9 @@
-output_directory: &out_dir /pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/debugging/outputs_refactored_noisy
+output_directory: &out_dir ../outputs_refactored
 
 map_sets:
   sat_f093:
-    map_dir: "../debugging/data_refactored_noisy/maps"
-    beam_dir: "../debugging/data_refactored_noisy/beams"
+    map_dir: "../data_refactored/maps"
+    beam_dir: "../data_refactored/beams"
     map_template: "sat_f093_bundle{id_bundle}_{map|hits}.fits"
     beam_file: "beam_sat_f093.dat"
     n_bundles: 2          # Number of bundles
@@ -16,6 +16,9 @@ map_sets:
 ####################
 masks:
   analysis_mask: !path [*out_dir, masks/analysis_mask.fits]
+  # When specifying this file, the mapset/bundle-specific hits files will
+  # be ignored and instead a global hits file will be used (testing puroposes)
+  global_hits_file_overwrite: /home/wolz/bbdev/SOOPERCOOL/outputs/masks/hits_1year_200dets_sat_beams.fits
 
   # Path to products (binary)
   galactic_mask: null  # "/path/to/galactic_mask.fits"
@@ -25,7 +28,7 @@ masks:
   external_mask: null
 
   apod_radius: 10.0
-  apod_radius_point_source: 4.0
+  apod_radius_point_source: 1.0
   apod_type: "C1"
 
 ####################################

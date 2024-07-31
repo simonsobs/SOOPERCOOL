@@ -23,55 +23,63 @@ def main(args):
 
     masks_settings = meta.masks
 
-    # First loop over the (map_set, id_bundles)
-    # pairs to define a common binary mask
-    hit_maps = []
-    for map_set in meta.map_sets_list:
-        n_bundles = meta.n_bundles_from_map_set(map_set)
-        for id_bundle in range(n_bundles):
+    # If a global hits file is indicated in the paramter file, use it.
+    if masks_settings["global_hits_file_overwrite"] is not None:
+        sum_hits = mu.read_map(
+            masks_settings["global_hits_file_overwrite"],
+            pix_type=meta.pix_type
+    )
+        # Create binary
+        binary = sum_hits.copy()
+        binary[:] = 1
+        binary[sum_hits == 0] = 0
+    else:
+        # Loop over the (map_set, id_bundles)
+        # pairs to define a common binary mask
+        hit_maps = []
+        for map_set in meta.map_sets_list:
+            n_bundles = meta.n_bundles_from_map_set(map_set)
+            for id_bundle in range(n_bundles):
 
-            map_dir = meta.map_dir_from_map_set(map_set)
-            map_template = meta.map_template_from_map_set(map_set)
+                map_dir = meta.map_dir_from_map_set(map_set)
+                map_template = meta.map_template_from_map_set(map_set)
+                map_file = map_template.format(id_bundle=id_bundle)
 
-            map_file = map_template.replace(
-                "{id_bundle}",
-                str(id_bundle)
-            )
-            type_options = [
-                f for f in re.findall(r"\{.*?\}", map_template)
-                if "|" in f
-            ]
-            if not type_options:
-                raise ValueError("The map directory must contain both maps "
-                                 "and hits files, indicated by a "
-                                 "corresponding suffix.")
-            else:
-                # Select the hitmap
-                option = type_options[0].replace("{", "")
-                option = option.replace("}", "").split("|")[1]
+                type_options = [
+                    f for f in re.findall(r"\{.*?\}", map_template)
+                    if "|" in f
+                ]
+                if not type_options:
+                    raise ValueError("The map directory must contain both maps "
+                                    "and hits files, indicated by a "
+                                    "corresponding suffix.")
+                else:
+                    # Select the hitmap
+                    option = type_options[0].replace("{", "")
+                    option = option.replace("}", "").split("|")[1]
 
-                map_file = map_file.replace(
-                    type_options[0],
-                    option
-                )
+                    map_file = map_file.replace(
+                        type_options[0],
+                        option
+                    )
 
-            print(f"Reading hitmap for {map_set} - bundle {id_bundle}")
-            if verbose:
-                print(f"    file_name: {map_dir}/{map_file}")
+                print(f"Reading hitmap for {map_set} - bundle {id_bundle}")
+                if verbose:
+                    print(f"    file_name: {map_dir}/{map_file}")
 
-            hits = mu.read_map(f"{map_dir}/{map_file}", pix_type=meta.pix_type)
-            print("HERE", type(hits))
-            hit_maps.append(hits)
+                hits = mu.read_map(f"{map_dir}/{map_file}", pix_type=meta.pix_type)
+                print("HERE", type(hits))
+                hit_maps.append(hits)
 
-    # Create binary and normalized hitmap
-    binary = hit_maps[0].copy()
-    sum_hits = hit_maps[0].copy()
-    binary[:] = 1
-    sum_hits[:] = 0
-    for hit_map in hit_maps:
-        binary[hit_map == 0] = 0
-        sum_hits += hit_map
-    sum_hits[binary == 0] = 0
+        # Create binary and normalized hitmap
+        binary = hit_maps[0].copy()
+        sum_hits = hit_maps[0].copy()
+        binary[:] = 1
+        sum_hits[:] = 0
+        for hit_map in hit_maps:
+            binary[hit_map == 0] = 0
+            sum_hits += hit_map
+        sum_hits[binary == 0] = 0
 
     # Normalize and smooth hitmaps
     sum_hits = mu.smooth_map(sum_hits, fwhm_deg=1, pix_type=meta.pix_type)
@@ -92,8 +100,10 @@ def main(args):
     )
 
     if do_plots:
+        print("np.shape(binary)", np.shape(binary))
         mu.plot_map(
             binary,
+            title="Binary mask",
             file_name=f"{plot_dir}/binary_mask",
             pix_type=meta.pix_type,
             lims=[-binary.max(), binary.max()]
@@ -101,6 +111,7 @@ def main(args):
 
         mu.plot_map(
             sum_hits,
+            title="Normalized hits",
             file_name=f"{plot_dir}/normalized_hits",
             pix_type=meta.pix_type,
             lims=[-1, 1]
@@ -118,6 +129,7 @@ def main(args):
         if do_plots:
             mu.plot_map(
                 gal_mask,
+                title="Galactic mask",
                 file_name=f"{plot_dir}/galactic_mask",
                 pix_type=meta.pix_type,
                 lims=[-1, 1]
@@ -134,6 +146,7 @@ def main(args):
         if do_plots:
             mu.plot_map(
                 ext_mask,
+                title="External mask",
                 file_name=f"{plot_dir}/external_mask",
                 pix_type=meta.pix_type,
                 lims=[-1, 1]
@@ -163,6 +176,7 @@ def main(args):
         if do_plots:
             mu.plot_map(
                 ps_mask,
+                title="Point source mask",
                 file_name=f"{plot_dir}/point_source_mask",
                 pix_type=meta.pix_type,
                 lims=[-1, 1]
@@ -181,6 +195,7 @@ def main(args):
     if do_plots:
         mu.plot_map(
             analysis_mask,
+            title="Analysis mask",
             file_name=f"{plot_dir}/analysis_mask",
             pix_type=meta.pix_type,
             lims=[-1, 1]
@@ -190,18 +205,16 @@ def main(args):
     first, second = su.get_spin_derivatives(analysis_mask)
 
     if do_plots:
-        mu.plot_map(first, title="First spin derivative",
-                    file_name=f"{plot_dir}/first_spin_derivative")
-        mu.plot_map(second, title="Second spin derivative",
-                    file_name=f"{plot_dir}/second_spin_derivative")
-
-        import matplotlib.pyplot as plt
-        plt.figure()
-        plt.plot(first)
-        plt.show()
-        plt.figure()
-        plt.plot(second)
-        plt.show()
+        mu.plot_map(
+            first,
+            title="First spin derivative",
+            file_name=f"{plot_dir}/first_spin_derivative"
+        )
+        mu.plot_map(
+            second,
+            title="Second spin derivative",
+            file_name=f"{plot_dir}/second_spin_derivative"
+        )
 
     if args.verbose:
         print("---------------------------------------------------------")
