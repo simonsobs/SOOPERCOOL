@@ -45,12 +45,13 @@ def main(args):
     meta = BBmeta(args.globals)
     verbose = args.verbose
 
-    lmax_sim = 3*meta.nside - 1
+    lmax_sim = 3000
 
     for ms in meta.map_sets_list:
         freq_tag = meta.freq_tag_from_map_set(ms)
-        beam_dir = meta.beam_dir_from_map_set(ms)
 
+        out_dir = meta.output_directory
+        beam_dir = f"{out_dir}/gaussian_beams"
         BBmeta.make_dir(beam_dir)
 
         fname = f"{beam_dir}/beam_{ms}.dat"

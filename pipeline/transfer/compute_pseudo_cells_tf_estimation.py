@@ -65,24 +65,28 @@ def main(args):
                 )
                 filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}"
 
-                map = mu.read_map(unfiltered_map_file,
-                                  field=[0, 1, 2], pix_type=meta.pix_type,
-                                  convert_K_to_muK=True)
-                map_filtered = mu.read_map(filtered_map_file,
-                                           field=[0, 1, 2],
-                                           pix_type=meta.pix_type,
-                                           convert_K_to_muK=True)
+                map = mu.read_map(
+                    unfiltered_map_file, pix_type=meta.pix_type,
+                    fields_hp=[0, 1, 2]
+                )
+                map_filtered = mu.read_map(
+                    filtered_map_file, pix_type=meta.pix_type,
+                    fields_hp=[0, 1, 2]
+                )
+
+                wcs = map.wcs
+                wcs.wcs.cdelt = np.array([-1/6., 1/6.])
 
                 field = {
-                    "spin0": nmt.NmtField(mask, map[:1]),
+                    "spin0": nmt.NmtField(mask, map[:1], wcs=wcs),
                     "spin2": nmt.NmtField(mask, map[1:],
-                                          purify_b=meta.pure_B)
+                                          purify_b=meta.pure_B, wcs=wcs)
                 }
 
                 field_filtered = {
-                    "spin0": nmt.NmtField(mask, map_filtered[:1]),
+                    "spin0": nmt.NmtField(mask, map_filtered[:1], wcs=wcs),
                     "spin2": nmt.NmtField(mask, map_filtered[1:],
-                                          purify_b=meta.pure_B)
+                                          purify_b=meta.pure_B, wcs=wcs)
                 }
 
                 fields[ftag]["unfiltered"][pure_type] = field

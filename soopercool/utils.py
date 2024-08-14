@@ -187,18 +187,20 @@ def beam_hpix(ll, nside):
     return beam_gaussian(ll, fwhm_hp_amin)
 
 
-def create_binning(nside, delta_ell, end_first_bin=None):
+def create_binning(lmax, delta_ell, end_first_bin=None):
     """
     """
     if end_first_bin is not None:
-        bin_low = np.arange(end_first_bin, 3*nside, delta_ell)
+        bin_low = np.arange(end_first_bin,
+                            lmax + 1,
+                            delta_ell)
         bin_high = bin_low + delta_ell - 1
         bin_low = np.concatenate(([0], bin_low))
         bin_high = np.concatenate(([end_first_bin-1], bin_high))
     else:
-        bin_low = np.arange(0, 3*nside, delta_ell)
+        bin_low = np.arange(0, lmax + 1, delta_ell)
         bin_high = bin_low + delta_ell - 1
-    bin_high[-1] = 3*nside - 1
+    bin_high[-1] = lmax
     bin_center = (bin_low + bin_high) / 2
 
     return bin_low, bin_high, bin_center
@@ -215,6 +217,8 @@ def power_law_cl(ell, amp, delta_ell, power_law_index):
             A = amp
         # A is power spectrum amplitude at pivot ell == 1 - delta_ell
         pl_ps[spec] = A / (ell + delta_ell) ** power_law_index
+        if spec != spec[::-1]:
+            pl_ps[spec[::-1]] = pl_ps[spec]
 
     return pl_ps
 
@@ -701,3 +705,12 @@ def get_spin_derivatives(map):
     cmap.set_under("w")
 
     return first, second
+
+
+def read_beam_from_file(beam_file, lmax=None):
+    """
+    """
+    l, bl = np.loadtxt(beam_file, unpack=True)
+    if lmax is not None:
+        return l[:lmax+1], bl[:lmax+1]
+    return l, bl

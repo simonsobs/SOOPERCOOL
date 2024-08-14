@@ -2,6 +2,7 @@ from soopercool import BBmeta
 import numpy as np
 from soopercool.utils import create_binning
 import argparse
+from soopercool import map_utils as mu
 
 
 def main(args):
@@ -13,18 +14,28 @@ def main(args):
     binning_dir = f"{out_dir}/binning"
     BBmeta.make_dir(binning_dir)
 
-    bin_low, bin_high, bin_center = create_binning(meta.nside,
+    mask = mu.read_map(meta.masks["analysis_mask"], pix_type=meta.pix_type)
+    lmax = mu.lmax_from_map(mask, pix_type=meta.pix_type)
+    print(lmax)
+
+    bin_low, bin_high, bin_center = create_binning(lmax,
                                                    args.deltal)
     print(bin_low, bin_high, bin_center)
-    file_name = f"binning_nside{meta.nside}_deltal{args.deltal}.npz"
+    file_name = f"binning_{meta.pix_type}_lmax{lmax}_deltal{args.deltal}"
 
-    bin_low2, bin_high2, bin_center2 = create_binning(meta.nside,
+    bin_low2, bin_high2, bin_center2 = create_binning(lmax,
                                                       args.deltal,
                                                       end_first_bin=30)
     print(bin_low2, bin_high2, bin_center2)
 
     np.savez(
-        f"{binning_dir}/{file_name}",
+        f"{binning_dir}/{file_name}.npz",
+        bin_low=bin_low,
+        bin_high=bin_high,
+        bin_center=bin_center
+    )
+    np.savez(
+        f"{binning_dir}/{file_name}_large_first_bin.npz",
         bin_low=bin_low2,
         bin_high=bin_high2,
         bin_center=bin_center2

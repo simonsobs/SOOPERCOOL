@@ -28,7 +28,7 @@ def main(args):
         sum_hits = mu.read_map(
             masks_settings["global_hits_file_overwrite"],
             pix_type=meta.pix_type
-    )
+        )
         # Create binary
         binary = sum_hits.copy()
         binary[:] = 1
@@ -43,16 +43,20 @@ def main(args):
 
                 map_dir = meta.map_dir_from_map_set(map_set)
                 map_template = meta.map_template_from_map_set(map_set)
-                map_file = map_template.format(id_bundle=id_bundle)
+                map_file = map_template.replace(
+                    "{id_bundle}",
+                    str(id_bundle)
+                )
 
                 type_options = [
                     f for f in re.findall(r"\{.*?\}", map_template)
                     if "|" in f
                 ]
                 if not type_options:
-                    raise ValueError("The map directory must contain both maps "
-                                    "and hits files, indicated by a "
-                                    "corresponding suffix.")
+                    raise ValueError(
+                        "The map directory must contain both maps "
+                        "and hits files, indicated by a "
+                        "corresponding suffix.")
                 else:
                     # Select the hitmap
                     option = type_options[0].replace("{", "")
@@ -67,7 +71,10 @@ def main(args):
                 if verbose:
                     print(f"    file_name: {map_dir}/{map_file}")
 
-                hits = mu.read_map(f"{map_dir}/{map_file}", pix_type=meta.pix_type)
+                hits = mu.read_map(
+                    f"{map_dir}/{map_file}",
+                    pix_type=meta.pix_type
+                )
                 print("HERE", type(hits))
                 hit_maps.append(hits)
 

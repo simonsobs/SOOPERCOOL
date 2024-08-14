@@ -1,4 +1,5 @@
 import soopercool.map_utils as mu
+import soopercool.utils as su
 import yaml
 import numpy as np
 import os
@@ -238,13 +239,12 @@ class BBmeta(object):
         binner = self.read_nmt_binning()
         return binner.get_effective_ells()
 
-    def read_beam(self, map_set):
+    def read_beam(self, map_set, lmax=None):
         """
         """
         beam_dir = self.beam_dir_from_map_set(map_set)
         beam_file = self.beam_file_from_map_set(map_set)
-        beam_file = f"{beam_dir}/{beam_file}"
-        l, bl = np.loadtxt(beam_file, unpack=True)
+        l, bl = su.read_beam_from_file(f"{beam_dir}/{beam_file}", lmax=lmax)
         if self.beam_floor is not None:
             bl[bl < self.beam_floor] = self.beam_floor
         return l, bl
