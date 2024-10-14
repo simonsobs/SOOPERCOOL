@@ -47,6 +47,20 @@ def main(args):
                     "{id_bundle}",
                     str(id_bundle)
                 )
+                type_options = [
+                    f for f in re.findall(r"\{.*?\}", map_template)
+                    if "|" in f
+                ]
+                if not type_options:
+                    raise ValueError(
+                        "The map directory must contain both maps "
+                        "and hits files, indicated by a "
+                        "corresponding suffix."
+                    )
+                else:
+                    # Select the hitmap
+                    option = type_options[0].replace("{", "")
+                    option = option.replace("}", "").split("|")[1]
 
                 type_options = [
                     f for f in re.findall(r"\{.*?\}", map_template)
@@ -75,7 +89,6 @@ def main(args):
                     f"{map_dir}/{map_file}",
                     pix_type=meta.pix_type
                 )
-                print("HERE", type(hits))
                 hit_maps.append(hits)
 
         # Create binary and normalized hitmap
