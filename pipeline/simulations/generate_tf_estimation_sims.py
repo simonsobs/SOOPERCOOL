@@ -45,8 +45,8 @@ def main(args):
         beams = {None: None}
 
     template = mu.template_from_map(mask, ncomp=3, pix_type=meta.pix_type)
-    #from pspy import so_map
-    #template = so_map.full_sky_car_template(ncomp=3, res=10).data
+    # from pspy import so_map
+    # template = so_map.full_sky_car_template(ncomp=3, res=10).data
     mpi.init(True)
 
     for id_sim in mpi.taskrange(Nsims - 1):
@@ -92,8 +92,12 @@ def main(args):
 
                 from pixell import enplot
                 for i, mode in zip([1, 2], "QU"):
-                    plot = enplot.plot(sims[f"pure{f}"][i], ticks=10, color="planck")
-                    enplot.write(f"{plot_dir}/pure{f}_power_law_tf_est_{id_sim:04d}{suffix}_{mode}", plot)
+                    plot = enplot.plot(sims[f"pure{f}"][i], ticks=10,
+                                       color="planck")
+                    enplot.write(
+                        f"{plot_dir}/pure{f}_power_law_tf_est_{id_sim:04d}{suffix}_{mode}",  # noqa
+                        plot
+                    )
 
     # if do_plots:
     #     ps_hp_order = ["TT", "EE", "BB", "TE", "EB", "TB"]
