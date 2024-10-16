@@ -1,14 +1,15 @@
 import argparse
 import sqlite3
 import numpy as np
+import os
 
 
-def get_atomic_maps_list(map_dir, query_dict, map_type="wmap", db_fpath=None,
+def get_atomic_maps_list(map_dir, queries_list, map_type="wmap", db_fpath=None,
                          verbose=False):
     """
     Outputs list of atomic maps
     (e.g. "{map_dir}/17107/atomic_1710705196_ws0_f090_full_{map_type}.fits")
-    based on map_dir (base directory for atomic maps) and query_dict.
+    based on map_dir (base directory for atomic maps) and queries_list.
 
     Parameters
     ----------
@@ -20,10 +21,9 @@ def get_atomic_maps_list(map_dir, query_dict, map_type="wmap", db_fpath=None,
     map_type: str
         Map type to output, e.g. 'wmap' fo weighted map, 'weights' for inverse
         variance weights map, 'hits' for hits map. Default: 'wmap'.
-    query_dict: dict of str
-        Dictionary with keys being the queryable parameters, e.g.
-        freq_channel or elevation, and values being the associated (str) values
-        or SQL query strings, e.g. " = 'f090'", ">= '30'"
+    queries_list: list of str
+        List with SQL query strings, e.g.
+        "freq_channel = 'f090'", "elevation >= '50'", etc.
     verbose: boolean
         Verbose output? Default: False
 
@@ -40,7 +40,7 @@ def get_atomic_maps_list(map_dir, query_dict, map_type="wmap", db_fpath=None,
 
     query_target = "prefix_path"
     table_name = "atomic"
-    where_statement = " AND ".join([f"{k}{v}" for k, v in query_dict.items()])
+    where_statement = " AND ".join(queries_list)
 
     conn = sqlite3.connect(db_fpath)
     cursor = conn.cursor()
@@ -75,28 +75,33 @@ def main(args):
     Get list of NERSC filepaths of atomic maps corresponding to an SQL query
     to the associated atomic maps database.
     """
-
+    print(f"Reading atomics at {args.map_dir}")
+    os.makedirs(args.outdir, exist_ok=True)
     atomic_maps_list = {}
     atomic_maps_list["wmap"] = get_atomic_maps_list(
-        args.map_dir, args.query_dict, map_type="wmap"
+        args.map_dir, args.queries_list, map_type="wmap", verbose=args.verbose
     )
 
     for typ in ["weights", "hits"]:
         atomic_maps_list[typ] = [a.replace("wmap", typ)
                                  for a in atomic_maps_list["wmap"]]
+    natomics = len(atomic_maps_list["wmap"])
     np.savez(f"{args.outdir}/atomic_maps_list.npz", **atomic_maps_list)
+    print(f"Stored list of {natomics} atomics "
+          f"under {args.outdir}/atomic_maps_list.npz")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--map_dir",
                         help="Atomic maps directory.")
-    parser.add_argument("--query_dict",
-                        help="Dictionary with SQL query of form "
-                        "{key}{value}, i.e. key is \"freq_channel\" and"
-                        " value is  \"= 'f090'\".")
+    parser.add_argument("--queries_list", nargs="+", default=[],
+                        help="String with SQL queries of form "
+                        "\"freq_channel = 'f090'\".")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Verbose output?")
     parser.add_argument("--outdir",
                         help="Output directory for atomic maps list.")
 
     args = parser.parse_args()
-    main(args.preprocess_config, args.query_str)
+    main(args)
