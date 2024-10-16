@@ -75,12 +75,12 @@ def main(args):
     Get list of NERSC filepaths of atomic maps corresponding to an SQL query
     to the associated atomic maps database.
     """
-    
+
     atomic_maps_list = {}
     atomic_maps_list["wmap"] = get_atomic_maps_list(
         args.map_dir, args.query_dict, map_type="wmap"
     )
-    
+
     for typ in ["weights", "hits"]:
         atomic_maps_list[typ] = [a.replace("wmap", typ)
                                  for a in atomic_maps_list["wmap"]]
