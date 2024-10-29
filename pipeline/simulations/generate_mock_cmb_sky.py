@@ -1,16 +1,17 @@
 import argparse
 from soopercool import BBmeta
-import healpy as hp
 from soopercool import utils
-import matplotlib.pyplot as plt
+from soopercool import map_utils as mu
+import soopercool.utils as su
 import numpy as np
+from soopercool import sim_utils
 
 
 def main(args):
     """
     """
     meta = BBmeta(args.globals)
-    verbose = args.verbose
+    # verbose = args.verbose
     out_dir = meta.output_directory
 
     sims_dir = f"{out_dir}/cmb_sims"
@@ -18,7 +19,9 @@ def main(args):
     BBmeta.make_dir(sims_dir)
     BBmeta.make_dir(plot_dir)
 
-    lmax_sim = 3*meta.nside - 1
+    mask = mu.read_map(meta.masks["analysis_mask"], pix_type=meta.pix_type)
+    lmax = mu.lmax_from_map(mask, pix_type=meta.pix_type)
+    lmax_sim = lmax + 500
 
     # Create the CMB fiducial cl
     lth, clth = utils.get_theory_cls(
@@ -29,55 +32,98 @@ def main(args):
              l=lth, **clth)
 
     beams = {
-        ms: meta.read_beam(ms)[1]
+        ms: su.read_beam_from_file(
+            f"{meta.beam_dir_from_map_set(ms)}/"
+            f"{meta.beam_file_from_map_set(ms)}",
+            lmax=lmax_sim
+        )[1]
         for ms in meta.map_sets_list
     }
 
-    hp_ordering = ["TT", "TE", "TB", "EE", "EB", "BB"]
-
+    template = mu.template_from_map(mask, ncomp=3, pix_type=meta.pix_type)
     for id_sim in range(meta.covariance["cov_num_sims"]):
-        alms = hp.synalm([clth[fp] for fp in hp_ordering])
+
+        meta.timer.start("cmb_sim")
+
+        alms = sim_utils.get_alms_from_cls(
+            ps_dict=clth,
+            lmax=lmax_sim,
+            fields="TEB",
+            components=None
+        )
         for ms in meta.map_sets_list:
-            if verbose:
-                print(f"# {id_sim+1} | {ms}")
 
-            alms_beamed = [hp.almxfl(alm, beams[ms]) for alm in alms]
-
-            map = hp.alm2map(alms_beamed, nside=meta.nside)
-            hp.write_map(f"{sims_dir}/cmb_{ms}_{id_sim:04d}.fits", map,
-                         overwrite=True, dtype=np.float32)
-            hp.write_cl(f"{sims_dir}/cl_{ms}_{id_sim:04d}.fits",
-                        hp.anafast(map), overwrite=True, dtype=np.float32)
-
-    # Plotting
-    cls = {ms: [] for ms in meta.map_sets_list}
-    for ms in meta.map_sets_list:
-        for id_sim in range(meta.covariance["cov_num_sims"]):
-            cls[ms].append(
-                hp.read_cl(f"{sims_dir}/cl_{ms}_{id_sim:04d}.fits")
+            alms_beamed = sim_utils.beam_alms(
+                alms,
+                beams[ms]
             )
-    cl_mean = {ms: np.mean(np.array(cls[ms]), axis=0)
-               for ms in meta.map_sets_list}
-    cl_std = {ms: np.std(np.array(cls[ms]), axis=0)
-              for ms in meta.map_sets_list}
 
-    ll = np.arange(lmax_sim + 1)
-    cl2dl = ll*(ll + 1)/2./np.pi
-    for ms in meta.map_sets_list:
-        for ip, fp in enumerate(["TT", "EE", "BB", "TE"]):
-            plt.title(f"{ms} | {fp}")
-            plt.errorbar(ll, cl2dl*cl_mean[ms][ip], cl2dl*cl_std[ms][ip],
-                         label="data", color="navy", lw=0.5, zorder=-32)
-            plt.plot(ll, cl2dl*clth[fp], label=" theory",
-                     color="k", ls="--")
-            plt.plot(ll, cl2dl*clth[fp]*beams[ms]**2, label=" beamed theory",
-                     color="darkorange", ls="--")
-            plt.ylabel(r"$D_\ell$")
-            plt.xlabel(r"$\ell$")
-            plt.yscale("log")
-            plt.legend()
-            plt.savefig(f"{plot_dir}/cl_{ms}_{fp}.png")
-            plt.clf()
+            map = sim_utils.get_map_from_alms(
+                alms_beamed,
+                template=template
+            )
+
+            mu.write_map(
+                f"{sims_dir}/cmb_{ms}_{id_sim:04d}.fits",
+                map,
+                pix_type=meta.pix_type)
+
+        meta.timer.stop(
+            "cmb_sim",
+            text_to_output=f"Simulated CMB maps for sim {id_sim:04d}"
+        )
+
+    # Plot functions, not sure if we want to add it
+    # from pixell import enplot
+    # for i, f in enumerate("TQU"):
+    #     plot = enplot.plot(maps["sat_f093"][i], color="planck", ticks=10)
+    #     enplot.write(f"{plot_dir}/cmb_sat_f093_{f}", plot)
+
+    # hp_ordering = ["TT", "TE", "TB", "EE", "EB", "BB"]
+
+    # for id_sim in range(meta.covariance["cov_num_sims"]):
+    #     alms = hp.synalm([clth[fp] for fp in hp_ordering])
+    #     for ms in meta.map_sets_list:
+    #         if verbose:
+    #             print(f"# {id_sim+1} | {ms}")
+
+    #         alms_beamed = [hp.almxfl(alm, beams[ms]) for alm in alms]
+
+    #         map = hp.alm2map(alms_beamed, nside=meta.nside)
+    #         mu.write_map(f"{sims_dir}/cmb_{ms}_{id_sim:04d}.fits", map,
+    #                      dtype=np.float32)
+    #         hp.write_cl(f"{sims_dir}/cl_{ms}_{id_sim:04d}.fits",
+    #                     hp.anafast(map), overwrite=True, dtype=np.float32)
+
+    # # Plotting
+    # cls = {ms: [] for ms in meta.map_sets_list}
+    # for ms in meta.map_sets_list:
+    #     for id_sim in range(meta.covariance["cov_num_sims"]):
+    #         cls[ms].append(
+    #             hp.read_cl(f"{sims_dir}/cl_{ms}_{id_sim:04d}.fits")
+    #         )
+    # cl_mean = {ms: np.mean(np.array(cls[ms]), axis=0)
+    #            for ms in meta.map_sets_list}
+    # cl_std = {ms: np.std(np.array(cls[ms]), axis=0)
+    #           for ms in meta.map_sets_list}
+
+    # ll = np.arange(lmax_sim + 1)
+    # cl2dl = ll*(ll + 1)/2./np.pi
+    # for ms in meta.map_sets_list:
+    #     for ip, fp in enumerate(["TT", "EE", "BB", "TE"]):
+    #         plt.title(f"{ms} | {fp}")
+    #         plt.errorbar(ll, cl2dl*cl_mean[ms][ip], cl2dl*cl_std[ms][ip],
+    #                      label="data", color="navy", lw=0.5, zorder=-32)
+    #         plt.plot(ll, cl2dl*clth[fp], label=" theory",
+    #                  color="k", ls="--")
+    #         plt.plot(ll, cl2dl*clth[fp]*beams[ms]**2, label=" beamed theory",
+    #                  color="darkorange", ls="--")
+    #         plt.ylabel(r"$D_\ell$")
+    #         plt.xlabel(r"$\ell$")
+    #         plt.yscale("log")
+    #         plt.legend()
+    #         plt.savefig(f"{plot_dir}/cl_{ms}_{fp}.png")
+    #         plt.clf()
 
 
 if __name__ == "__main__":

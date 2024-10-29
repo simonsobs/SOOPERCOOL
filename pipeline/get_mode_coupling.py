@@ -3,6 +3,7 @@ from soopercool import BBmeta
 from soopercool import map_utils as mu
 import pymaster as nmt
 import numpy as np
+import soopercool.utils as su
 
 
 def main(args):
@@ -21,13 +22,31 @@ def main(args):
     if do_plots:
         BBmeta.make_dir(plot_dir)
 
-    nl = 3 * meta.nside
     nspec = 7
 
-    mask = mu.read_map(meta.masks["analysis_mask"], ncomp=1)
+    mask = mu.read_map(meta.masks["analysis_mask"],
+                       pix_type=meta.pix_type)
+    lmax = mu.lmax_from_map(mask, pix_type=meta.pix_type)
+    nl = lmax + 1
 
-    field_spin0 = nmt.NmtField(mask, None, spin=0)
-    field_spin2 = nmt.NmtField(mask, None, spin=2, purify_b=meta.pure_B)
+    if meta.pix_type == "car":
+        _, wcs = mask.geometry
+    else:
+        wcs = None
+
+    field_spin0 = nmt.NmtField(
+        mask,
+        None,
+        wcs=wcs,
+        spin=0
+    )
+    field_spin2 = nmt.NmtField(
+        mask,
+        None,
+        wcs=wcs,
+        spin=2,
+        purify_b=meta.pure_B
+    )
 
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
@@ -52,8 +71,11 @@ def main(args):
         beam_dir = meta.beam_dir_from_map_set(map_set)
         beam_file = meta.beam_file_from_map_set(map_set)
 
-        l, bl = np.loadtxt(f"{beam_dir}/{beam_file}", unpack=True)
-        beams[map_set] = bl[:nl]
+        _, bl = su.read_beam_from_file(
+            f"{beam_dir}/{beam_file}",
+            lmax=lmax
+        )
+        beams[map_set] = bl
 
     # Beam-correct the mode coupling matrix
     beamed_mcm = {}

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-paramfile='../paramfiles/paramfile_refactored_noisy.yaml'
+paramfile='../paramfiles/paramfile_refactored.yaml'
 
 echo "Running pipeline with paramfile: ${paramfile}"
 

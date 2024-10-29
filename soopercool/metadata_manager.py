@@ -1,7 +1,8 @@
+import soopercool.map_utils as mu
+import soopercool.utils as su
 import yaml
 import numpy as np
 import os
-import healpy as hp
 import time
 
 
@@ -169,12 +170,14 @@ class BBmeta(object):
             Type of mask to load.
             Can be "binary", "galactic", "point_source" or "analysis".
         """
-        return hp.ud_grade(
-            hp.read_map(getattr(self, f"{mask_type}_mask_name")),
-            nside_out=self.nside
-        )
+        mask = mu.read_map(getattr(self, f"{mask_type}_mask_name"),
+                           pix_type=self.pix_type)
+        if self.pix_type == 'hp':
+            mask = mu.ud_grade(mask, nside_out=self.nside,
+                               pix_type=self.pix_type)
+        return mask
 
-    def save_mask(self, mask_type, mask, overwrite=False):
+    def save_mask(self, mask_type, mask):
         """
         Save the mask given a mask type.
 
@@ -185,21 +188,22 @@ class BBmeta(object):
             Can be "binary", "galactic", "point_source" or "analysis".
         mask : array-like
             Mask to save.
-        overwrite : bool, optional
-            Overwrite the mask if it already exists.
         """
-        return hp.write_map(getattr(self, f"{mask_type}_mask_name"), mask,
-                            overwrite=overwrite, dtype=np.float32)
+        return mu.write_map(getattr(self, f"{mask_type}_mask_name"), mask,
+                            dtype=np.float32, pix_type=self.pix_type)
 
     def read_hitmap(self):
         """
         Read the hitmap. For now, we assume that all tags
         share the same hitmap.
         """
-        hitmap = hp.read_map(self.nhits_map_name)
-        return hp.ud_grade(hitmap, self.nside, power=-2)
+        hitmap = mu.read_map(self.nhits_map_name, pix_type=self.pix_type)
+        if self.pix_type == 'hp':
+            hitmap = mu.ud_grade(hitmap, self.nside, power=-2,
+                                 pix_type=self.pix_type)
+        return hitmap
 
-    def save_hitmap(self, map, overwrite=True):
+    def save_hitmap(self, map):
         """
         Save the hitmap to disk.
 
@@ -208,10 +212,9 @@ class BBmeta(object):
         map : array-like
             Mask to save.
         """
-        hp.write_map(
+        mu.write_map(
             os.path.join(self.mask_directory, self.masks["nhits_map"]),
-            map, dtype=np.float32, overwrite=overwrite
-        )
+            map, dtype=np.float32, pix_type=self.pix_type)
 
     def read_nmt_binning(self):
         """
@@ -236,13 +239,12 @@ class BBmeta(object):
         binner = self.read_nmt_binning()
         return binner.get_effective_ells()
 
-    def read_beam(self, map_set):
+    def read_beam(self, map_set, lmax=None):
         """
         """
         beam_dir = self.beam_dir_from_map_set(map_set)
         beam_file = self.beam_file_from_map_set(map_set)
-        beam_file = f"{beam_dir}/{beam_file}"
-        l, bl = np.loadtxt(beam_file, unpack=True)
+        l, bl = su.read_beam_from_file(f"{beam_dir}/{beam_file}", lmax=lmax)
         if self.beam_floor is not None:
             bl[bl < self.beam_floor] = self.beam_floor
         return l, bl
@@ -418,49 +420,6 @@ class BBmeta(object):
         print("==============================================================")
         print('')
 
-    def get_nhits_map_from_toast_schedule(self, filter_tag):
-        from soopercool.utils import toast_filter_map
-        import subprocess
-
-        tag_settings = self.tags_settings[filter_tag]
-
-        if tag_settings["filtering_type"] != "toast":
-            raise NotImplementedError(f"Filterer type {tag_settings['filtering_type']} " # noqa
-                                      "not implemented")
-        kwargs = {
-            "map": None,
-            "map_file": self.masks["input_nhits_path"],
-            "mask": None,
-            "template": tag_settings["template"],
-            "config": tag_settings["config"],
-            "schedule": tag_settings["schedule"],
-            "nside": self.nside,
-            "instrument": tag_settings["tf_instrument"],
-            "band": tag_settings["tf_band"],
-            "sbatch_job_name": "get_nhits_map",
-            "sbatch_dir": self.scripts_dir,
-            "nhits_map_only": True
-        }
-        sbatch_file = toast_filter_map(**kwargs)
-
-        if self.slurm:
-            # Running with SLURM job scheduller
-            cmd = "sbatch {}".format(str(sbatch_file.resolve()))
-            if self.slurm_autosubmit:
-                subprocess.run(cmd, shell=True, check=True)
-                raise Exception(
-                    'Submitted SLURM script for nhits map calculation. \
-                    Please run the script again after SLURM job finished.')
-            else:
-                self.print_banner(
-                    msg='To submit these scripts to SLURM:\n    {}'.format(cmd)
-                    )
-                raise Exception(
-                    'Pleas __rerun__ the script after SLURM job finished.')
-        else:
-            # Run the script directly
-            subprocess.run(str(sbatch_file.resolve()), shell=True, check=True)
-
     def get_map_filename_transfer(self, id_sim, cl_type,
                                   pure_type=None, filter_tag=None):
         """
@@ -473,7 +432,8 @@ class BBmeta(object):
 
         return f"{path_to_maps}/{file_name}"
 
-    def read_map(self, map_set, id_split, id_sim=None, pol_only=False):
+    def read_map(self, map_set, id_split, id_sim=None, pol_only=False,
+                 convert_K_to_muK=False):
         """
         Read a map given a map set and split index.
         Can also read a given covariance simulation if `id_sim` is provided.
@@ -489,13 +449,16 @@ class BBmeta(object):
             If None, return the data map.
         pol_only : bool, optional
             Return only the polarization maps.
+        convert_K_to_muK: bool, optional
+            Convert maps from K to muK units upon loading.
         """
         field = [1, 2] if pol_only else [0, 1, 2]
         fname = self.get_map_filename(map_set, id_split, id_sim)
-        return hp.read_map(fname, field=field)
+        return mu.read_map(fname, field=field, pix_type=self.pix_type,
+                           convert_K_to_muK=convert_K_to_muK)
 
     def read_map_transfer(self, id_sim, signal=None, e_or_b=None,
-                          pol_only=False):
+                          pol_only=False, convert_K_to_muK=False):
         """
         Read a map given a simulation index.
         Can also read a pure-E or pure-B simulation if `e_or_b` is provided.
@@ -514,13 +477,16 @@ class BBmeta(object):
             If None, assumes validation mode.
         pol_only : bool, optional
             Return only the polarization maps.
+        convert_K_to_muK: bool, optional
+            Convert maps from K to muK units upon loading.
         """
         field = [1, 2] if pol_only else [0, 1, 2]
         if (not signal and not e_or_b) or (signal and e_or_b):
             raise ValueError("You have to set to None either `signal` or "
                              "`e_or_b`")
         fname = self.get_map_filename_transfer(id_sim, signal, e_or_b)
-        return hp.read_map_transfer(fname, field=field)
+        return mu.read_map(fname, field=field, pix_type=self.pix_type,
+                           convert_K_to_muK=convert_K_to_muK)
 
     def get_ps_names_list(self, type="all", coadd=False):
         """

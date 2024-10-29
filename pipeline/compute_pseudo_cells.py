@@ -20,7 +20,8 @@ def main(args):
 
     BBmeta.make_dir(cells_dir)
 
-    mask = mu.read_map(meta.masks["analysis_mask"], ncomp=1)
+    mask = mu.read_map(meta.masks["analysis_mask"],
+                       pix_type=meta.pix_type)
 
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
@@ -65,8 +66,10 @@ def main(args):
         option = type_options.replace("{", "").replace("}", "").split("|")[0]
 
         map_file = map_file.replace(type_options, option)
-        m = mu.read_map(f"{map_dir}/{map_file}", ncomp=3)
 
+        m = mu.read_map(f"{map_dir}/{map_file}", pix_type=meta.pix_type,
+                        fields_hp=[0, 1, 2],
+                        convert_K_to_muK=True)
         if do_plots:
             for i, f in enumerate(["T", "Q", "U"]):
                 hp.mollview(m[i],
@@ -78,8 +81,10 @@ def main(args):
                             f"bundle{id_bundle}_{f}.png")
                 plt.close()
 
-        field_spin0 = nmt.NmtField(mask, m[:1])
-        field_spin2 = nmt.NmtField(mask, m[1:], purify_b=meta.pure_B)
+        wcs = m.wcs
+
+        field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs)
+        field_spin2 = nmt.NmtField(mask, m[1:], wcs=wcs, purify_b=meta.pure_B)
 
         fields[map_set, id_bundle] = {
             "spin0": field_spin0,

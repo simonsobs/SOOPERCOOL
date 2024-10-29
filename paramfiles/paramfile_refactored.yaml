@@ -1,12 +1,12 @@
-output_directory: &out_dir /pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/debugging/outputs_refactored_noisy
+output_directory: &out_dir test_CAR_PR
 
 map_sets:
   sat_f093:
-    map_dir: "../debugging/data_refactored_noisy/maps"
-    beam_dir: "../debugging/data_refactored_noisy/beams"
-    map_template: "sat_f093_bundle{id_bundle}_{map|hits}.fits"
-    beam_file: "beam_sat_f093.dat"
-    n_bundles: 2          # Number of bundles
+    map_dir: "/home/laposta/Documents/development/soopercool_f2f/SOOPERCOOL/pipeline/outputs_satp3_CAR/bundled_maps"
+    beam_dir: "/home/laposta/Documents/development/cloned_repo/SOOPERCOOL/data_256/beams"
+    map_template: "coadd_f090_bundle0_{map|hits}.fits"
+    beam_file: "beam_cmb_sat1_f093.dat"
+    n_bundles: 4         # Number of bundles
     freq_tag: 93         # Freq. tag (e.g. useful to coadd freqs)
     exp_tag: "SAT"      # Experiment tag (useful to get noise-bias free cross-split spectra)
     filtering_tag: "mcut0"
@@ -16,16 +16,19 @@ map_sets:
 ####################
 masks:
   analysis_mask: !path [*out_dir, masks/analysis_mask.fits]
+  # When specifying this file, the mapset/bundle-specific hits files will
+  # be ignored and instead a global hits file will be used (testing puroposes)
+  global_hits_file_overwrite: /home/wolz/bbdev/SOOPERCOOL/outputs/masks/hits_1year_200dets_sat_beams.fits
 
   # Path to products (binary)
-  galactic_mask: null  # "/path/to/galactic_mask.fits"
+  galactic_mask: ~/Downloads/planck_gal_masks/planck_galmask_070_CAR_10arcmin.fits  # "/path/to/galactic_mask.fits"
   point_source_catalog: null
   point_source_mask: null  # "/path/to/point_source_mask.fits"
 
   external_mask: null
 
   apod_radius: 10.0
-  apod_radius_point_source: 4.0
+  apod_radius_point_source: 1.0
   apod_type: "C1"
 
 ####################################
@@ -33,11 +36,12 @@ masks:
 ####################################
 ## General parameters
 general_pars:
-  nside: 256
+  pix_type: car
+  nside: 512
   lmin: 30
   lmax: 600
-  binning_file: !path [*out_dir, binning/binning_nside256_deltal10.npz]
-  pure_B: True
+  binning_file: !path [*out_dir, binning/binning_nside256_deltal21.npz]
+  pure_B: False
   # Where the beam window is lower than beam_floor, set it to beam_floor
   beam_floor: 1.e-2
 

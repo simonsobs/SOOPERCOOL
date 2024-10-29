@@ -21,7 +21,8 @@ def main(args):
 
     BBmeta.make_dir(cells_dir)
 
-    mask = mu.read_map(meta.masks["analysis_mask"], ncomp=1)
+    mask = mu.read_map(meta.masks["analysis_mask"],
+                       pix_type=meta.pix_type)
 
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
@@ -44,7 +45,8 @@ def main(args):
             map_set, id_bundle = map_name.split("__")
             map_fname = f"{base_dir}/cov_sims_{map_set}_bundle{id_bundle}.fits"
 
-            m = mu.read_map(map_fname, ncomp=3)
+            m = mu.read_map(map_fname, field=[0, 1, 2],
+                            pix_type=meta.pix_type, convert_K_to_muK=True)
             field_spin0 = nmt.NmtField(mask, m[:1])
             field_spin2 = nmt.NmtField(mask, m[1:], purify_b=meta.pure_B)
 

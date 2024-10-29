@@ -1,5 +1,6 @@
 import argparse
 from soopercool import BBmeta
+from soopercool import map_utils as mu
 from soopercool import mpi_utils as mpi
 import numpy as np
 import healpy as hp
@@ -94,9 +95,8 @@ def main(args):
                 noise_maps = hp.alm2map(noise_alms, nside=meta.nside)
 
                 fname = f"homogeneous_noise_{ms}_bundle{id_bundle}_{id_sim:04d}.fits" # noqa
-                hp.write_map(f"{noise_sims_dir}/{fname}", noise_maps,
-                             overwrite=True,
-                             dtype=np.float32)
+                mu.write_map(f"{noise_sims_dir}/{fname}", noise_maps[ms],
+                             dtype=np.float32, convert_muK_to_K=True)
                 for ip, fp in enumerate(["TT", "EE", "BB", "TE"]):
                     plt.title(f"{ms} | {fp}")
                     plt.plot(hp.anafast(noise_maps)[ip], c="navy",
