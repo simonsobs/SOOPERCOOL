@@ -75,8 +75,6 @@ def main(args):
                 )
 
                 wcs = map.wcs
-                wcs.wcs.cdelt = np.array([-1/6., 1/6.])
-
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1], wcs=wcs),
                     "spin2": nmt.NmtField(mask, map[1:],
