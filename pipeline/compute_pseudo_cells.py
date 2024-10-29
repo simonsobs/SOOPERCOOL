@@ -82,7 +82,6 @@ def main(args):
                 plt.close()
 
         wcs = m.wcs
-        wcs.wcs.cdelt = np.array([-1/6., 1/6.])
 
         field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs)
         field_spin2 = nmt.NmtField(mask, m[1:], wcs=wcs, purify_b=meta.pure_B)
