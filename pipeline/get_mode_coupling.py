@@ -31,7 +31,6 @@ def main(args):
 
     if meta.pix_type == "car":
         _, wcs = mask.geometry
-        wcs.wcs.cdelt = np.array([-1/6., 1/6.])
     else:
         wcs = None
 
