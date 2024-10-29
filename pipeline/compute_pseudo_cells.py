@@ -81,7 +81,7 @@ def main(args):
                             f"bundle{id_bundle}_{f}.png")
                 plt.close()
 
-        wcs = m.wcs
+        wcs = m.wcs if meta.pix_type == "car" else None
 
         field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs)
         field_spin2 = nmt.NmtField(mask, m[1:], wcs=wcs, purify_b=meta.pure_B)
