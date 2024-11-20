@@ -8,8 +8,7 @@ import numpy as np
 
 
 def main(args):
-    """
-    """
+    """ """
     meta = BBmeta(args.globals)
     verbose = args.verbose
     do_plots = not args.no_plots
@@ -31,8 +30,7 @@ def main(args):
     cl_power_law_tf_est = utils.power_law_cl(
         lth, **tf_settings["power_law_pars_tf_est"]
     )
-    np.savez(f"{sim_dir}/cl_power_law_tf_est.npz",
-             ell=lth, **cl_power_law_tf_est)
+    np.savez(f"{sim_dir}/cl_power_law_tf_est.npz", ell=lth, **cl_power_law_tf_est)
 
     Nsims = tf_settings["tf_est_num_sims"]
 
@@ -51,12 +49,9 @@ def main(args):
 
     for id_sim in mpi.taskrange(Nsims - 1):
         almsTEB = sim_utils.get_alms_from_cls(
-            ps_dict=cl_power_law_tf_est,
-            lmax=lmax_sim,
-            fields="TEB",
-            components=None
+            ps_dict=cl_power_law_tf_est, lmax=lmax_sim, fields="TEB", components=None
         )
-        print(np.sum(almsTEB[0]-almsTEB[1]))
+        print(np.sum(almsTEB[0] - almsTEB[1]))
         print(almsTEB[0])
         print(almsTEB[1])
         print(almsTEB[2])
@@ -67,36 +62,31 @@ def main(args):
 
             if not tf_settings["do_not_beam_est_sims"]:
                 suffix = f"_{beam_label}"
-                almsTEB_post = sim_utils.beam_alms(
-                    almsTEB.copy(),
-                    bl
-                )
+                almsTEB_post = sim_utils.beam_alms(almsTEB.copy(), bl)
             else:
                 suffix = ""
                 almsTEB_post = almsTEB
 
             sims = {
                 f"pure{f}": sim_utils.get_map_from_alms(
-                    almsTEB_post * select[:, None],
-                    template=template
-                ) for f, select in zip("TEB", np.eye(3))
+                    almsTEB_post * select[:, None], template=template
+                )
+                for f, select in zip("TEB", np.eye(3))
             }
 
             for f in "TEB":
                 fname = f"pure{f}_power_law_tf_est_{id_sim:04d}{suffix}.fits"
                 mu.write_map(
-                    f"{sim_dir}/{fname}",
-                    sims[f"pure{f}"],
-                    pix_type=meta.pix_type
+                    f"{sim_dir}/{fname}", sims[f"pure{f}"], pix_type=meta.pix_type
                 )
 
                 from pixell import enplot
+
                 for i, mode in zip([1, 2], "QU"):
-                    plot = enplot.plot(sims[f"pure{f}"][i], ticks=10,
-                                       color="planck")
+                    plot = enplot.plot(sims[f"pure{f}"][i], ticks=10, color="planck")
                     enplot.write(
                         f"{plot_dir}/pure{f}_power_law_tf_est_{id_sim:04d}{suffix}_{mode}",  # noqa
-                        plot
+                        plot,
                     )
 
     # if do_plots:
@@ -140,11 +130,14 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate pureT/E/B simulations \
-                     for transfer function estimation")
-    parser.add_argument("--globals", type=str,
-                        help="Path to the yaml with global parameters")
-    parser.add_argument("--no-plots", action="store_true",
-                        help="Pass to generate plots")
+                     for transfer function estimation"
+    )
+    parser.add_argument(
+        "--globals", type=str, help="Path to the yaml with global parameters"
+    )
+    parser.add_argument(
+        "--no-plots", action="store_true", help="Pass to generate plots"
+    )
     parser.add_argument("--verbose", action="store_true")
 
     args = parser.parse_args()

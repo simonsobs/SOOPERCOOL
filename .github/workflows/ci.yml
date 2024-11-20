@@ -63,7 +63,7 @@ jobs:
         with:
           args: "--config .flake8"
           max-line-length: "100"
-          ignore: "E203"
+          ignore: "E203,E226,W503"
 
       - name: Tests
         run: pytest -vv --cov=soopercool 

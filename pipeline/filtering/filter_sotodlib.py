@@ -8,8 +8,7 @@ from pixell import enmap
 
 
 def main(args):
-    """
-    """
+    """ """
     meta = BBmeta(args.globals)
 
     out_dir = meta.output_directory
@@ -40,11 +39,7 @@ def main(args):
     for obs_id, wafer in atomic_ids:
         db_obs_id = su.get_obs_id_from_map_id(args.context, obs_id)
         aman[(wafer, obs_id)] = su.get_aman(
-            args.context,
-            db_obs_id,
-            wafer, freq_tag,
-            thinning_factor=1.0,
-            seed=1234
+            args.context, db_obs_id, wafer, freq_tag, thinning_factor=1.0, seed=1234
         )
 
     # Loop over the simulations
@@ -61,21 +56,20 @@ def main(args):
         for obs_id, wafer in atomic_ids:
 
             fsim_wmap, fsim_w = su.filter_sim(
-                aman[wafer, obs_id],
-                sim, wcs, return_nofilter=False
+                aman[wafer, obs_id], sim, wcs, return_nofilter=False
             )
             fsim_w = np.moveaxis(fsim_w.diagonal(), -1, 0)
-            template = enmap.insert(template, fsim_wmap,
-                                    op=np.ndarray.__iadd__)
-            template_w = enmap.insert(template_w, fsim_w,
-                                      op=np.ndarray.__iadd__)
+            template = enmap.insert(template, fsim_wmap, op=np.ndarray.__iadd__)
+            template_w = enmap.insert(template_w, fsim_w, op=np.ndarray.__iadd__)
 
         template_w[template_w == 0] = np.inf
         fsim = template / template_w
 
-        out_fname = args.map_template.format(sim_id=sim_id).replace(".fits", "_filtered.fits")  # noqa
+        out_fname = args.map_template.format(sim_id=sim_id).replace(
+            ".fits", "_filtered.fits"
+        )  # noqa
         out_file = f"{fsims_dir}/{out_fname}"
-        mu.write_map(out_file, fsim, dtype=np.float32, pix_type='car')
+        mu.write_map(out_file, fsim, dtype=np.float32, pix_type="car")
 
 
 b = """
@@ -96,11 +90,10 @@ b = """
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
-    parser.add_argument("--atomic-maps-dir",
-                        help="Path to the atomic maps root dir.",
-                        required=False)
-    parser.add_argument("--atomics-list", help="List of atomic maps",
-                        required=False)
+    parser.add_argument(
+        "--atomic-maps-dir", help="Path to the atomic maps root dir.", required=False
+    )
+    parser.add_argument("--atomics-list", help="List of atomic maps", required=False)
     parser.add_argument("--context", help="Context file", required=False)
     parser.add_argument("--map-dir", help="Map to filter", required=False)
     parser.add_argument("--map-template", help="Map template", required=False)

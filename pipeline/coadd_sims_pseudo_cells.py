@@ -22,14 +22,13 @@ def main(args):
     cells_dir = f"{out_dir}/cells_sims"
 
     binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"], binning["bin_high"] + 1)
     lb = nmt_bins.get_effective_ells()
-    field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
+    field_pairs = [m1 + m2 for m1, m2 in product("TEB", repeat=2)]
 
     ps_names = {
         "cross": meta.get_ps_names_list(type="cross", coadd=False),
-        "auto": meta.get_ps_names_list(type="auto", coadd=False)
+        "auto": meta.get_ps_names_list(type="auto", coadd=False),
     }
 
     cross_split_list = meta.get_ps_names_list(type="all", coadd=False)
@@ -42,15 +41,13 @@ def main(args):
         # Initialize output dictionary
         cells_coadd = {
             "cross": {
-                (ms1, ms2): {
-                    fp: [] for fp in field_pairs
-                } for ms1, ms2 in cross_map_set_list
+                (ms1, ms2): {fp: [] for fp in field_pairs}
+                for ms1, ms2 in cross_map_set_list
             },
             "auto": {
-                (ms1, ms2): {
-                    fp: [] for fp in field_pairs
-                } for ms1, ms2 in cross_map_set_list
-            }
+                (ms1, ms2): {fp: [] for fp in field_pairs}
+                for ms1, ms2 in cross_map_set_list
+            },
         }
 
         # Loop over all map set pairs
@@ -72,7 +69,9 @@ def main(args):
 
             for field_pair in field_pairs:
 
-                cells_coadd[type][map_set1, map_set2][field_pair] += [cells_dict[field_pair]] # noqa
+                cells_coadd[type][map_set1, map_set2][field_pair] += [
+                    cells_dict[field_pair]
+                ]  # noqa
 
         # Average the cross-split power spectra
         cells_coadd["noise"] = {}
@@ -80,33 +79,30 @@ def main(args):
             cells_coadd["noise"][(map_set1, map_set2)] = {}
             for field_pair in field_pairs:
                 for type in ["cross", "auto"]:
-                    cells_coadd[type][map_set1, map_set2][field_pair] = \
-                        np.mean(
-                            cells_coadd[type][map_set1, map_set2][field_pair],
-                            axis=0
-                        )
+                    cells_coadd[type][map_set1, map_set2][field_pair] = np.mean(
+                        cells_coadd[type][map_set1, map_set2][field_pair], axis=0
+                    )
 
-                cells_coadd["noise"][(map_set1, map_set2)][field_pair] = \
-                    cells_coadd["auto"][map_set1, map_set2][field_pair] - \
-                    cells_coadd["cross"][map_set1, map_set2][field_pair]
+                cells_coadd["noise"][(map_set1, map_set2)][field_pair] = (
+                    cells_coadd["auto"][map_set1, map_set2][field_pair]
+                    - cells_coadd["cross"][map_set1, map_set2][field_pair]
+                )
 
             for type in ["cross", "auto", "noise"]:
                 cells_to_save = {
-                    fp: cells_coadd[type][map_set1, map_set2][fp]
-                    for fp in field_pairs
+                    fp: cells_coadd[type][map_set1, map_set2][fp] for fp in field_pairs
                 }
                 np.savez(
                     f"{cells_dir}/decoupled_{type}_pcls_{map_set1}_x_{map_set2}_{id_sim:04d}.npz",  # noqa
                     lb=lb,
-                    **cells_to_save
+                    **cells_to_save,
                 )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pseudo-Cl calculator")
     parser.add_argument("--globals", type=str, help="Path to the yaml file")
-    parser.add_argument("--no-plots", action="store_true",
-                        help="Do not make plots")
+    parser.add_argument("--no-plots", action="store_true", help="Do not make plots")
     parser.add_argument("--verbose", action="store_true", help="Verbose mode.")
     mode = parser.add_mutually_exclusive_group()
 

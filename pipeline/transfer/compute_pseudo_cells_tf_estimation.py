@@ -8,8 +8,7 @@ from soopercool import map_utils as mu
 
 
 def main(args):
-    """
-    """
+    """ """
     meta = BBmeta(args.globals)
     verbose = args.verbose
     out_dir = meta.output_directory
@@ -18,8 +17,7 @@ def main(args):
     BBmeta.make_dir(pcls_tf_est_dir)
 
     binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"], binning["bin_high"] + 1)
 
     mask_file = meta.masks["analysis_mask"]
     mask = mu.read_map(mask_file, pix_type=meta.pix_type)
@@ -28,9 +26,11 @@ def main(args):
     filtering_tag_pairs = meta.get_independent_filtering_pairs()
 
     if None in filtering_tags and len(filtering_tags) < 1:
-        raise ValueError("There must be at least one filter \
+        raise ValueError(
+            "There must be at least one filter \
                           applied to the data to be able to \
-                          compute a transfer function for it")
+                          compute a transfer function for it"
+        )
 
     tf_settings = meta.transfer_settings
 
@@ -38,12 +38,7 @@ def main(args):
 
     for id_sim in mpi.taskrange(tf_settings["tf_est_num_sims"] - 1):
 
-        fields = {
-            ftag: {
-                "filtered": {},
-                "unfiltered": {}
-            } for ftag in filtering_tags
-        }
+        fields = {ftag: {"filtered": {}, "unfiltered": {}} for ftag in filtering_tags}
 
         for ftag in filtering_tags:
             if verbose:
@@ -51,12 +46,16 @@ def main(args):
             for pure_type in ["pureT", "pureE", "pureB"]:
 
                 unfiltered_map_dir = tf_settings["unfiltered_map_dir"][ftag]
-                unfiltered_map_tmpl = tf_settings["unfiltered_map_template"][ftag] # noqa
+                unfiltered_map_tmpl = tf_settings["unfiltered_map_template"][
+                    ftag
+                ]  # noqa
 
                 unfiltered_map_file = unfiltered_map_tmpl.format(
                     id_sim=id_sim, pure_type=pure_type
                 )
-                unfiltered_map_file = f"{unfiltered_map_dir}/{unfiltered_map_file}" # noqa
+                unfiltered_map_file = (
+                    f"{unfiltered_map_dir}/{unfiltered_map_file}"  # noqa
+                )
 
                 filtered_map_dir = tf_settings["filtered_map_dir"][ftag]
                 filtered_map_tmpl = tf_settings["filtered_map_template"][ftag]
@@ -66,25 +65,23 @@ def main(args):
                 filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}"
 
                 map = mu.read_map(
-                    unfiltered_map_file, pix_type=meta.pix_type,
-                    fields_hp=[0, 1, 2]
+                    unfiltered_map_file, pix_type=meta.pix_type, fields_hp=[0, 1, 2]
                 )
                 map_filtered = mu.read_map(
-                    filtered_map_file, pix_type=meta.pix_type,
-                    fields_hp=[0, 1, 2]
+                    filtered_map_file, pix_type=meta.pix_type, fields_hp=[0, 1, 2]
                 )
 
                 wcs = map.wcs
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1], wcs=wcs),
-                    "spin2": nmt.NmtField(mask, map[1:],
-                                          purify_b=meta.pure_B, wcs=wcs)
+                    "spin2": nmt.NmtField(mask, map[1:], purify_b=meta.pure_B, wcs=wcs),
                 }
 
                 field_filtered = {
                     "spin0": nmt.NmtField(mask, map_filtered[:1], wcs=wcs),
-                    "spin2": nmt.NmtField(mask, map_filtered[1:],
-                                          purify_b=meta.pure_B, wcs=wcs)
+                    "spin2": nmt.NmtField(
+                        mask, map_filtered[1:], purify_b=meta.pure_B, wcs=wcs
+                    ),
                 }
 
                 fields[ftag]["unfiltered"][pure_type] = field
@@ -95,18 +92,22 @@ def main(args):
                 continue
 
             pcls_mat_filtered = ps_utils.get_pcls_mat_transfer(
-                fields[ftag1]["filtered"],
-                nmt_bins, fields2=fields[ftag2]["filtered"]
+                fields[ftag1]["filtered"], nmt_bins, fields2=fields[ftag2]["filtered"]
             )
             pcls_mat_unfiltered = ps_utils.get_pcls_mat_transfer(
                 fields[ftag1]["unfiltered"],
-                nmt_bins, fields2=fields[ftag2]["unfiltered"]
+                nmt_bins,
+                fields2=fields[ftag2]["unfiltered"],
             )
 
-            np.savez(f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_filtered_{id_sim:04d}.npz", # noqa
-                     pcls_mat=pcls_mat_filtered)
-            np.savez(f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_{id_sim:04d}.npz", # noqa
-                     pcls_mat=pcls_mat_unfiltered)
+            np.savez(
+                f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_filtered_{id_sim:04d}.npz",  # noqa
+                pcls_mat=pcls_mat_filtered,
+            )
+            np.savez(
+                f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_{id_sim:04d}.npz",  # noqa
+                pcls_mat=pcls_mat_unfiltered,
+            )
 
 
 if __name__ == "__main__":

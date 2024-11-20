@@ -42,7 +42,7 @@ def pcler(args):
         meta.timer.stop(
             "couplings",
             text_to_output="Load inverse coupling matrix for beamed sims",
-            verbose=args.verbose
+            verbose=args.verbose,
         )
     if args.data or args.sims:
         # Set the number of sims to loop over
@@ -75,19 +75,14 @@ def pcler(args):
 
                 # Include beam in namaster fields to deconvolve it
                 field_spin0 = nmt.NmtField(mask, [map[0]])
-                field_spin2 = nmt.NmtField(mask, [map[1], map[2]],
-                                           purify_b=meta.pure_B)
+                field_spin2 = nmt.NmtField(mask, [map[1], map[2]], purify_b=meta.pure_B)
 
-                fields[map_set, id_split] = {
-                    "spin0": field_spin0,
-                    "spin2": field_spin2
-                }
+                fields[map_set, id_split] = {"spin0": field_spin0, "spin2": field_spin2}
             if args.verbose:
                 print(f"{id_sim}/{Nsims}")
                 print(" Computing sim power spectra")
 
-            for map_name1, map_name2 in meta.get_ps_names_list(type="all",
-                                                               coadd=False):
+            for map_name1, map_name2 in meta.get_ps_names_list(type="all", coadd=False):
                 sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
                 fname = f"{cl_dir}/decoupled_pcls_nobeam_{map_name1}_{map_name2}{sim_label}.npz"  # noqa
 
@@ -99,18 +94,17 @@ def pcler(args):
                 pcls = ps_utils.get_coupled_pseudo_cls(
                     fields[map_set1, id_split1],
                     fields[map_set2, id_split2],
-                    nmt_binning
+                    nmt_binning,
                 )
 
                 decoupled_pcls = ps_utils.decouple_pseudo_cls(
                     pcls, inv_couplings_beamed[map_set1, map_set2]
                 )
-                np.savez(fname,
-                         **decoupled_pcls, lb=nmt_binning.get_effective_ells())
+                np.savez(fname, **decoupled_pcls, lb=nmt_binning.get_effective_ells())
             meta.timer.stop(
                 "pcler",
                 text_to_output=f"Compute mock data C_ell #{id_sim}",
-                verbose=args.verbose
+                verbose=args.verbose,
             )
 
         if args.plots:
@@ -124,8 +118,7 @@ def pcler(args):
             cls_dict = {}
             map_split_pairs_list = []
 
-            for map_name1, map_name2 in meta.get_ps_names_list(type="all",
-                                                               coadd=False):
+            for map_name1, map_name2 in meta.get_ps_names_list(type="all", coadd=False):
                 m1, s1 = map_name1.split("__")
                 m2, s2 = map_name2.split("__")
                 split_pair = f"split{s1}_x_split{s2}"
@@ -136,29 +129,30 @@ def pcler(args):
                     cls_dict[map_pair, fp, split_pair] = []
                 for id_sim in range(Nsims):
                     sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
-                    cls = np.load(f"{cl_dir}/decoupled_pcls_nobeam_{map_name1}_{map_name2}{sim_label}.npz")  # noqa
+                    cls = np.load(
+                        f"{cl_dir}/decoupled_pcls_nobeam_{map_name1}_{map_name2}{sim_label}.npz"
+                    )  # noqa
                     for fp in field_pairs:
                         cls_dict[map_pair, fp, split_pair] += [cls[fp]]
 
             # Compute mean and std
             cls_mean_dict = {
-                (map_pair, field_pair, split_pair):
-                np.mean(cls_dict[map_pair, field_pair, split_pair], axis=0)
+                (map_pair, field_pair, split_pair): np.mean(
+                    cls_dict[map_pair, field_pair, split_pair], axis=0
+                )
                 for (map_pair, field_pair, split_pair) in cls_dict
             }
             cls_std_dict = {
-                (map_pair, field_pair, split_pair):
-                np.std(cls_dict[map_pair, field_pair, split_pair], axis=0)
+                (map_pair, field_pair, split_pair): np.std(
+                    cls_dict[map_pair, field_pair, split_pair], axis=0
+                )
                 for (map_pair, field_pair, split_pair) in cls_dict
             }
 
             # Load and bin theory spectra
-            bp_win = np.load(
-                f"{meta.coupling_directory}/couplings_unfiltered.npz"
-            )
+            bp_win = np.load(f"{meta.coupling_directory}/couplings_unfiltered.npz")
             cls_theory_unbinned = meta.load_fiducial_cl("cosmo")
-            cls_theory_binned = ps_utils.get_binned_cls(bp_win,
-                                                        cls_theory_unbinned)
+            cls_theory_binned = ps_utils.get_binned_cls(bp_win, cls_theory_unbinned)
             nls_theory_unbinned = meta.load_fiducial_cl("noise")
 
             # Plot power spectra
@@ -176,39 +170,45 @@ def pcler(args):
 
                 for i1, i2 in [(i, j) for i in range(3) for j in range(3)]:
                     # Define subplots
-                    main = plt.subplot(grid[3*i1:3*(i1 + 1) - 1, i2])
-                    sub = plt.subplot(grid[3*(i1 + 1) - 1, i2])
+                    main = plt.subplot(grid[3 * i1 : 3 * (i1 + 1) - 1, i2])
+                    sub = plt.subplot(grid[3 * (i1 + 1) - 1, i2])
 
                     f1, f2 = "TEB"[i1], "TEB"[i2]
                     spec = f2 + f1 if i1 > i2 else f1 + f2
-                    no_e = 0. if meta.null_e_modes and "E" in spec else 1.
+                    no_e = 0.0 if meta.null_e_modes and "E" in spec else 1.0
                     n_splits = meta.n_splits_from_map_set(map_set_1)
 
                     # Plot fiducial theory and noise spectra
                     cl_th = no_e * cls_theory_unbinned[spec]
                     nl_th = (
-                        (n_splits
-                         * nls_theory_unbinned[map_set_1][spec])
-                        if auto else 0.
+                        (n_splits * nls_theory_unbinned[map_set_1][spec])
+                        if auto
+                        else 0.0
                     )
 
-                    rescaling = ell*(ell + 1)/(2*np.pi)
-                    main.plot(ell, rescaling*cl_th, "k-",
-                              label="theory signal")
+                    rescaling = ell * (ell + 1) / (2 * np.pi)
+                    main.plot(ell, rescaling * cl_th, "k-", label="theory signal")
                     if auto:
-                        main.plot(ell, rescaling*(nl_th + cl_th), "k:",
-                                  label="theory isotropic noise")
+                        main.plot(
+                            ell,
+                            rescaling * (nl_th + cl_th),
+                            "k:",
+                            label="theory isotropic noise",
+                        )
 
                     # Plot split combinations (decoupled)
                     offset = 0.5
-                    rescaling = lb*(lb + 1.)/(2*np.pi)
+                    rescaling = lb * (lb + 1.0) / (2 * np.pi)
 
                     main.errorbar(
                         lb - offset,
-                        rescaling*cls_mean_dict[map_pair, spec, split_pair],
-                        rescaling*cls_std_dict[map_pair, spec, split_pair],
-                        color="navy", marker=".", markerfacecolor="white",
-                        label=f"{map_pair}\n{split_pair}", ls="None"
+                        rescaling * cls_mean_dict[map_pair, spec, split_pair],
+                        rescaling * cls_std_dict[map_pair, spec, split_pair],
+                        color="navy",
+                        marker=".",
+                        markerfacecolor="white",
+                        label=f"{map_pair}\n{split_pair}",
+                        ls="None",
                     )
 
                     if f1 == f2:
@@ -216,25 +216,30 @@ def pcler(args):
 
                     if type == "sims":
                         # Plot residuals
-                        residual = ((cls_mean_dict[map_pair, spec, split_pair]
-                                    - cls_theory_binned[spec])
-                                    / cls_std_dict[map_pair, spec, split_pair])
+                        residual = (
+                            cls_mean_dict[map_pair, spec, split_pair]
+                            - cls_theory_binned[spec]
+                        ) / cls_std_dict[map_pair, spec, split_pair]
 
                         sub.axhspan(-2, 2, color="gray", alpha=0.2)
                         sub.axhspan(-1, 1, color="gray", alpha=0.7)
 
                         sub.axhline(0, color="k")
-                        sub.plot(lb - offset,
-                                 residual * np.sqrt(Nsims),
-                                 color="navy", marker=".",
-                                 markerfacecolor="white", ls="None")
+                        sub.plot(
+                            lb - offset,
+                            residual * np.sqrt(Nsims),
+                            color="navy",
+                            marker=".",
+                            markerfacecolor="white",
+                            ls="None",
+                        )
 
                     # Multipole range
                     main.set_xlim(2, meta.lmax)
                     sub.set_xlim(*main.get_xlim())
 
                     # Suplot y range
-                    sub.set_ylim((-5., 5.))
+                    sub.set_ylim((-5.0, 5.0))
 
                     # Cosmetix
                     main.set_title(f1 + f2, fontsize=14)
@@ -250,19 +255,20 @@ def pcler(args):
                         if isinstance(rescaling, float):
                             main.set_ylabel(r"$C_\ell$", fontsize=13)
                         else:
-                            main.set_ylabel(r"$\ell(\ell+1)C_\ell/2\pi$",
-                                            fontsize=13)
+                            main.set_ylabel(r"$\ell(\ell+1)C_\ell/2\pi$", fontsize=13)
                         sub.set_ylabel(
                             r"$\Delta C_\ell / (\sigma/\sqrt{N_\mathrm{sims}})$",  # noqa
-                            fontsize=13
+                            fontsize=13,
                         )
 
-                plt.savefig(f"{plot_dir}/decoupled_pcls_nobeam_{type}_{map_pair}_{split_pair}.pdf", # noqa
-                            bbox_inches="tight")
+                plt.savefig(
+                    f"{plot_dir}/decoupled_pcls_nobeam_{type}_{map_pair}_{split_pair}.pdf",  # noqa
+                    bbox_inches="tight",
+                )
             meta.timer.stop(
                 "plots",
                 text_to_output="Plot decoupled C_ells for mock data",
-                verbose=args.verbose
+                verbose=args.verbose,
             )
 
     if args.tf_est:
@@ -276,37 +282,30 @@ def pcler(args):
         for id_sim in mpi_utils.taskrange(meta.tf_est_num_sims - 1):
             meta.timer.start("pcler_tf_est")
 
-            fields = {ftag: {
-                "filtered": {},
-                "unfiltered": {}
-                } for ftag in filtering_tags
+            fields = {
+                ftag: {"filtered": {}, "unfiltered": {}} for ftag in filtering_tags
             }
 
             for ftag in filtering_tags:
                 for pure_type in ["pureT", "pureE", "pureB"]:
                     map_file = meta.get_map_filename_transfer(
-                        id_sim,
-                        "tf_est",
-                        pure_type=pure_type,
-                        filter_tag=ftag
+                        id_sim, "tf_est", pure_type=pure_type, filter_tag=ftag
                     )
-                    map_file_filtered = map_file.replace(".fits",
-                                                         "_filtered.fits")
+                    map_file_filtered = map_file.replace(".fits", "_filtered.fits")
 
                     map = hp.read_map(map_file, field=[0, 1, 2])
-                    map_filtered = hp.read_map(map_file_filtered,
-                                               field=[0, 1, 2])
+                    map_filtered = hp.read_map(map_file_filtered, field=[0, 1, 2])
 
                     # TO-DO: include pureT simulation type in the future
                     field = {
                         "spin0": nmt.NmtField(mask, map[:1]),
-                        "spin2": nmt.NmtField(mask, map[1:],
-                                              purify_b=meta.pure_B)
+                        "spin2": nmt.NmtField(mask, map[1:], purify_b=meta.pure_B),
                     }
                     field_filtered = {
                         "spin0": nmt.NmtField(mask, map_filtered[:1]),
-                        "spin2": nmt.NmtField(mask, map_filtered[1:],
-                                              purify_b=meta.pure_B)
+                        "spin2": nmt.NmtField(
+                            mask, map_filtered[1:], purify_b=meta.pure_B
+                        ),
                     }
 
                     fields[ftag]["unfiltered"][pure_type] = field
@@ -315,21 +314,27 @@ def pcler(args):
             for ftag1, ftag2 in filtering_tag_pairs:
                 pcls_mat_filtered = ps_utils.get_pcls_mat_transfer(
                     fields[ftag1]["filtered"],
-                    nmt_binning, fields2=fields[ftag2]["filtered"]
+                    nmt_binning,
+                    fields2=fields[ftag2]["filtered"],
                 )
                 pcls_mat_unfiltered = ps_utils.get_pcls_mat_transfer(
                     fields[ftag1]["unfiltered"],
-                    nmt_binning, fields2=fields[ftag2]["unfiltered"]
+                    nmt_binning,
+                    fields2=fields[ftag2]["unfiltered"],
                 )
 
-                np.savez(f"{cl_dir}/pcls_mat_tf_est_{ftag1}x{ftag2}_filtered_{id_sim:04d}.npz", # noqa
-                         pcls_mat=pcls_mat_filtered)
-                np.savez(f"{cl_dir}/pcls_mat_tf_est_{ftag1}x{ftag2}_unfiltered_{id_sim:04d}.npz", # noqa
-                         pcls_mat=pcls_mat_unfiltered)
+                np.savez(
+                    f"{cl_dir}/pcls_mat_tf_est_{ftag1}x{ftag2}_filtered_{id_sim:04d}.npz",  # noqa
+                    pcls_mat=pcls_mat_filtered,
+                )
+                np.savez(
+                    f"{cl_dir}/pcls_mat_tf_est_{ftag1}x{ftag2}_unfiltered_{id_sim:04d}.npz",  # noqa
+                    pcls_mat=pcls_mat_unfiltered,
+                )
             meta.timer.stop(
                 "pcler_tf_est",
                 text_to_output=f"Compute C_ell #{id_sim} for TF estimation",
-                verbose=args.verbose
+                verbose=args.verbose,
             )
 
     if args.tf_val:
@@ -345,12 +350,16 @@ def pcler(args):
             for ftag1, ftag2 in filtering_tag_pairs:
 
                 cross_name = f"{ftag1}x{ftag2}"
-                couplings = np.load(f"{meta.coupling_directory}/couplings_{cross_name}_{ftype}.npz")  # noqa
-                inv_couplings[ftype][ftag1, ftag2] = couplings["inv_coupling"].reshape([n_bins*9, n_bins*9])  # noqa
+                couplings = np.load(
+                    f"{meta.coupling_directory}/couplings_{cross_name}_{ftype}.npz"
+                )  # noqa
+                inv_couplings[ftype][ftag1, ftag2] = couplings["inv_coupling"].reshape(
+                    [n_bins * 9, n_bins * 9]
+                )  # noqa
         meta.timer.stop(
             "couplings_tf_val",
             text_to_output="Loading inverse coupling matrix for validation",
-            verbose=args.verbose
+            verbose=args.verbose,
         )
 
         # Initialize MPI
@@ -362,40 +371,39 @@ def pcler(args):
                     fields = {}
                     for ftag in filtering_tags:
                         map_file = meta.get_map_filename_transfer(
-                            id_sim, cl_type=cl_type,
-                            filter_tag=ftag
+                            id_sim, cl_type=cl_type, filter_tag=ftag
                         )
                         if ftype == "filtered":
-                            map_file = map_file.replace(".fits",
-                                                        "_filtered.fits")
+                            map_file = map_file.replace(".fits", "_filtered.fits")
 
                         map = hp.read_map(map_file, field=[0, 1, 2])
 
                         fields[ftag] = {
                             "spin0": nmt.NmtField(mask, map[:1]),
-                            "spin2": nmt.NmtField(mask, map[1:],
-                                                  purify_b=meta.pure_B)
+                            "spin2": nmt.NmtField(mask, map[1:], purify_b=meta.pure_B),
                         }
 
                     for ftag1, ftag2 in filtering_tag_pairs:
 
                         pcls = ps_utils.get_coupled_pseudo_cls(
-                            fields[ftag1], fields[ftag2],
-                            nmt_binning
+                            fields[ftag1], fields[ftag2], nmt_binning
                         )
                         decoupled_pcls = ps_utils.decouple_pseudo_cls(
                             pcls, inv_couplings[ftype][ftag1, ftag2]
                         )
 
-                        np.savez(f"{cl_dir}/pcls_{cl_type}_{ftag1}x{ftag2}_{id_sim:04d}_{ftype}.npz",  # noqa
-                                 **decoupled_pcls)
+                        np.savez(
+                            f"{cl_dir}/pcls_{cl_type}_{ftag1}x{ftag2}_{id_sim:04d}_{ftype}.npz",  # noqa
+                            **decoupled_pcls,
+                        )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pseudo-Cl calculator")
     parser.add_argument("--globals", type=str, help="Path to the yaml file")
-    parser.add_argument("--plots", action="store_true",
-                        help="Plot the generated power spectra if True.")
+    parser.add_argument(
+        "--plots", action="store_true", help="Plot the generated power spectra if True."
+    )
     parser.add_argument("--verbose", action="store_true")
 
     mode = parser.add_mutually_exclusive_group()
@@ -407,8 +415,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if (args.tf_est and args.plots) or (args.tf_val and args.plots):
-        warnings.warn("Both --tf_[...] and --plots are set to True. "
-                      "This is not implemented yet. Set --plot to False")
+        warnings.warn(
+            "Both --tf_[...] and --plots are set to True. "
+            "This is not implemented yet. Set --plot to False"
+        )
         args.plots = False
 
     pcler(args)

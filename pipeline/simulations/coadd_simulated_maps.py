@@ -7,8 +7,7 @@ import matplotlib.pyplot as plt
 
 
 def main(args):
-    """
-    """
+    """ """
     meta = BBmeta(args.globals)
     verbose = args.verbose
 
@@ -25,14 +24,11 @@ def main(args):
 
     binary = hp.read_map(f"{masks_dir}/binary_mask.fits")
 
-    lmax = 3*meta.nside - 1
+    lmax = 3 * meta.nside - 1
     ll = np.arange(lmax + 1)
-    cl2dl = ll*(ll+1)/2./np.pi
+    cl2dl = ll * (ll + 1) / 2.0 / np.pi
 
-    beams = {
-        ms: meta.read_beam(ms)[1][:lmax+1]
-        for ms in meta.map_sets_list
-    }
+    beams = {ms: meta.read_beam(ms)[1][: lmax + 1] for ms in meta.map_sets_list}
 
     if do_plots:
         field_pairs = ["TT", "EE", "BB", "TE"]
@@ -44,14 +40,14 @@ def main(args):
         for ms in meta.map_sets_list:
             nu = meta.freq_tag_from_map_set(ms)
             for i, fp in enumerate(field_pairs):
-                cmb_cl = hp.read_cl(fiducial_cmb)[i, :lmax+1]
-                dust_cl = hp.read_cl(
-                    fiducial_dust.format(nu1=nu, nu2=nu)
-                )[i, :lmax+1]
-                synch_cl = hp.read_cl(
-                    fiducial_synch.format(nu1=nu, nu2=nu)
-                )[i, :lmax+1]
-                clth[ms, fp] = (cmb_cl + dust_cl + synch_cl) * beams[ms]**2
+                cmb_cl = hp.read_cl(fiducial_cmb)[i, : lmax + 1]
+                dust_cl = hp.read_cl(fiducial_dust.format(nu1=nu, nu2=nu))[
+                    i, : lmax + 1
+                ]
+                synch_cl = hp.read_cl(fiducial_synch.format(nu1=nu, nu2=nu))[
+                    i, : lmax + 1
+                ]
+                clth[ms, fp] = (cmb_cl + dust_cl + synch_cl) * beams[ms] ** 2
 
     mpi.init(True)
 
@@ -78,57 +74,71 @@ def main(args):
             signal = hp.alm2map(alms_beamed, nside=meta.nside)
 
             if do_plots:
-                signal_cl = {fp: hp.anafast(signal)[i]
-                             for i, fp in enumerate(field_pairs)}
+                signal_cl = {
+                    fp: hp.anafast(signal)[i] for i, fp in enumerate(field_pairs)
+                }
 
             for id_bundle in range(meta.n_bundles_from_map_set(ms)):
 
-                fname = noise_map_template.format(id_sim=id_sim, map_set=ms,
-                                                  id_bundle=id_bundle)
-                noise = hp.read_map(
-                    f"{noise_map_dir}/{fname}", field=[0, 1, 2]
+                fname = noise_map_template.format(
+                    id_sim=id_sim, map_set=ms, id_bundle=id_bundle
                 )
+                noise = hp.read_map(f"{noise_map_dir}/{fname}", field=[0, 1, 2])
                 if do_plots and id_bundle == 0:
                     noise_cl = {
-                        fp: hp.anafast(noise)[i]
-                        for i, fp in enumerate(field_pairs)
+                        fp: hp.anafast(noise)[i] for i, fp in enumerate(field_pairs)
                     }
                     for i, fp in enumerate(field_pairs):
                         plt.title(f"{ms} | bundle {id_bundle} | {fp}")
-                        plt.loglog(ll, cl2dl*signal_cl[fp], c="navy",
-                                   label="Signal")
-                        plt.loglog(ll, cl2dl*noise_cl[fp], c="grey", alpha=0.5,
-                                   label="Noise")
-                        plt.loglog(ll, cl2dl*clth[ms, fp], c="darkorange",
-                                   label="Theory (beamed)")
+                        plt.loglog(ll, cl2dl * signal_cl[fp], c="navy", label="Signal")
+                        plt.loglog(
+                            ll, cl2dl * noise_cl[fp], c="grey", alpha=0.5, label="Noise"
+                        )
+                        plt.loglog(
+                            ll,
+                            cl2dl * clth[ms, fp],
+                            c="darkorange",
+                            label="Theory (beamed)",
+                        )
                         plt.xlabel(r"$\ell$", fontsize=15)
                         plt.ylabel(r"$D_\ell$", fontsize=15)
                         plt.legend()
-                        plt.savefig(f"{plots_dir}/cl_{ms}_bundle{id_bundle}_{fp}.png")  # noqa
+                        plt.savefig(
+                            f"{plots_dir}/cl_{ms}_bundle{id_bundle}_{fp}.png"
+                        )  # noqa
                         plt.close()
 
                 split_map = signal + noise
 
                 map_name = f"cov_sims_{ms}_bundle{id_bundle}.fits"
-                hp.write_map(f"{base_dir}/{map_name}", split_map*binary,
-                             overwrite=True,
-                             dtype=np.float32)
+                hp.write_map(
+                    f"{base_dir}/{map_name}",
+                    split_map * binary,
+                    overwrite=True,
+                    dtype=np.float32,
+                )
 
                 if do_plots:
                     for i, f in enumerate("TQU"):
-                        hp.mollview(split_map[i]*binary,
-                                    cmap="RdYlBu_r",
-                                    title=f"{ms} - {id_sim} - {f}",
-                                    min=-300 if f == "T" else -10,
-                                    max=300 if f == "T" else 10)
-                        plt.savefig(f"{plots_dir}/map_{ms}_bundle{id_bundle}_{f}.png") # noqa
+                        hp.mollview(
+                            split_map[i] * binary,
+                            cmap="RdYlBu_r",
+                            title=f"{ms} - {id_sim} - {f}",
+                            min=-300 if f == "T" else -10,
+                            max=300 if f == "T" else 10,
+                        )
+                        plt.savefig(
+                            f"{plots_dir}/map_{ms}_bundle{id_bundle}_{f}.png"
+                        )  # noqa
                         plt.close()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
-    parser.add_argument("--no_plots", action="store_true", help="Do not plot the maps.") # noqa
+    parser.add_argument(
+        "--no_plots", action="store_true", help="Do not plot the maps."
+    )  # noqa
     parser.add_argument("--verbose", action="store_true", help="Verbose mode.")
     args = parser.parse_args()
     main(args)

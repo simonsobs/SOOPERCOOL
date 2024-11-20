@@ -8,8 +8,7 @@ from soopercool import sim_utils
 
 
 def main(args):
-    """
-    """
+    """ """
     meta = BBmeta(args.globals)
     # verbose = args.verbose
     out_dir = meta.output_directory
@@ -25,17 +24,14 @@ def main(args):
 
     # Create the CMB fiducial cl
     lth, clth = utils.get_theory_cls(
-        meta.covariance["cosmo"],
-        lmax=lmax_sim  # ensure cl accuracy up to lmax
+        meta.covariance["cosmo"], lmax=lmax_sim  # ensure cl accuracy up to lmax
     )
-    np.savez(f"{sims_dir}/cl_theory.npz",
-             l=lth, **clth)
+    np.savez(f"{sims_dir}/cl_theory.npz", l=lth, **clth)
 
     beams = {
         ms: su.read_beam_from_file(
-            f"{meta.beam_dir_from_map_set(ms)}/"
-            f"{meta.beam_file_from_map_set(ms)}",
-            lmax=lmax_sim
+            f"{meta.beam_dir_from_map_set(ms)}/" f"{meta.beam_file_from_map_set(ms)}",
+            lmax=lmax_sim,
         )[1]
         for ms in meta.map_sets_list
     }
@@ -46,31 +42,20 @@ def main(args):
         meta.timer.start("cmb_sim")
 
         alms = sim_utils.get_alms_from_cls(
-            ps_dict=clth,
-            lmax=lmax_sim,
-            fields="TEB",
-            components=None
+            ps_dict=clth, lmax=lmax_sim, fields="TEB", components=None
         )
         for ms in meta.map_sets_list:
 
-            alms_beamed = sim_utils.beam_alms(
-                alms,
-                beams[ms]
-            )
+            alms_beamed = sim_utils.beam_alms(alms, beams[ms])
 
-            map = sim_utils.get_map_from_alms(
-                alms_beamed,
-                template=template
-            )
+            map = sim_utils.get_map_from_alms(alms_beamed, template=template)
 
             mu.write_map(
-                f"{sims_dir}/cmb_{ms}_{id_sim:04d}.fits",
-                map,
-                pix_type=meta.pix_type)
+                f"{sims_dir}/cmb_{ms}_{id_sim:04d}.fits", map, pix_type=meta.pix_type
+            )
 
         meta.timer.stop(
-            "cmb_sim",
-            text_to_output=f"Simulated CMB maps for sim {id_sim:04d}"
+            "cmb_sim", text_to_output=f"Simulated CMB maps for sim {id_sim:04d}"
         )
 
     # Plot functions, not sure if we want to add it

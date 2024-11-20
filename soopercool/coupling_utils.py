@@ -1,65 +1,55 @@
 import numpy as np
 
 
-def get_transfer_with_error(mean_pcls_mat_filt,
-                            mean_pcls_mat_unfilt,
-                            pcls_mat_filt):
-    """
-    """
+def get_transfer_with_error(mean_pcls_mat_filt, mean_pcls_mat_unfilt, pcls_mat_filt):
+    """ """
     cct_inv = np.transpose(
         np.linalg.inv(
             np.transpose(
-                np.einsum('jil,jkl->ikl',
-                          mean_pcls_mat_unfilt,
-                          mean_pcls_mat_unfilt),
-                axes=[2, 0, 1]
+                np.einsum("jil,jkl->ikl", mean_pcls_mat_unfilt, mean_pcls_mat_unfilt),
+                axes=[2, 0, 1],
             )
-        ), axes=[1, 2, 0]
+        ),
+        axes=[1, 2, 0],
     )
 
     tf = np.einsum(
-        'ijl,jkl->kil', cct_inv,
-        np.einsum(
-            'jil,jkl->ikl',
-            mean_pcls_mat_unfilt,
-            mean_pcls_mat_filt
-        )
+        "ijl,jkl->kil",
+        cct_inv,
+        np.einsum("jil,jkl->ikl", mean_pcls_mat_unfilt, mean_pcls_mat_filt),
     )
 
     tferr = np.std(
         np.array(
-            [np.einsum(
-                'ijl,jkl->kil', cct_inv,
+            [
                 np.einsum(
-                    'jil,jkl->ikl',
-                    mean_pcls_mat_unfilt,
-                    clf))
-                for clf in pcls_mat_filt]
-        ), axis=0
+                    "ijl,jkl->kil",
+                    cct_inv,
+                    np.einsum("jil,jkl->ikl", mean_pcls_mat_unfilt, clf),
+                )
+                for clf in pcls_mat_filt
+            ]
+        ),
+        axis=0,
     )
 
     return tf, tferr
 
 
-def get_transfer_dict(mean_pcls_mat_filt_dict,
-                      mean_pcls_mat_unfilt_dict,
-                      pcls_mat_dict,
-                      filtering_pairs):
-    """
-    """
+def get_transfer_dict(
+    mean_pcls_mat_filt_dict, mean_pcls_mat_unfilt_dict, pcls_mat_dict, filtering_pairs
+):
+    """ """
     tf_dict = {(ftag1, ftag2): {} for ftag1, ftag2 in filtering_pairs}
     for ftag1, ftag2 in filtering_pairs:
 
-        mean_pcls_mat_filt = \
-            mean_pcls_mat_filt_dict[ftag1, ftag2]
-        mean_pcls_mat_unfilt = \
-            mean_pcls_mat_unfilt_dict[ftag1, ftag2]
-        pcls_mat_filt = \
-            pcls_mat_dict[ftag1, ftag2]["filtered"]
+        mean_pcls_mat_filt = mean_pcls_mat_filt_dict[ftag1, ftag2]
+        mean_pcls_mat_unfilt = mean_pcls_mat_unfilt_dict[ftag1, ftag2]
+        pcls_mat_filt = pcls_mat_dict[ftag1, ftag2]["filtered"]
 
-        tf, tferr = get_transfer_with_error(mean_pcls_mat_filt,
-                                            mean_pcls_mat_unfilt,
-                                            pcls_mat_filt)
+        tf, tferr = get_transfer_with_error(
+            mean_pcls_mat_filt, mean_pcls_mat_unfilt, pcls_mat_filt
+        )
         field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
 
         for i, fp1 in enumerate(field_pairs):
@@ -72,13 +62,10 @@ def get_transfer_dict(mean_pcls_mat_filt_dict,
 
 
 def read_pcls_matrices(pcls_mat_dir, filtering_pairs, Nsims):
-    """
-    """
+    """ """
     pcls_mat_dict = {
-        (ftag1, ftag2): {
-                "filtered": [],
-                "unfiltered": []
-        } for ftag1, ftag2 in filtering_pairs
+        (ftag1, ftag2): {"filtered": [], "unfiltered": []}
+        for ftag1, ftag2 in filtering_pairs
     }
 
     # Load the pseudo-cl matrices for each simulation
@@ -87,16 +74,14 @@ def read_pcls_matrices(pcls_mat_dir, filtering_pairs, Nsims):
         for label in ["filtered", "unfiltered"]:
             for ftag1, ftag2 in filtering_pairs:
                 suffix = f"{ftag1}_x_{ftag2}_{label}_{id_sim:04d}"
-                pcls_mat = np.load(
-                    f"{pcls_mat_dir}/pcls_mat_tf_est_{suffix}.npz")
+                pcls_mat = np.load(f"{pcls_mat_dir}/pcls_mat_tf_est_{suffix}.npz")
                 pcls_mat_dict[ftag1, ftag2][label] += [pcls_mat["pcls_mat"]]
 
     return pcls_mat_dict
 
 
 def load_mcms(coupling_dir, ps_names=None, full_mcm=False):
-    """
-    """
+    """ """
     file_root = "mcm"
     mcms_dict = {}
 
@@ -113,8 +98,7 @@ def load_mcms(coupling_dir, ps_names=None, full_mcm=False):
 
 
 def read_mcm(mcm_file, binned=False, full_mcm=False):
-    """
-    """
+    """ """
     mcm = np.load(mcm_file)
     suffix = "_binned" if binned else ""
     _, n_bins, _, nl = mcm[f"spin0xspin0{suffix}"].shape
@@ -129,61 +113,56 @@ def read_mcm(mcm_file, binned=False, full_mcm=False):
         return {
             "spin0xspin0": mcm[f"spin0xspin0{suffix}"],
             "spin0xspin2": mcm[f"spin0xspin2{suffix}"],
-            "spin2xspin2": mcm[f"spin2xspin2{suffix}"]
+            "spin2xspin2": mcm[f"spin2xspin2{suffix}"],
         }
 
 
-def average_pcls_matrices(pcls_mat_dict, filtering_pairs,
-                          filtered):
-    """
-    """
+def average_pcls_matrices(pcls_mat_dict, filtering_pairs, filtered):
+    """ """
     label = "filtered" if filtered else "unfiltered"
     pcls_mat_mean = {
-        (ftag1, ftag2): np.mean(
-                pcls_mat_dict[ftag1, ftag2][label],
-                axis=0
-            )
-        for ftag1, ftag2 in filtering_pairs}
+        (ftag1, ftag2): np.mean(pcls_mat_dict[ftag1, ftag2][label], axis=0)
+        for ftag1, ftag2 in filtering_pairs
+    }
 
     return pcls_mat_mean
 
 
 def compute_couplings(mcm, nmt_binning, transfer=None):
-    """
-    """
+    """ """
 
     size, n_bins, _, nl = mcm.shape
     if transfer is not None:
-        tmcm = np.einsum('ijk,jklm->iklm',
-                         transfer,
-                         mcm)
+        tmcm = np.einsum("ijk,jklm->iklm", transfer, mcm)
     else:
         tmcm = mcm
 
     btmcm = np.transpose(
-        np.array([
-            np.sum(tmcm[:, :, :, nmt_binning.get_ell_list(i)],
-                   axis=-1)
-            for i in range(n_bins)
-        ]), axes=[1, 2, 3, 0]
+        np.array(
+            [
+                np.sum(tmcm[:, :, :, nmt_binning.get_ell_list(i)], axis=-1)
+                for i in range(n_bins)
+            ]
+        ),
+        axes=[1, 2, 3, 0],
     )
 
-    inv_btmcm = np.linalg.inv(
-        btmcm.reshape([size*n_bins, size*n_bins])
-    )
-    winflat = np.dot(inv_btmcm, tmcm.reshape([size*n_bins, size*nl]))
+    inv_btmcm = np.linalg.inv(btmcm.reshape([size * n_bins, size * n_bins]))
+    winflat = np.dot(inv_btmcm, tmcm.reshape([size * n_bins, size * nl]))
     inv_coupling = inv_btmcm.reshape([size, n_bins, size, n_bins])
     bpw_windows = winflat.reshape([size, n_bins, size, nl])
 
     return bpw_windows, inv_coupling
 
 
-def get_couplings_dict(mcm_dict, nmt_binning,
-                       transfer_dict=None,
-                       ps_names_and_ftags=None,
-                       filtering_pairs=None):
-    """
-    """
+def get_couplings_dict(
+    mcm_dict,
+    nmt_binning,
+    transfer_dict=None,
+    ps_names_and_ftags=None,
+    filtering_pairs=None,
+):
+    """ """
     couplings = {}
 
     if ps_names_and_ftags is not None:
@@ -197,9 +176,7 @@ def get_couplings_dict(mcm_dict, nmt_binning,
             else:
                 transfer = None
 
-            bpw_win, inv_coupling = compute_couplings(
-                mcm, nmt_binning, transfer
-            )
+            bpw_win, inv_coupling = compute_couplings(mcm, nmt_binning, transfer)
             couplings[ms1, ms2]["bp_win"] = bpw_win
             couplings[ms1, ms2]["inv_coupling"] = inv_coupling
 
@@ -212,11 +189,8 @@ def get_couplings_dict(mcm_dict, nmt_binning,
             else:
                 transfer = None
 
-            bpw_win, inv_coupling = compute_couplings(
-                mcm, nmt_binning, transfer
-            )
+            bpw_win, inv_coupling = compute_couplings(mcm, nmt_binning, transfer)
             couplings[ftag1, ftag2]["bp_win"] = bpw_win
-            couplings[ftag1, ftag2][
-                "inv_coupling"] = inv_coupling
+            couplings[ftag1, ftag2]["inv_coupling"] = inv_coupling
 
     return couplings

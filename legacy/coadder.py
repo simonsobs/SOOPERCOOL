@@ -16,7 +16,7 @@ def coadder(args):
     meta = BBmeta(args.globals)
     nmt_binning = meta.read_nmt_binning()
     lb = nmt_binning.get_effective_ells()
-    field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
+    field_pairs = [m1 + m2 for m1, m2 in product("TEB", repeat=2)]
 
     if args.data:
         cl_dir = meta.cell_data_directory
@@ -28,7 +28,7 @@ def coadder(args):
 
     ps_names = {
         "cross": meta.get_ps_names_list(type="cross", coadd=False),
-        "auto": meta.get_ps_names_list(type="auto", coadd=False)
+        "auto": meta.get_ps_names_list(type="auto", coadd=False),
     }
 
     cross_split_list = meta.get_ps_names_list(type="all", coadd=False)
@@ -46,15 +46,13 @@ def coadder(args):
         # Initialize output dictionary
         cells_coadd = {
             "cross": {
-                (ms1, ms2): {
-                    fp: [] for fp in field_pairs
-                } for ms1, ms2 in cross_map_set_list
+                (ms1, ms2): {fp: [] for fp in field_pairs}
+                for ms1, ms2 in cross_map_set_list
             },
             "auto": {
-                (ms1, ms2): {
-                    fp: [] for fp in field_pairs
-                } for ms1, ms2 in cross_map_set_list
-            }
+                (ms1, ms2): {fp: [] for fp in field_pairs}
+                for ms1, ms2 in cross_map_set_list
+            },
         }
 
         # Loop over all map set pairs
@@ -74,7 +72,9 @@ def coadder(args):
 
             for field_pair in field_pairs:
 
-                cells_coadd[type][map_set1, map_set2][field_pair] += [cells_dict[field_pair]] # noqa
+                cells_coadd[type][map_set1, map_set2][field_pair] += [
+                    cells_dict[field_pair]
+                ]  # noqa
 
         # Average the cross-split power spectra
         cells_coadd["noise"] = {}
@@ -82,15 +82,14 @@ def coadder(args):
             cells_coadd["noise"][(map_set1, map_set2)] = {}
             for field_pair in field_pairs:
                 for type in ["cross", "auto"]:
-                    cells_coadd[type][map_set1, map_set2][field_pair] = \
-                        np.mean(
-                            cells_coadd[type][map_set1, map_set2][field_pair],
-                            axis=0
-                        )
+                    cells_coadd[type][map_set1, map_set2][field_pair] = np.mean(
+                        cells_coadd[type][map_set1, map_set2][field_pair], axis=0
+                    )
 
-                cells_coadd["noise"][(map_set1, map_set2)][field_pair] = \
-                    cells_coadd["auto"][map_set1, map_set2][field_pair] - \
-                    cells_coadd["cross"][map_set1, map_set2][field_pair]
+                cells_coadd["noise"][(map_set1, map_set2)][field_pair] = (
+                    cells_coadd["auto"][map_set1, map_set2][field_pair]
+                    - cells_coadd["cross"][map_set1, map_set2][field_pair]
+                )
 
             for type in ["cross", "auto", "noise"]:
                 cells_to_save = {
@@ -100,7 +99,7 @@ def coadder(args):
                 np.savez(
                     f"{cl_dir}/decoupled_{type}_pcls_nobeam_{map_set1}_{map_set2}{sim_label}.npz",  # noqa
                     lb=lb,
-                    **cells_to_save
+                    **cells_to_save,
                 )
 
 
