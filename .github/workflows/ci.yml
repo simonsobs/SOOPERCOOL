@@ -16,12 +16,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout SOOPERCOOL repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.8
+          python-version: |
+              3.9
+              3.10
+              3.11
+              3.12
 
       - uses: awvwgk/setup-fortran@main
         id: setup-fortran
@@ -58,6 +62,8 @@ jobs:
         uses: py-actions/flake8@v2
         with:
           args: "--config .flake8"
+          max-line-length: "100"
+          ignore: "E203"
 
       - name: Tests
         run: pytest -vv --cov=soopercool 
