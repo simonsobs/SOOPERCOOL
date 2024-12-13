@@ -1,6 +1,7 @@
 """
 Unit tests for the soopercool.ps_utils module.
 """
+
 from soopercool import ps_utils
 
 nside = 32
@@ -20,7 +21,7 @@ def test_field_pairs_from_spins():
         "spin0xspin0": ["TT"],
         "spin0xspin2": ["TE", "TB"],
         "spin2xspin0": ["ET", "BT"],
-        "spin2xspin2": ["EE", "EB", "BE", "BB"]
+        "spin2xspin2": ["EE", "EB", "BE", "BB"],
     }
     cls_out = ps_utils.field_pairs_from_spins(cls_in)
     for k in cls_out:

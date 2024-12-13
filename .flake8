@@ -1,5 +1,7 @@
 [flake8]
-exclude =
-    build/,
-    legacy/,
-    setup.py
+# exclude =
+#     build/,
+#     legacy/,
+#     setup.py
+max-line-length = 100
+ignore = E203, E226, W503

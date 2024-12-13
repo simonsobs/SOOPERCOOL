@@ -3,8 +3,7 @@ from soopercool import BBmeta
 
 
 def main(args):
-    """
-    """
+    """ """
     meta = BBmeta(args.globals)
 
     filtered_sims_dir = f"{meta.output_directory}/{args.out_dir}"
@@ -21,11 +20,7 @@ def main(args):
     for sim_id in range(id_min, id_max + 1):
         map_name = f"{args.map_dir}/{args.map_template.format(sim_id=sim_id)}"
 
-        filter_function(
-            map_name,
-            mask_file,
-            filtered_sims_dir
-        )
+        filter_function(map_name, mask_file, filtered_sims_dir)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,4 @@
 import healpy as hp
-import numpy as np
 import matplotlib.pyplot as plt
 
 

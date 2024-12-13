@@ -15,11 +15,11 @@ def _check_pix_type(pix_type):
     pix_type : str
         Pixellization type.
     """
-    if not (pix_type in ['hp', 'car']):
+    if not (pix_type in ["hp", "car"]):
         raise ValueError(f"Unknown pixelisation type {pix_type}.")
 
 
-def ud_grade(map_in, nside_out, power=None, pix_type='hp'):
+def ud_grade(map_in, nside_out, power=None, pix_type="hp"):
     """
     Utility function to upgrade or downgrade a map.
     Only support the healpix pixellization type.
@@ -40,7 +40,7 @@ def ud_grade(map_in, nside_out, power=None, pix_type='hp'):
     map_out : np.ndarray
         Output map.
     """
-    if pix_type != 'hp':
+    if pix_type != "hp":
         raise ValueError("Can't U/D-grade non-HEALPix maps")
     return hp.ud_grade(map_in, nside_out=nside_out, power=power)
 
@@ -99,11 +99,9 @@ def _get_pix_type(map_file):
         return "hp"
 
 
-def read_map(map_file,
-             pix_type='hp',
-             fields_hp=None,
-             convert_K_to_muK=False,
-             geometry=None):
+def read_map(
+    map_file, pix_type="hp", fields_hp=None, convert_K_to_muK=False, geometry=None
+):
     """
     Read a map from a file, regardless of the pixellization type.
 
@@ -127,19 +125,18 @@ def read_map(map_file,
     """
     conv = 1
     if convert_K_to_muK:
-        conv = 1.e6
+        conv = 1.0e6
     _check_pix_type(pix_type)
-    if pix_type == 'hp':
+    if pix_type == "hp":
         kwargs = {"field": fields_hp} if fields_hp is not None else {}
         m = hp.read_map(map_file, **kwargs)
     else:
         m = enmap.read_map(map_file, geometry=geometry)
 
-    return conv*m
+    return conv * m
 
 
-def write_map(map_file, map, dtype=None, pix_type='hp',
-              convert_muK_to_K=False):
+def write_map(map_file, map, dtype=None, pix_type="hp", convert_muK_to_K=False):
     """
     Write a map to a file, regardless of the pixellization type.
 
@@ -157,9 +154,9 @@ def write_map(map_file, map, dtype=None, pix_type='hp',
         Convert muK to K.
     """
     if convert_muK_to_K:
-        map *= 1.e-6
+        map *= 1.0e-6
     _check_pix_type(pix_type)
-    if pix_type == 'hp':
+    if pix_type == "hp":
         hp.write_map(map_file, map, overwrite=True, dtype=dtype)
     else:
         enmap.write_map(map_file, map)
@@ -217,27 +214,15 @@ def _plot_map_hp(map, lims=None, file_name=None, title=None):
         range_args = [{} for i in range(ncomp)]
 
     if ncomp == 1 and lims is not None:
-        range_args = [{
-            "min": lims[0],
-            "max": lims[1]
-        }]
+        range_args = [{"min": lims[0], "max": lims[1]}]
     if ncomp == 3 and lims is not None:
-        range_args = [
-            {
-                "min": lims[i][0],
-                "max": lims[i][1]
-            } for i in lims(3)
-        ]
+        range_args = [{"min": lims[i][0], "max": lims[i][1]} for i in lims(3)]
     for i in range(ncomp):
         if ncomp != 1:
             f = "TQU"[i]
         print("np.shape(map)", np.shape(np.atleast_2d(map)))
         hp.mollview(
-            np.atleast_2d(map)[i],
-            cmap=cmap,
-            title=title,
-            **range_args[i],
-            cbar=True
+            np.atleast_2d(map)[i], cmap=cmap, title=title, **range_args[i], cbar=True
         )
         if file_name:
             if ncomp == 1:
@@ -270,32 +255,21 @@ def _plot_map_car(map, lims=None, file_name=None):
         range_args = {}
 
     if ncomp == 1 and lims is not None:
-        range_args = {
-            "min": lims[0],
-            "max": lims[1]
-        }
+        range_args = {"min": lims[0], "max": lims[1]}
     if ncomp == 3 and lims is not None:
         range_args = {
             "min": [lims[i][0] for i in range(ncomp)],
-            "max": [lims[i][1] for i in range(ncomp)]
+            "max": [lims[i][1] for i in range(ncomp)],
         }
 
-    plot = enplot.plot(
-         map,
-         colorbar=True,
-         ticks=10,
-         **range_args
-    )
+    plot = enplot.plot(map, colorbar=True, ticks=10, **range_args)
     for i in range(ncomp):
         suffix = ""
         if ncomp != 1:
             suffix = f"_{'TQU'[i]}"
 
         if file_name:
-            enplot.write(
-                f"{file_name}{suffix}.png",
-                plot[i]
-            )
+            enplot.write(f"{file_name}{suffix}.png", plot[i])
         else:
             enplot.show(plot[i])
 
@@ -351,11 +325,7 @@ def apodize_mask(mask, apod_radius_deg, apod_type, pix_type="hp"):
     """
     _check_pix_type(pix_type)
     if pix_type == "hp":
-        mask_apo = nmt.mask_apodization(
-            mask,
-            apod_radius_deg,
-            apod_type
-        )
+        mask_apo = nmt.mask_apodization(mask, apod_radius_deg, apod_type)
     else:
         distance = enmap.distance_transform(mask)
         distance = np.rad2deg(distance)
@@ -366,10 +336,9 @@ def apodize_mask(mask, apod_radius_deg, apod_type, pix_type="hp"):
         if apod_type == "C1":
             mask_apo = 0.5 - 0.5 * np.cos(-np.pi * distance / apod_radius_deg)
         elif apod_type == "C2":
-            mask_apo = (
-                distance / apod_radius_deg -
-                np.sin(2 * np.pi * distance / apod_radius_deg) / (2 * np.pi)
-            )
+            mask_apo = distance / apod_radius_deg - np.sin(
+                2 * np.pi * distance / apod_radius_deg
+            ) / (2 * np.pi)
         else:
             raise ValueError(f"Unknown apodization type {apod_type}")
         mask_apo[idx] = 1

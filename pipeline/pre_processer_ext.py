@@ -53,24 +53,28 @@ def pre_processer(args):
 
     binary_file = f"{output_dir}/masks/binary_mask.fits"
     if not os.path.isfile(binary_file):
-        raise ValueError(f"Binary mask not found at {output_dir}/masks. "
-                         "Have you run the mask maker?")
+        raise ValueError(
+            f"Binary mask not found at {output_dir}/masks. "
+            "Have you run the mask maker?"
+        )
 
     binary_mask = mu.read_map(f"{output_dir}/masks/binary_mask.fits")
     nside_out = meta.nside
-    lmax_out = 3*nside_out - 1
-    ells_beam = np.arange(3*nside_out + 1)
+    lmax_out = 3 * nside_out - 1
+    ells_beam = np.arange(3 * nside_out + 1)
 
     if args.planck:
         npipe_dir = "/global/cfs/cdirs/cmb/data/planck2020/npipe"
-        bundles = ['A', 'B']
-        bundles_dict = {'A': 0, 'B': 1}
+        bundles = ["A", "B"]
+        bundles_dict = {"A": 0, "B": 1}
         convert_to_K = 1
 
         print("Beams")
         bdir = meta.beam_dir_from_map_set(meta.map_sets_list[0])
         os.makedirs(bdir, exist_ok=True)
-        beam_windows_dir = f"{bdir}/simulated_maps/npipe_aux/beam_window_functions"  # noqa
+        beam_windows_dir = (
+            f"{bdir}/simulated_maps/npipe_aux/beam_window_functions"  # noqa
+        )
 
         # Download Planck NPIPE RIMO from URL and save temporarily
         url_pref = "https://portal.nersc.gov/cfs/cmb/planck2020/misc"
@@ -87,15 +91,21 @@ def pre_processer(args):
         spectra = ["TT", "EE", "BB", "TE"]
         leakage_term = {}
         for spec in spectra:
-            leakage_term[spec] = [f"{spec}_2_TT", f"{spec}_2_EE",
-                                  f"{spec}_2_BB", f"{spec}_2_TE",
-                                  f"{spec}_2_TB", f"{spec}_2_EB",
-                                  f"{spec}_2_ET", f"{spec}_2_BT",
-                                  f"{spec}_2_BE"]
+            leakage_term[spec] = [
+                f"{spec}_2_TT",
+                f"{spec}_2_EE",
+                f"{spec}_2_BB",
+                f"{spec}_2_TE",
+                f"{spec}_2_TB",
+                f"{spec}_2_EB",
+                f"{spec}_2_ET",
+                f"{spec}_2_BT",
+                f"{spec}_2_BE",
+            ]
 
         beams = {}
         for map_set in meta.map_sets_list:
-            if 'planck' not in map_set:
+            if "planck" not in map_set:
                 continue
             print(map_set)
             f = str(meta.freq_tag_from_map_set(map_set)).zfill(3)
@@ -109,7 +119,9 @@ def pre_processer(args):
                 _, beams[map_set] = np.loadtxt(beam_file, unpack=True)
                 continue
 
-            wl = fits.open(f"{beam_windows_dir}/full_frequency/Wl_npipe6v20_{f}GHzx{f}GHz.fits")  # noqa
+            wl = fits.open(
+                f"{beam_windows_dir}/full_frequency/Wl_npipe6v20_{f}GHzx{f}GHz.fits"
+            )  # noqa
             wl_dict = {}
             num = 1
             for spec in spectra:
@@ -118,8 +130,8 @@ def pre_processer(args):
                 num += 1
 
             # Planck beam: sqrt of XX_2_XX term of the beam leakage matrix
-            bl_T = np.sqrt(wl_dict["TT_2_TT"][0])[:(3*nside_out+1)]
-            bl_pol = np.sqrt(wl_dict["EE_2_EE"][0])[:(3*nside_out+1)]
+            bl_T = np.sqrt(wl_dict["TT_2_TT"][0])[: (3 * nside_out + 1)]
+            bl_pol = np.sqrt(wl_dict["EE_2_EE"][0])[: (3 * nside_out + 1)]
             beams[map_set] = bl_pol
 
             # Save beams
@@ -133,12 +145,16 @@ def pre_processer(args):
             for bundle in bundles:
                 print(f"{map_set}_bundle{bundle}")
                 beam_file_T = f"{beam_dir}/beam_T_{map_set}_bundle{bundle}.dat"
-                beam_file_pol = f"{beam_dir}/beam_pol_{map_set}_bundle{bundle}.dat"  # noqa
+                beam_file_pol = (
+                    f"{beam_dir}/beam_pol_{map_set}_bundle{bundle}.dat"  # noqa
+                )
 
                 if os.path.isfile(beam_file_pol):
                     print("beams found in", beam_dir)
                     continue
-                wl = fits.open(f"{beam_windows_dir}/AB/Wl_npipe6v20_{f}{bundle}x{f}{bundle}.fits")  # noqa
+                wl = fits.open(
+                    f"{beam_windows_dir}/AB/Wl_npipe6v20_{f}{bundle}x{f}{bundle}.fits"
+                )  # noqa
                 wl_dict = {}
                 num = 1
                 for spec in spectra:
@@ -147,8 +163,8 @@ def pre_processer(args):
                     num += 1
 
                 # Planck beam: sqrt of XX_2_XX term of the beam leakage matrix
-                bl_T = np.sqrt(wl_dict["TT_2_TT"][0])[:(3*nside_out+1)]
-                bl_pol = np.sqrt(wl_dict["EE_2_EE"][0])[:(3*nside_out+1)]
+                bl_T = np.sqrt(wl_dict["TT_2_TT"][0])[: (3 * nside_out + 1)]
+                bl_pol = np.sqrt(wl_dict["EE_2_EE"][0])[: (3 * nside_out + 1)]
 
                 np.savetxt(beam_file_T, np.transpose([ells_beam, bl_T]))
                 np.savetxt(beam_file_pol, np.transpose([ells_beam, bl_pol]))
@@ -170,35 +186,43 @@ def pre_processer(args):
             z = np.sin(dipole_latitude)
             # Generate a dipole template (for the two possible nside)
             dipole_template = {}
-            dipole_template[1024] = dipole_amplitude * np.dot([x, y, z], hp.pix2vec(1024, np.arange(hp.nside2npix(1024))))  # noqa
-            dipole_template[2048] = dipole_amplitude * np.dot([x, y, z], hp.pix2vec(2048, np.arange(hp.nside2npix(2048))))  # noqa
+            dipole_template[1024] = dipole_amplitude * np.dot(
+                [x, y, z], hp.pix2vec(1024, np.arange(hp.nside2npix(1024)))
+            )  # noqa
+            dipole_template[2048] = dipole_amplitude * np.dot(
+                [x, y, z], hp.pix2vec(2048, np.arange(hp.nside2npix(2048)))
+            )  # noqa
 
     elif args.wmap:
-        convert_to_K = 1.e-3
-        bands_dict = {'023': 'K1', '033': 'Ka1'}
+        convert_to_K = 1.0e-3
+        bands_dict = {"023": "K1", "033": "Ka1"}
 
         for map_set in meta.map_sets_list:
-            if 'wmap' in map_set:
+            if "wmap" in map_set:
                 f = meta.freq_tag_from_map_set(map_set)
                 nbundles = meta.n_bundles_from_map_set(map_set)
-        bundles = list(range(1, nbundles+1))
+        bundles = list(range(1, nbundles + 1))
 
         if args.data:
             for map_set in meta.map_sets_list:
-                if 'wmap' not in map_set:
+                if "wmap" not in map_set:
                     continue
                 f = str(meta.freq_tag_from_map_set(map_set)).zfill(3)
 
                 map_dir = meta.map_dir_from_map_set(map_set)
                 meta.timer.start("Download WMAP data")
-                url_pref = "https://lambda.gsfc.nasa.gov/data/map/dr5/skymaps/1yr/raw"  # noqa
+                url_pref = (
+                    "https://lambda.gsfc.nasa.gov/data/map/dr5/skymaps/1yr/raw"  # noqa
+                )
 
                 # Download WMAP single-year maps from URL and store
                 print("Downloading WMAP single-year maps")
                 for yr in bundles:
                     fname_map = f"wmap_iqumap_r9_yr{yr}_{bands_dict[f]}_v5.fits"  # noqa
                     print("-", fname_map)
-                    fname_data_map = f"{map_dir}/{map_set}_bundle{yr-1}_map.fits"  # noqa
+                    fname_data_map = (
+                        f"{map_dir}/{map_set}_bundle{yr-1}_map.fits"  # noqa
+                    )
                     if os.path.isfile(fname_data_map):
                         print("  data maps already on disk")
                         continue
@@ -212,19 +236,25 @@ def pre_processer(args):
 
                 print("Mask")
                 # Download WMAP temperature analysis mask from URL and store
-                url_pref = "https://lambda.gsfc.nasa.gov/data/map/dr5/ancillary/masks"  # noqa
+                url_pref = (
+                    "https://lambda.gsfc.nasa.gov/data/map/dr5/ancillary/masks"  # noqa
+                )
                 url = f"{url_pref}/wmap_temperature_kq85_analysis_mask_r9_9yr_v5.fits"  # noqa
-                fname_mask = f"{output_dir}/masks/wmap_temperature_analysis_mask.fits"  # noqa
+                fname_mask = (
+                    f"{output_dir}/masks/wmap_temperature_analysis_mask.fits"  # noqa
+                )
 
                 os.makedirs(f"{output_dir}/masks", exist_ok=True)
                 if not os.path.isfile(fname_mask):
                     wget.download(url, fname_mask)
                     print("\n")
-                mask = mu.read_map(fname_mask, field=['N_OBS'])
+                mask = mu.read_map(fname_mask, field=["N_OBS"])
 
                 print("Beams")
                 print("Downloading WMAP beam window functions")
-                url_pref = "https://lambda.gsfc.nasa.gov/data/map/dr5/ancillary/beams"  # noqa
+                url_pref = (
+                    "https://lambda.gsfc.nasa.gov/data/map/dr5/ancillary/beams"  # noqa
+                )
 
                 print(map_set)
                 beam_dir = meta.beam_dir_from_map_set(map_set)
@@ -234,20 +264,22 @@ def pre_processer(args):
                     print(f"beams found at {beam_dir}")
                     continue
                 if not os.path.isfile(beam_file):
-                    url = f"{url_pref}/wmap_ampl_bl_{bands_dict[f]}_9yr_v5p1.txt"  # noqa
+                    url = (
+                        f"{url_pref}/wmap_ampl_bl_{bands_dict[f]}_9yr_v5p1.txt"  # noqa
+                    )
                     wget.download(url, beam_file)
                     print("\n")
                 # read beams
                 # if last ell < 3*nside_out
                 # extend beams repeating the last value
-                bl = np.zeros(3*nside_out+1)
+                bl = np.zeros(3 * nside_out + 1)
                 l, b, _ = np.loadtxt(beam_file, unpack=True)
                 lmax_file = int(l[-1])
-                if lmax_file < 3*nside_out:
-                    bl[:(lmax_file+1)] = b
+                if lmax_file < 3 * nside_out:
+                    bl[: (lmax_file + 1)] = b
                     bl[lmax_file:] = b[-1]
                 else:
-                    bl = b[:(3*nside_out+1)]
+                    bl = b[: (3 * nside_out + 1)]
                 np.savetxt(beam_file, np.transpose([ells_beam, bl]))
             meta.timer.stop("Download WMAP data")
 
@@ -266,7 +298,7 @@ def pre_processer(args):
                     continue
                 # original nside
                 f = str(meta.freq_tag_from_map_set(map_set)).zfill(3)
-                nside_in = 1024 if f == '030' else 2048
+                nside_in = 1024 if f == "030" else 2048
             elif args.wmap:
                 if "wmap" not in map_set:
                     continue
@@ -274,13 +306,15 @@ def pre_processer(args):
 
             map_dir = meta.map_dir_from_map_set(map_set)
 
-            dgrade = (nside_in != nside_out)
+            dgrade = nside_in != nside_out
             if dgrade:  # if downgrading
                 # which alms indices to clip before downgrading
-                lmax_in = 3*nside_in - 1
+                lmax_in = 3 * nside_in - 1
                 clip_indices = []
-                for m in range(lmax_out+1):
-                    clip_indices.append(hp.Alm.getidx(lmax_in, np.arange(m, lmax_out+1), m))  # noqa
+                for m in range(lmax_out + 1):
+                    clip_indices.append(
+                        hp.Alm.getidx(lmax_in, np.arange(m, lmax_out + 1), m)
+                    )  # noqa
                 clip_indices = np.concatenate(clip_indices)
 
             for bundle in bundles:
@@ -295,8 +329,7 @@ def pre_processer(args):
                     fname_in = f"{map_dir}/wmap_{bands_dict[f]}/wmap_iqumap_r9_yr{bundle}_{bands_dict[f]}_v5.fits"  # noqa
                     fname_alms = f"{map_dir}/wmap_{bands_dict[f]}/alms_wmap_{bands_dict[f]}_yr{bundle}_map_{nside_in}.npz"  # noqa
                     fname_out = f"{map_dir}/{map_set}_bundle{bundle-1}_map.fits"  # noqa
-                    os.makedirs(f"{map_dir}/wmap_{bands_dict[f]}",
-                                exist_ok=True)
+                    os.makedirs(f"{map_dir}/wmap_{bands_dict[f]}", exist_ok=True)
 
                 if os.path.isfile(fname_out):
                     print("maps already processed, found in", map_dir)
@@ -304,14 +337,13 @@ def pre_processer(args):
                 if os.path.isfile(fname_alms):
                     print("reading alms at", fname_alms)
                     alm_file = np.load(fname_alms)
-                    alm = np.array([alm_file['alm_T'],
-                                    alm_file['alm_E'],
-                                    alm_file['alm_B']])
+                    alm = np.array(
+                        [alm_file["alm_T"], alm_file["alm_E"], alm_file["alm_B"]]
+                    )
                 else:
                     print("reading input maps at", fname_in)
                     # read TQU, convert to K
-                    map_in = convert_to_K * mu.read_map(fname_in,
-                                                        field=[0, 1, 2])
+                    map_in = convert_to_K * mu.read_map(fname_in, field=[0, 1, 2])
                     if args.planck:
                         print("removing dipole")
                         map_in[0] -= dipole_template[nside_in]
@@ -325,8 +357,7 @@ def pre_processer(args):
                     alm = hp.map2alm(map_in, pol=True, use_pixel_weights=True)
                     del map_in
                     print("writing alms to disk")
-                    np.savez(fname_alms, alm_T=alm[0],
-                             alm_E=alm[1], alm_B=alm[2])
+                    np.savez(fname_alms, alm_T=alm[0], alm_E=alm[1], alm_B=alm[2])
 
                 if dgrade:
                     print(f"downgrading to nside={nside_out}")
@@ -349,16 +380,22 @@ def pre_processer(args):
                     print("plotting maps")
 
                     if args.planck:
-                        utils.plot_map(map_out,
-                                       f"{map_dir}/plots/map_{map_set}_bundle{bundles_dict[bundle]}",  # noqa
-                                       title=map_set, TQU=True)
+                        utils.plot_map(
+                            map_out,
+                            f"{map_dir}/plots/map_{map_set}_bundle{bundles_dict[bundle]}",  # noqa
+                            title=map_set,
+                            TQU=True,
+                        )
                     elif args.wmap:
-                        utils.plot_map(map_out,
-                                       f"{map_dir}/plots/map_{map_set}_bundle{bundle-1}",  # noqa
-                                       title=map_set, TQU=True)
-        if 'm_out' in locals():
+                        utils.plot_map(
+                            map_out,
+                            f"{map_dir}/plots/map_{map_set}_bundle{bundle-1}",  # noqa
+                            title=map_set,
+                            TQU=True,
+                        )
+        if "m_out" in locals():
             del map_out
-        if 'alm' in locals():
+        if "alm" in locals():
             del alm
         meta.timer.stop("Process external maps")
 
@@ -382,7 +419,7 @@ def pre_processer(args):
 
         for sim_id in range(nsims):
             # starting seed from 0200 to 0000 (if processing original maps)
-            sim_id_in = sim_id+200 if process_sims else sim_id
+            sim_id_in = sim_id + 200 if process_sims else sim_id
 
             # sims output dirs
             os.makedirs(f"{sims_dir}/{sim_id:04d}", exist_ok=True)
@@ -399,15 +436,17 @@ def pre_processer(args):
 
                 f = str(meta.freq_tag_from_map_set(map_set)).zfill(3)
                 # original nside
-                nside_in = 1024 if f == '030' else 2048
-                dgrade = (nside_in != nside_out)
+                nside_in = 1024 if f == "030" else 2048
+                dgrade = nside_in != nside_out
 
                 if process_sims and dgrade:
                     # which alms indices to clip before downgrading
-                    lmax_in = 3*nside_in - 1
+                    lmax_in = 3 * nside_in - 1
                     clip_indices = []
-                    for m in range(lmax_out+1):
-                        clip_indices.append(hp.Alm.getidx(lmax_in, np.arange(m, lmax_out+1), m)) # noqa
+                    for m in range(lmax_out + 1):
+                        clip_indices.append(
+                            hp.Alm.getidx(lmax_in, np.arange(m, lmax_out + 1), m)
+                        )  # noqa
                     clip_indices = np.concatenate(clip_indices)
 
                 for bundle in bundles:
@@ -427,7 +466,9 @@ def pre_processer(args):
                     else:
                         # sims fnames (only Planck)
                         fname_in = f"{ext_sims_dir}/npipe6v20{bundle}_sim"
-                        fname_in += f"/{sim_id_in:04d}/npipe6v20{bundle}_{f}_map.fits"  # noqa
+                        fname_in += (
+                            f"/{sim_id_in:04d}/npipe6v20{bundle}_{f}_map.fits"  # noqa
+                        )
                         fname_out = f"{sims_dir}/{sim_id:04d}/{map_set}_bundle{bundles_dict[bundle]}_map.fits"  # noqa
 
                     if os.path.isfile(fname_out):
@@ -436,16 +477,14 @@ def pre_processer(args):
 
                     print("reading input maps at", fname_in)
                     # read TQU, convert to K
-                    map_in = convert_to_K * mu.read_map(fname_in,
-                                                        field=[0, 1, 2])
+                    map_in = convert_to_K * mu.read_map(fname_in, field=[0, 1, 2])
 
                     if process_sims:
                         if not args.noise:
                             # Subtract the dipole (not from noise)
                             map_in[0] -= dipole_template[nside_in]
                         print("computing alms")
-                        alm = hp.map2alm(map_in,
-                                         pol=True, use_pixel_weights=True)
+                        alm = hp.map2alm(map_in, pol=True, use_pixel_weights=True)
                         del map_in
 
                         if dgrade:
@@ -470,15 +509,16 @@ def pre_processer(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Pre-processing external data for the pipeline")
-    parser.add_argument("--globals", type=str,
-                        help="Path to the yaml with global parameters")
-    parser.add_argument("--planck", action="store_true",
-                        help="Pass to process Planck maps")
-    parser.add_argument("--wmap", action="store_true",
-                        help="Pass to process WMAP maps")
-    parser.add_argument("--plots", action="store_true",
-                        help="Pass to generate plots")
+        description="Pre-processing external data for the pipeline"
+    )
+    parser.add_argument(
+        "--globals", type=str, help="Path to the yaml with global parameters"
+    )
+    parser.add_argument(
+        "--planck", action="store_true", help="Pass to process Planck maps"
+    )
+    parser.add_argument("--wmap", action="store_true", help="Pass to process WMAP maps")
+    parser.add_argument("--plots", action="store_true", help="Pass to generate plots")
 
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--data", action="store_true")

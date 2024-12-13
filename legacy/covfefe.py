@@ -37,12 +37,10 @@ def covFeFe(args):
         cl_dict[ms1, ms2] = []
         for iii in range(Nsims):
             cells_dict = np.load(
-                f"{cl_dir}/decoupled_cross_pcls_nobeam_{ms1}_{ms2}_{iii:04d}.npz", # noqa
+                f"{cl_dir}/decoupled_cross_pcls_nobeam_{ms1}_{ms2}_{iii:04d}.npz",  # noqa
             )
             cl_vec = np.concatenate(
-                [
-                    cells_dict[field_pair] for field_pair in field_pairs
-                ]
+                [cells_dict[field_pair] for field_pair in field_pairs]
             )
             cl_dict[ms1, ms2].append(cl_vec)
 
@@ -60,8 +58,7 @@ def covFeFe(args):
         cl12_mean = np.mean(cl12, axis=0)
         cl34_mean = np.mean(cl34, axis=0)
         cov = np.mean(
-            np.einsum("ij,ik->ijk", cl12-cl12_mean, cl34-cl34_mean),
-            axis=0
+            np.einsum("ij,ik->ijk", cl12 - cl12_mean, cl34 - cl34_mean), axis=0
         )
         full_cov_dict[ms1, ms2, ms3, ms4] = cov
 
@@ -69,22 +66,19 @@ def covFeFe(args):
         for i, field_pair_1 in enumerate(field_pairs):
             for j, field_pair_2 in enumerate(field_pairs):
 
-                cov_block = cov[i*n_bins:(i+1)*n_bins, j*n_bins:(j+1)*n_bins]
+                cov_block = cov[
+                    i * n_bins : (i + 1) * n_bins, j * n_bins : (j + 1) * n_bins
+                ]
                 cov_dict[field_pair_1 + field_pair_2] = cov_block
 
-        np.savez(
-            f"{cov_dir}/mc_cov_{ms1}_{ms2}_{ms3}_{ms4}.npz",
-            **cov_dict
-        )
+        np.savez(f"{cov_dir}/mc_cov_{ms1}_{ms2}_{ms3}_{ms4}.npz", **cov_dict)
 
     if args.plots:
-        plot_dir = meta.plot_dir_from_output_dir(
-            meta.covmat_directory_rel
-        )
+        plot_dir = meta.plot_dir_from_output_dir(meta.covmat_directory_rel)
         n_fields = len(field_pairs)
         n_spec = len(cross_ps_names)
 
-        full_size = n_spec*n_fields*n_bins
+        full_size = n_spec * n_fields * n_bins
         full_cov = np.zeros((full_size, full_size))
 
         for i, (ms1, ms2) in enumerate(cross_ps_names):
@@ -93,8 +87,8 @@ def covFeFe(args):
                     continue
 
                 full_cov[
-                    i*n_fields*n_bins:(i+1)*n_fields*n_bins,
-                    j*n_fields*n_bins:(j+1)*n_fields*n_bins
+                    i * n_fields * n_bins : (i + 1) * n_fields * n_bins,
+                    j * n_fields * n_bins : (j + 1) * n_fields * n_bins,
                 ] = full_cov_dict[ms1, ms2, ms3, ms4]
 
         # Symmetrize
@@ -108,15 +102,12 @@ def covFeFe(args):
         divider = make_axes_locatable(plt.gca())
         cax = divider.append_axes("right", size=0.3, pad=0.1)
         plt.colorbar(im, cax=cax)
-        plt.savefig(f"{plot_dir}/full_corr.png", dpi=300,
-                    bbox_inches="tight")
+        plt.savefig(f"{plot_dir}/full_corr.png", dpi=300, bbox_inches="tight")
 
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(
-        description="Covariance matrix calculator"
-    )
+    parser = argparse.ArgumentParser(description="Covariance matrix calculator")
     parser.add_argument("--globals", type=str, help="Path to the yaml file")
     parser.add_argument("--plots", action="store_true", help="Generate plots")
 

@@ -7,8 +7,7 @@ from soopercool import map_utils as mu
 import numpy as np
 
 
-def get_noise_cls(noise_kwargs, lmax, freq_tag, fsky=0.1,
-                  is_beam_deconvolved=False):
+def get_noise_cls(noise_kwargs, lmax, freq_tag, fsky=0.1, is_beam_deconvolved=False):
     """
     Load polarization noise from SO SAT noise model.
     Assume polarization noise is half of that.
@@ -22,37 +21,29 @@ def get_noise_cls(noise_kwargs, lmax, freq_tag, fsky=0.1,
     noise_model = noise_calc.SOSatV3point1(
         sensitivity_mode=sensitivity_mode,
         one_over_f_mode=oof_mode,
-        survey_years=noise_kwargs["survey_years"]
+        survey_years=noise_kwargs["survey_years"],
     )
     lth, _, nlth_P = noise_model.get_noise_curves(
-        fsky,
-        lmax + 1,
-        delta_ell=1,
-        deconv_beam=is_beam_deconvolved
+        fsky, lmax + 1, delta_ell=1, deconv_beam=is_beam_deconvolved
     )
     lth = np.concatenate(([0, 1], lth))[:]
-    nlth_P = np.array(
-        [np.concatenate(([0, 0], nl))[:] for nl in nlth_P]
-    )
-    freq_tags = {int(f): i_f
-                 for (i_f, f) in enumerate(noise_model.get_bands())}
+    nlth_P = np.array([np.concatenate(([0, 0], nl))[:] for nl in nlth_P])
+    freq_tags = {int(f): i_f for (i_f, f) in enumerate(noise_model.get_bands())}
 
     if freq_tag not in freq_tags:
         raise ValueError(f"{freq_tag} GHz is not an SO-SAT frequency")
 
     idx_f = freq_tags[freq_tag]
-    nl_th_dict = {pq: nlth_P[idx_f]
-                  for pq in ["EE", "EB", "BE", "BB"]}
-    nl_th_dict["TT"] = 0.5*nlth_P[idx_f]
-    nl_th_dict["TE"] = 0.*nlth_P[idx_f]
-    nl_th_dict["TB"] = 0.*nlth_P[idx_f]
+    nl_th_dict = {pq: nlth_P[idx_f] for pq in ["EE", "EB", "BE", "BB"]}
+    nl_th_dict["TT"] = 0.5 * nlth_P[idx_f]
+    nl_th_dict["TE"] = 0.0 * nlth_P[idx_f]
+    nl_th_dict["TB"] = 0.0 * nlth_P[idx_f]
 
     return lth, nl_th_dict
 
 
 def generate_noise_map(nl_T, nl_P, n_bundles, nside, seed):
-    """
-    """
+    """ """
     noise_mat = np.array([nl_T, nl_P, nl_P, np.zeros_like(nl_P)])
     noise_mat *= n_bundles
 
@@ -61,8 +52,7 @@ def generate_noise_map(nl_T, nl_P, n_bundles, nside, seed):
 
 
 def main(args):
-    """
-    """
+    """ """
     meta = BBmeta(args.globals)
     verbose = args.verbose
     out_dir = meta.output_directory
@@ -70,16 +60,17 @@ def main(args):
     sims_dir = f"{out_dir}/noise_sims"
     BBmeta.make_dir(sims_dir)
 
-    lmax_sim = 3*meta.nside - 1
+    lmax_sim = 3 * meta.nside - 1
 
     noise_kwargs = {
         "one_over_f_mode": "optimistic",
         "sensitivity_mode": "baseline",
         "survey_years": 5,
     }
-    nlth = {ms: get_noise_cls(noise_kwargs, lmax_sim,
-                              meta.freq_tag_from_map_set(ms))
-            for ms in meta.map_sets_list}
+    nlth = {
+        ms: get_noise_cls(noise_kwargs, lmax_sim, meta.freq_tag_from_map_set(ms))
+        for ms in meta.map_sets_list
+    }
     nlth["l"] = np.arange(lmax_sim + 1)
 
     mpi.init(True)
@@ -91,14 +82,15 @@ def main(args):
                 print(f"# {id_sim+1} | {ms}")
             n_bundles = meta.n_bundles_from_map_set(ms)
             for id_bundle in range(n_bundles):
-                seed = id_sim*n_bundles + id_bundle + 4582
+                seed = id_sim * n_bundles + id_bundle + 4582
                 noise = generate_noise_map(
-                    nlth[ms][1]["TT"], nlth[ms][1]["EE"],
-                    n_bundles, meta.nside, seed
+                    nlth[ms][1]["TT"], nlth[ms][1]["EE"], n_bundles, meta.nside, seed
                 )
                 mu.write_map(
                     f"{sims_dir}/{id_sim:04d}/noise_sims_{ms}_{id_sim:04d}_bundle{id_bundle}.fits",  # noqa
-                    noise, dtype=np.float32, convert_muK_to_K=True
+                    noise,
+                    dtype=np.float32,
+                    convert_muK_to_K=True,
                 )
 
 

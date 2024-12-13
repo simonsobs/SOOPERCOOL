@@ -22,26 +22,25 @@ def get_sat_beam(freq_tag, lmax):
     Compute and save dictionary with beam window functions for each map set.
     """
     noise_model = noise_calc.SOSatV3point1(
-        survey_years=5,
-        sensitivity_mode="baseline",
-        one_over_f_mode=1
+        survey_years=5, sensitivity_mode="baseline", one_over_f_mode=1
     )
-    freq_tags = {int(f): i_f
-                 for (i_f, f) in enumerate(noise_model.get_bands())}
+    freq_tags = {int(f): i_f for (i_f, f) in enumerate(noise_model.get_bands())}
 
     if freq_tag not in freq_tags:
         raise ValueError(f"{freq_tag} GHz is not an SO-SAT frequency")
 
     ll = np.arange(lmax + 1)
-    beams_list = {int(freq_band): beam_arcmin
-                  for freq_band, beam_arcmin in zip(noise_model.get_bands(),
-                                                    noise_model.get_beams())}
+    beams_list = {
+        int(freq_band): beam_arcmin
+        for freq_band, beam_arcmin in zip(
+            noise_model.get_bands(), noise_model.get_beams()
+        )
+    }
     return ll, beam_gaussian(ll, beams_list[freq_tag])
 
 
 def main(args):
-    """
-    """
+    """ """
     meta = BBmeta(args.globals)
     verbose = args.verbose
 
