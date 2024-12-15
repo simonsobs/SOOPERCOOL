@@ -74,7 +74,9 @@ def main(args):
                     fields_hp=[0, 1, 2]
                 )
 
-                wcs = map.wcs
+                wcs = None
+                if hasattr(map, 'wcs'):
+                    wcs = map.wcs 
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1], wcs=wcs),
                     "spin2": nmt.NmtField(mask, map[1:],
