@@ -72,8 +72,8 @@ def main(args):
                 )
 
                 wcs = None
-                if hasattr(map, 'wcs'):
-                    wcs = map.wcs 
+                if hasattr(map, "wcs"):
+                    wcs = map.wcs
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1], wcs=wcs),
                     "spin2": nmt.NmtField(mask, map[1:], purify_b=meta.pure_B, wcs=wcs),

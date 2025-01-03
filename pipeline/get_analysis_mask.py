@@ -24,10 +24,7 @@ def main(args):
 
     # If a global hits file is indicated in the paramter file, use it.
     if masks_settings["global_hits"] is not None:
-        sum_hits = mu.read_map(
-            masks_settings["global_hits"],
-            pix_type=meta.pix_type
-        )
+        sum_hits = mu.read_map(masks_settings["global_hits"], pix_type=meta.pix_type)
         # Create binary
         binary = sum_hits.copy()
         binary[:] = 1
