@@ -71,7 +71,9 @@ def main(args):
                     filtered_map_file, pix_type=meta.pix_type, fields_hp=[0, 1, 2]
                 )
 
-                wcs = map.wcs
+                wcs = None
+                if hasattr(map, 'wcs'):
+                    wcs = map.wcs 
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1], wcs=wcs),
                     "spin2": nmt.NmtField(mask, map[1:], purify_b=meta.pure_B, wcs=wcs),
