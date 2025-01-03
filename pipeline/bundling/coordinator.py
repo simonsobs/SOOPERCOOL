@@ -6,8 +6,7 @@ import h5py
 
 
 def read_hdf5_map(fname, to_nest=False):
-    """
-    """
+    """ """
     f = h5py.File(fname, "r")
     dset = f["map"]
     header = dict(dset.attrs)
@@ -29,14 +28,12 @@ def read_hdf5_map(fname, to_nest=False):
     return mapdata
 
 
-def write_hdf5_map(fname, nside, dict_maps, list_of_obsid,
-                   nest_or_ring='RING'):
-    """
-    """
-    with h5py.File(fname, 'w') as f:
-        f.attrs['NSIDE'] = nside
-        f.attrs['ORDERING'] = nest_or_ring
-        f.attrs['OBS_ID'] = list_of_obsid
+def write_hdf5_map(fname, nside, dict_maps, list_of_obsid, nest_or_ring="RING"):
+    """ """
+    with h5py.File(fname, "w") as f:
+        f.attrs["NSIDE"] = nside
+        f.attrs["ORDERING"] = nest_or_ring
+        f.attrs["OBS_ID"] = list_of_obsid
         for k, v in dict_maps.items():
             f.create_dataset(k, data=v)
 
@@ -74,7 +71,7 @@ def gen_masks_of_given_atomic_map_list_for_bundles(nmaps, nbundles):
             _n_per_bundle = n_per_bundle
 
         i_begin = idx * _n_per_bundle
-        i_end = (idx+1) * _n_per_bundle
+        i_end = (idx + 1) * _n_per_bundle
 
         _m = np.zeros(nmaps, dtype=np.bool_)
         _m[i_begin:i_end] = True

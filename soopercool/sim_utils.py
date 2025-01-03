@@ -49,8 +49,7 @@ def get_ps_matrix_for_sim(ps_dict, lmax, components=None, fields="TEB"):
     """
     ordering = list(get_alm_ordering(fields=fields, components=components))
 
-    nalms = len(components) * len(fields) \
-        if components is not None else len(fields)
+    nalms = len(components) * len(fields) if components is not None else len(fields)
     ps_matrix = np.zeros((nalms, nalms, lmax))
 
     for i, lab1 in enumerate(ordering):
@@ -58,11 +57,11 @@ def get_ps_matrix_for_sim(ps_dict, lmax, components=None, fields="TEB"):
             if components is not None:
                 c1, f1 = lab1
                 c2, f2 = lab2
-                ps_matrix[i, j, :] = ps_dict[c1, c2][f1+f2][:lmax]
+                ps_matrix[i, j, :] = ps_dict[c1, c2][f1 + f2][:lmax]
             else:
                 f1 = lab1
                 f2 = lab2
-                ps_matrix[i, j, :] = ps_dict[f1+f2][:lmax]
+                ps_matrix[i, j, :] = ps_dict[f1 + f2][:lmax]
     return ps_matrix
 
 
@@ -83,25 +82,15 @@ def get_alms_from_cls(ps_dict, lmax, fields="TEB", components=None, seed=None):
     seed : int
         The seed for the random number generator. Default is None.
     """
-    ps_matrix = get_ps_matrix_for_sim(ps_dict,
-                                      lmax,
-                                      components=components,
-                                      fields=fields)
-    alms = curvedsky.rand_alm(
-        ps_matrix,
-        lmax=lmax,
-        seed=seed
+    ps_matrix = get_ps_matrix_for_sim(
+        ps_dict, lmax, components=components, fields=fields
     )
+    alms = curvedsky.rand_alm(ps_matrix, lmax=lmax, seed=seed)
     ordering = list(get_alm_ordering(fields, components))
     alms_dict = {}
     if components is not None:
         for comp in components:
-            alms_dict[comp] = {
-                comp: [
-                    alms[ordering.index((comp, f))]
-                    for f in fields
-                ]
-            }
+            alms_dict[comp] = {comp: [alms[ordering.index((comp, f))] for f in fields]}
         return alms_dict
 
     else:
@@ -153,10 +142,7 @@ def get_map_from_alms(alms, template):
         pix_type = "hp"
 
     if pix_type == "hp":
-        map = hp.alm2map(
-            alms,
-            nside=hp.npix2nside(template.shape[-1])
-        )
+        map = hp.alm2map(alms, nside=hp.npix2nside(template.shape[-1]))
     else:
         map = curvedsky.alm2map(
             alms,

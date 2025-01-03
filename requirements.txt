@@ -1,4 +1,4 @@
-numpy
+numpy<2.1
 scipy
 healpy
 pymaster
@@ -6,3 +6,4 @@ sacc
 camb
 Jinja2
 wget
+pixell

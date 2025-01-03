@@ -13,6 +13,7 @@ class BBmeta(object):
     a single interface to all the parameters and products
     that will be used from different stages of the pipeline.
     """
+
     def __init__(self, fname_config):
         """
         Initialize the pipeline manager from a yaml file.
@@ -34,13 +35,13 @@ class BBmeta(object):
         self._set_general_attributes()
 
         # Basic sanity checks
-        if self.lmax > 3*self.nside-1:
-            raise ValueError("lmax should be lower or equal "
-                             f"to 3*nside-1 = {3*self.nside-1}")
+        if self.lmax > 3 * self.nside - 1:
+            raise ValueError(
+                "lmax should be lower or equal " f"to 3*nside-1 = {3*self.nside-1}"
+            )
 
         # Initialize method to parse map_sets metadata
-        map_sets_attributes = list(self.map_sets[
-            next(iter(self.map_sets))].keys())
+        map_sets_attributes = list(self.map_sets[next(iter(self.map_sets))].keys())
         for map_sets_attribute in map_sets_attributes:
             self._init_getter_from_map_set(map_sets_attribute)
 
@@ -55,8 +56,10 @@ class BBmeta(object):
         """
         Custom yaml loader to load the configuration file.
         """
+
         def path_constructor(loader, node):
             return "/".join(loader.construct_sequence(node))
+
         yaml.SafeLoader.add_constructor("!path", path_constructor)
         with open(config, "r") as f:
             return yaml.load(f, Loader=yaml.SafeLoader)
@@ -85,8 +88,7 @@ class BBmeta(object):
                 os.makedirs(full_path, exist_ok=True)
 
     def _set_general_attributes(self):
-        """
-        """
+        """ """
         for key, value in self.general_pars.items():
             setattr(self, key, value)
 
@@ -103,8 +105,9 @@ class BBmeta(object):
         Constructor for the map_list attribute.
         """
         out_list = [
-            f"{map_set}__{id_split}" for map_set in self.map_sets_list
-                for id_split in range(self.n_bundles_from_map_set(map_set))  # noqa
+            f"{map_set}__{id_split}"
+            for map_set in self.map_sets_list
+            for id_split in range(self.n_bundles_from_map_set(map_set))  # noqa
         ]
         return out_list
 
@@ -120,7 +123,7 @@ class BBmeta(object):
         setattr(
             self,
             f"{map_set_attribute}_from_map_set",
-            lambda map_set: self.map_sets[map_set][map_set_attribute]
+            lambda map_set: self.map_sets[map_set][map_set_attribute],
         )
 
     def _get_galactic_mask_name(self):
@@ -140,8 +143,7 @@ class BBmeta(object):
         """
         Get the name of the point source mask.
         """
-        return os.path.join(self.mask_directory,
-                            self.masks["point_source_mask"])
+        return os.path.join(self.mask_directory, self.masks["point_source_mask"])
 
     def _get_analysis_mask_name(self):
         """
@@ -170,11 +172,11 @@ class BBmeta(object):
             Type of mask to load.
             Can be "binary", "galactic", "point_source" or "analysis".
         """
-        mask = mu.read_map(getattr(self, f"{mask_type}_mask_name"),
-                           pix_type=self.pix_type)
-        if self.pix_type == 'hp':
-            mask = mu.ud_grade(mask, nside_out=self.nside,
-                               pix_type=self.pix_type)
+        mask = mu.read_map(
+            getattr(self, f"{mask_type}_mask_name"), pix_type=self.pix_type
+        )
+        if self.pix_type == "hp":
+            mask = mu.ud_grade(mask, nside_out=self.nside, pix_type=self.pix_type)
         return mask
 
     def save_mask(self, mask_type, mask):
@@ -189,8 +191,12 @@ class BBmeta(object):
         mask : array-like
             Mask to save.
         """
-        return mu.write_map(getattr(self, f"{mask_type}_mask_name"), mask,
-                            dtype=np.float32, pix_type=self.pix_type)
+        return mu.write_map(
+            getattr(self, f"{mask_type}_mask_name"),
+            mask,
+            dtype=np.float32,
+            pix_type=self.pix_type,
+        )
 
     def read_hitmap(self):
         """
@@ -198,9 +204,8 @@ class BBmeta(object):
         share the same hitmap.
         """
         hitmap = mu.read_map(self.nhits_map_name, pix_type=self.pix_type)
-        if self.pix_type == 'hp':
-            hitmap = mu.ud_grade(hitmap, self.nside, power=-2,
-                                 pix_type=self.pix_type)
+        if self.pix_type == "hp":
+            hitmap = mu.ud_grade(hitmap, self.nside, power=-2, pix_type=self.pix_type)
         return hitmap
 
     def save_hitmap(self, map):
@@ -214,16 +219,19 @@ class BBmeta(object):
         """
         mu.write_map(
             os.path.join(self.mask_directory, self.masks["nhits_map"]),
-            map, dtype=np.float32, pix_type=self.pix_type)
+            map,
+            dtype=np.float32,
+            pix_type=self.pix_type,
+        )
 
     def read_nmt_binning(self):
         """
         Read the binning file and return the corresponding NmtBin object.
         """
         import pymaster as nmt
+
         binning = np.load(self.path_to_binning)
-        return nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+        return nmt.NmtBin.from_edges(binning["bin_low"], binning["bin_high"] + 1)
 
     def get_n_bandpowers(self):
         """
@@ -240,8 +248,7 @@ class BBmeta(object):
         return binner.get_effective_ells()
 
     def read_beam(self, map_set, lmax=None):
-        """
-        """
+        """ """
         beam_dir = self.beam_dir_from_map_set(map_set)
         beam_file = self.beam_file_from_map_set(map_set)
         l, bl = su.read_beam_from_file(f"{beam_dir}/{beam_file}", lmax=lmax)
@@ -253,8 +260,15 @@ class BBmeta(object):
         """
         Loop over the simulation parameters and set them as attributes.
         """
-        for name in ["num_sims", "cosmology", "noise", "anisotropic_noise",
-                     "null_e_modes", "mock_nsrcs", "mock_srcs_hole_radius"]:
+        for name in [
+            "num_sims",
+            "cosmology",
+            "noise",
+            "anisotropic_noise",
+            "null_e_modes",
+            "mock_nsrcs",
+            "mock_srcs_hole_radius",
+        ]:
             setattr(self, name, self.sim_pars[name])
 
     def _init_filtering_params(self):
@@ -306,8 +320,7 @@ class BBmeta(object):
         return data
 
     def plot_dir_from_output_dir(self, out_dir):
-        """
-        """
+        """ """
         root = self.output_dir
 
         if root in out_dir:
@@ -319,7 +332,7 @@ class BBmeta(object):
 
         return path_to_plots
 
-    def get_fname_mask(self, map_type='analysis'):
+    def get_fname_mask(self, map_type="analysis"):
         """
         Get the full filepath to a mask of predefined type.
 
@@ -329,17 +342,19 @@ class BBmeta(object):
             Choose between 'analysis', 'binary', 'point_source'.
             Defaults to 'analysis'.
         """
-        base_dir = self.masks['mask_directory']
-        if map_type == 'analysis':
-            fname = os.path.join(base_dir, self.masks['analysis_mask'])
-        elif map_type == 'binary':
-            fname = os.path.join(base_dir, self.masks['binary_mask'])
-        elif map_type == 'point_source':
-            fname = os.path.join(base_dir, self.masks['point_source_mask'])
+        base_dir = self.masks["mask_directory"]
+        if map_type == "analysis":
+            fname = os.path.join(base_dir, self.masks["analysis_mask"])
+        elif map_type == "binary":
+            fname = os.path.join(base_dir, self.masks["binary_mask"])
+        elif map_type == "point_source":
+            fname = os.path.join(base_dir, self.masks["point_source_mask"])
         else:
-            raise ValueError("The map_type chosen does not exits. "
-                             "Choose between 'analysis', 'binary', "
-                             "'point_source'.")
+            raise ValueError(
+                "The map_type chosen does not exits. "
+                "Choose between 'analysis', 'binary', "
+                "'point_source'."
+            )
         return fname
 
     def get_map_filename(self, map_set, id_split, id_sim=None):
@@ -364,16 +379,12 @@ class BBmeta(object):
         """
         map_set_root = self.file_root_from_map_set(map_set)
         if id_sim is not None:
-            path_to_maps = os.path.join(
-                self.sims_directory,
-                f"{id_sim:04d}"
-            )
+            path_to_maps = os.path.join(self.sims_directory, f"{id_sim:04d}")
             os.makedirs(path_to_maps, exist_ok=True)
         else:
             path_to_maps = self.map_directory
 
-        return os.path.join(path_to_maps,
-                            f"{map_set_root}_split_{id_split}.fits")
+        return os.path.join(path_to_maps, f"{map_set_root}_split_{id_split}.fits")
 
     def get_filter_function(self, filter_tag):
         from soopercool.utils import m_filter_map, toast_filter_map
@@ -393,18 +404,18 @@ class BBmeta(object):
                 "instrument": tag_settings["tf_instrument"],
                 "band": tag_settings["tf_band"],
                 "nside": self.nside,
-                "sbatch_dir": self.scripts_dir
+                "sbatch_dir": self.scripts_dir,
             }
             filter_function = toast_filter_map
         else:
             raise NotImplementedError(
-                f"Filterer type {tag_settings['filtering_type']} "
-                "not implemented"
+                f"Filterer type {tag_settings['filtering_type']} " "not implemented"
             )
 
         def filter_operation(map_file, mask_file, out_dir, extra_kwargs={}):
             return filter_function(
-                map_file, mask_file, out_dir, **kwargs, **extra_kwargs)
+                map_file, mask_file, out_dir, **kwargs, **extra_kwargs
+            )
 
         return filter_operation
 
@@ -412,18 +423,18 @@ class BBmeta(object):
         """
         print a banner message
         """
-        print('')
+        print("")
         print("==============================================================")
-        print('')
+        print("")
         print(msg)
-        print('')
+        print("")
         print("==============================================================")
-        print('')
+        print("")
 
-    def get_map_filename_transfer(self, id_sim, cl_type,
-                                  pure_type=None, filter_tag=None):
-        """
-        """
+    def get_map_filename_transfer(
+        self, id_sim, cl_type, pure_type=None, filter_tag=None
+    ):
+        """ """
         path_to_maps = getattr(self, f"{cl_type}_sims_dir")
 
         beam_label = f"_{filter_tag}" if filter_tag else ""
@@ -432,8 +443,9 @@ class BBmeta(object):
 
         return f"{path_to_maps}/{file_name}"
 
-    def read_map(self, map_set, id_split, id_sim=None, pol_only=False,
-                 convert_K_to_muK=False):
+    def read_map(
+        self, map_set, id_split, id_sim=None, pol_only=False, convert_K_to_muK=False
+    ):
         """
         Read a map given a map set and split index.
         Can also read a given covariance simulation if `id_sim` is provided.
@@ -454,11 +466,16 @@ class BBmeta(object):
         """
         field = [1, 2] if pol_only else [0, 1, 2]
         fname = self.get_map_filename(map_set, id_split, id_sim)
-        return mu.read_map(fname, field=field, pix_type=self.pix_type,
-                           convert_K_to_muK=convert_K_to_muK)
+        return mu.read_map(
+            fname,
+            field=field,
+            pix_type=self.pix_type,
+            convert_K_to_muK=convert_K_to_muK,
+        )
 
-    def read_map_transfer(self, id_sim, signal=None, e_or_b=None,
-                          pol_only=False, convert_K_to_muK=False):
+    def read_map_transfer(
+        self, id_sim, signal=None, e_or_b=None, pol_only=False, convert_K_to_muK=False
+    ):
         """
         Read a map given a simulation index.
         Can also read a pure-E or pure-B simulation if `e_or_b` is provided.
@@ -482,11 +499,14 @@ class BBmeta(object):
         """
         field = [1, 2] if pol_only else [0, 1, 2]
         if (not signal and not e_or_b) or (signal and e_or_b):
-            raise ValueError("You have to set to None either `signal` or "
-                             "`e_or_b`")
+            raise ValueError("You have to set to None either `signal` or " "`e_or_b`")
         fname = self.get_map_filename_transfer(id_sim, signal, e_or_b)
-        return mu.read_map(fname, field=field, pix_type=self.pix_type,
-                           convert_K_to_muK=convert_K_to_muK)
+        return mu.read_map(
+            fname,
+            field=field,
+            pix_type=self.pix_type,
+            convert_K_to_muK=convert_K_to_muK,
+        )
 
     def get_ps_names_list(self, type="all", coadd=False):
         """
@@ -546,18 +566,21 @@ class BBmeta(object):
                     exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
                     exp_tag_2 = self.exp_tag_from_map_set(map_set_2)
 
-                    if ((type == "cross") and (exp_tag_1 == exp_tag_2)
-                            and (split_1 == split_2)):
+                    if (
+                        (type == "cross")
+                        and (exp_tag_1 == exp_tag_2)
+                        and (split_1 == split_2)
+                    ):
                         continue
-                    if ((type == "auto") and ((exp_tag_1 != exp_tag_2)
-                                              or (split_1 != split_2))):
+                    if (type == "auto") and (
+                        (exp_tag_1 != exp_tag_2) or (split_1 != split_2)
+                    ):
                         continue
 
                 ps_name_list.append((map1, map2))
         return ps_name_list
 
-    def get_n_split_pairs_from_map_sets(self, map_set_1, map_set_2,
-                                        type="cross"):
+    def get_n_split_pairs_from_map_sets(self, map_set_1, map_set_2, type="cross"):
         """
         Returns the number of unique cross (and auto) bundle spectra that are
         associated to a given pair of map sets ("tagged-coadded" maps).
@@ -597,21 +620,20 @@ class BBmeta(object):
             else:
                 n_pairs = n_splits_1 * n_splits_2
         else:
-            raise ValueError("You selected an invalid type. "
-                             "Options are 'cross', 'auto', and 'all'.")
+            raise ValueError(
+                "You selected an invalid type. "
+                "Options are 'cross', 'auto', and 'all'."
+            )
         return n_pairs
 
     def get_filtering_tags(self):
-        """
-        """
-        return list(set(
-            [self.filtering_tag_from_map_set(ms)
-             for ms in self.map_sets_list]
-        ))
+        """ """
+        return list(
+            set([self.filtering_tag_from_map_set(ms) for ms in self.map_sets_list])
+        )
 
     def get_independent_filtering_pairs(self):
-        """
-        """
+        """ """
         cross_ps_names = self.get_ps_names_list(coadd=True)
         filtering_pairs = []
         for ms1, ms2 in cross_ps_names:
@@ -626,8 +648,9 @@ class BBmeta(object):
         matrices
         """
         filter_flags = [""] if beamed else ["filtered", "unfiltered"]
-        map_set_pairs = (self.get_ps_names_list(type="all", coadd=True)
-                         if beamed else [("", "")])
+        map_set_pairs = (
+            self.get_ps_names_list(type="all", coadd=True) if beamed else [("", "")]
+        )
         inv_couplings = {}
 
         for ms1, ms2 in map_set_pairs:
@@ -635,9 +658,8 @@ class BBmeta(object):
                 map_label = f"{ms1}_{ms2}" if beamed else ""
                 fname = f"couplings_{map_label}{filter_flag}"
                 couplings = np.load(f"{self.coupling_directory}/{fname}.npz")
-                npairs, ndata, _, _ = np.shape(couplings['inv_coupling'])
-                c = couplings['inv_coupling'].reshape((npairs*ndata,
-                                                       npairs*ndata))
+                npairs, ndata, _, _ = np.shape(couplings["inv_coupling"])
+                c = couplings["inv_coupling"].reshape((npairs * ndata, npairs * ndata))
                 if beamed:
                     inv_couplings[ms1, ms2] = c
                     if ms1 != ms2:
@@ -664,6 +686,7 @@ class Timer:
     Basic timer class to time different
     parts of pipeline stages.
     """
+
     def __init__(self):
         """
         Initialize the timers with an empty dict
@@ -707,6 +730,5 @@ class Timer:
         dt = time.time() - self.timers[timer_label]
         self.timers.pop(timer_label)
         if verbose:
-            prefix = f"[{text_to_output}]" if text_to_output \
-                else f"[{timer_label}]"
+            prefix = f"[{text_to_output}]" if text_to_output else f"[{timer_label}]"
             print(f"{prefix} Took {dt:.02f} s to process.")

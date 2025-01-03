@@ -64,7 +64,7 @@ def main(args):
     for id_bundle in range(args.nbundles):
         print("Bundle #", id_bundle + 1)
         for i in range(natomics)[bundle_mask]:
-            print(i, end=',')
+            print(i, end=",")
             fname_wmap = atomic_maps_list["wmap"][i]
 
             # FIXME: Load correctly. At the moment this is a placeholder.
@@ -74,41 +74,46 @@ def main(args):
 
         # Coadd tthe ivar weights and hits maps
         coadd_weight_map = np.sum(weights, axis=0)
-        mask = np.mean(coadd_weight_map[1:], axis=0) > 0.
+        mask = np.mean(coadd_weight_map[1:], axis=0) > 0.0
         nside = hp.npix2nside(npix)
         coadd_hits_map = np.sum(hits_maps, axis=0)[mask]
 
         # Optionally apply signflip using Yuji's code
         if args.do_signflip:
-            fname = 'sf_map.hdf5'
+            fname = "sf_map.hdf5"
 
             sf = coadder.SignFlip()
-            obs_weights = np.sum(weights[:, 1:, :]*0.5, axis=(1, 2))
+            obs_weights = np.sum(weights[:, 1:, :] * 0.5, axis=(1, 2))
 
             sf.gen_seq(obs_weights)
             signs = sf.seq * 2 - 1
         else:
-            fname = 'coadd_map.hdf5'
+            fname = "coadd_map.hdf5"
             signs = np.ones(natomics)
 
         # Divide by weights to get back the unweighted map solution
         coadd_solved_map = np.divide(
-            np.sum(signs[:, np.newaxis, np.newaxis]*weighted_maps, axis=0),
-            coadd_weight_map, out=np.zeros_like(coadd_weight_map),
-            where=mask
+            np.sum(signs[:, np.newaxis, np.newaxis] * weighted_maps, axis=0),
+            coadd_weight_map,
+            out=np.zeros_like(coadd_weight_map),
+            where=mask,
         )
-    # *****
+        # *****
 
         # Save maps to disk
         fname = os.path.join(args.outdir, fname)
-        dict_maps = {"weight_map": coadd_weight_map,
-                     "solved_map": coadd_solved_map,
-                     "hits_map": coadd_hits_map}
+        dict_maps = {
+            "weight_map": coadd_weight_map,
+            "solved_map": coadd_solved_map,
+            "hits_map": coadd_hits_map,
+        }
 
         # This is just a proxy to the obs ID, e.g.
         # "atomic_1709852088_ws2_f090_full"
-        list_of_obsid = ["_".join(atm.split('/')[-1].split("_")[:-1])
-                         for atm in atomic_maps_list["wmap"][bundle_mask]]
+        list_of_obsid = [
+            "_".join(atm.split("/")[-1].split("_")[:-1])
+            for atm in atomic_maps_list["wmap"][bundle_mask]
+        ]
 
         # TODO: Adapt SOOPERCOOL to handle hdf5 maps as inputs.
         coordinator.write_hdf5_map(fname, nside, dict_maps, list_of_obsid)
@@ -116,15 +121,19 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--atomic_list_fpath",
-                        help="Path to npz file with path to atomic maps.")
-    parser.add_argument("--outdir",
-                        help="Output directory for bundle maps list.")
-    parser.add_argument("--nbundles",
-                        help="Number of bundles to make from atomic maps.")
-    parser.add_argument("--do_signflip", action="store_true",
-                        help="Whether to make sign-flip noise realizations"
-                        "from the atomic maps in each bundle.")
+    parser.add_argument(
+        "--atomic_list_fpath", help="Path to npz file with path to atomic maps."
+    )
+    parser.add_argument("--outdir", help="Output directory for bundle maps list.")
+    parser.add_argument(
+        "--nbundles", help="Number of bundles to make from atomic maps."
+    )
+    parser.add_argument(
+        "--do_signflip",
+        action="store_true",
+        help="Whether to make sign-flip noise realizations"
+        "from the atomic maps in each bundle.",
+    )
 
     args = parser.parse_args()
     main(args)

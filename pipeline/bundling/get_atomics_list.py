@@ -4,8 +4,9 @@ import numpy as np
 import os
 
 
-def get_atomic_maps_list(map_dir, queries_list, map_type="wmap", db_fpath=None,
-                         verbose=False):
+def get_atomic_maps_list(
+    map_dir, queries_list, map_type="wmap", db_fpath=None, verbose=False
+):
     """
     Outputs list of atomic maps
     (e.g. "{map_dir}/17107/atomic_1710705196_ws0_f090_full_{map_type}.fits")
@@ -54,7 +55,9 @@ def get_atomic_maps_list(map_dir, queries_list, map_type="wmap", db_fpath=None,
     # FIXME: Give warning if query key is not present in the database.
 
     # Read data
-    cursor.execute(f"select {query_target} from {table_name} where {where_statement};")  # noqa
+    cursor.execute(
+        f"select {query_target} from {table_name} where {where_statement};"
+    )  # noqa
     result = cursor.fetchall()
     if verbose:
         print(f" Found {len(result)} matching entries.")
@@ -83,25 +86,28 @@ def main(args):
     )
 
     for typ in ["weights", "hits"]:
-        atomic_maps_list[typ] = [a.replace("wmap", typ)
-                                 for a in atomic_maps_list["wmap"]]
+        atomic_maps_list[typ] = [
+            a.replace("wmap", typ) for a in atomic_maps_list["wmap"]
+        ]
     natomics = len(atomic_maps_list["wmap"])
     np.savez(f"{args.outdir}/atomic_maps_list.npz", **atomic_maps_list)
-    print(f"Stored list of {natomics} atomics "
-          f"under {args.outdir}/atomic_maps_list.npz")
+    print(
+        f"Stored list of {natomics} atomics "
+        f"under {args.outdir}/atomic_maps_list.npz"
+    )
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--map_dir",
-                        help="Atomic maps directory.")
-    parser.add_argument("--queries_list", nargs="+", default=[],
-                        help="String with SQL queries of form "
-                        "\"freq_channel = 'f090'\".")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Verbose output?")
-    parser.add_argument("--outdir",
-                        help="Output directory for atomic maps list.")
+    parser.add_argument("--map_dir", help="Atomic maps directory.")
+    parser.add_argument(
+        "--queries_list",
+        nargs="+",
+        default=[],
+        help="String with SQL queries of form " "\"freq_channel = 'f090'\".",
+    )
+    parser.add_argument("--verbose", action="store_true", help="Verbose output?")
+    parser.add_argument("--outdir", help="Output directory for atomic maps list.")
 
     args = parser.parse_args()
     main(args)

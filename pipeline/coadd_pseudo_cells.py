@@ -23,16 +23,15 @@ def main(args):
     BBmeta.make_dir(plot_dir)
 
     binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"], binning["bin_high"] + 1)
     lb = nmt_bins.get_effective_ells()
-    field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
+    field_pairs = [m1 + m2 for m1, m2 in product("TEB", repeat=2)]
 
     if do_plots:
         import healpy as hp
         import matplotlib.pyplot as plt
 
-        lmax = 3*meta.nside - 1
+        lmax = 3 * meta.nside - 1
         ll = np.arange(lmax + 1)
         field_pairs_theory = {"TT": 0, "EE": 1, "BB": 2, "TE": 3}
         colors = {"cross": "navy", "auto": "darkorange", "noise": "r"}
@@ -46,7 +45,7 @@ def main(args):
 
     ps_names = {
         "cross": meta.get_ps_names_list(type="cross", coadd=False),
-        "auto": meta.get_ps_names_list(type="auto", coadd=False)
+        "auto": meta.get_ps_names_list(type="auto", coadd=False),
     }
 
     cross_split_list = meta.get_ps_names_list(type="all", coadd=False)
@@ -57,15 +56,13 @@ def main(args):
     # Initialize output dictionary
     cells_coadd = {
         "cross": {
-            (ms1, ms2): {
-                fp: [] for fp in field_pairs
-            } for ms1, ms2 in cross_map_set_list
+            (ms1, ms2): {fp: [] for fp in field_pairs}
+            for ms1, ms2 in cross_map_set_list
         },
         "auto": {
-            (ms1, ms2): {
-                fp: [] for fp in field_pairs
-            } for ms1, ms2 in cross_map_set_list
-        }
+            (ms1, ms2): {fp: [] for fp in field_pairs}
+            for ms1, ms2 in cross_map_set_list
+        },
     }
 
     # Loop over all map set pairs
@@ -85,7 +82,9 @@ def main(args):
 
         for field_pair in field_pairs:
 
-            cells_coadd[type][map_set1, map_set2][field_pair] += [cells_dict[field_pair]] # noqa
+            cells_coadd[type][map_set1, map_set2][field_pair] += [
+                cells_dict[field_pair]
+            ]  # noqa
 
     # Average the cross-split power spectra
     cells_coadd["noise"] = {}
@@ -94,29 +93,31 @@ def main(args):
         for field_pair in field_pairs:
             for type in ["cross", "auto"]:
                 if len(cells_coadd[type][map_set1, map_set2][field_pair]) != 0:
-                    cells_coadd[type][map_set1, map_set2][field_pair] = \
-                        np.mean(
-                            cells_coadd[type][map_set1, map_set2][field_pair],
-                            axis=0
-                        )
+                    cells_coadd[type][map_set1, map_set2][field_pair] = np.mean(
+                        cells_coadd[type][map_set1, map_set2][field_pair], axis=0
+                    )
 
             if len(cells_coadd["auto"][map_set1, map_set2][field_pair]) == 0:
-                cells_coadd["noise"][map_set1, map_set2][field_pair] = np.zeros_like(cells_coadd["cross"][map_set1, map_set2][field_pair])  # noqa
-                cells_coadd["auto"][map_set1, map_set2][field_pair] = np.zeros_like(cells_coadd["cross"][map_set1, map_set2][field_pair])  # noqa
-            else:
-                cells_coadd["noise"][(map_set1, map_set2)][field_pair] = \
-                    cells_coadd["auto"][map_set1, map_set2][field_pair] - \
+                cells_coadd["noise"][map_set1, map_set2][field_pair] = np.zeros_like(
                     cells_coadd["cross"][map_set1, map_set2][field_pair]
+                )  # noqa
+                cells_coadd["auto"][map_set1, map_set2][field_pair] = np.zeros_like(
+                    cells_coadd["cross"][map_set1, map_set2][field_pair]
+                )  # noqa
+            else:
+                cells_coadd["noise"][(map_set1, map_set2)][field_pair] = (
+                    cells_coadd["auto"][map_set1, map_set2][field_pair]
+                    - cells_coadd["cross"][map_set1, map_set2][field_pair]
+                )
 
         for type in ["cross", "auto", "noise"]:
             cells_to_save = {
-                fp: cells_coadd[type][map_set1, map_set2][fp]
-                for fp in field_pairs
+                fp: cells_coadd[type][map_set1, map_set2][fp] for fp in field_pairs
             }
             np.savez(
                 f"{cells_dir}/decoupled_{type}_pcls_{map_set1}_x_{map_set2}.npz",  # noqa
                 lb=lb,
-                **cells_to_save
+                **cells_to_save,
             )
 
     if do_plots:
@@ -128,22 +129,30 @@ def main(args):
 
                 plt.figure(figsize=(10, 8))
                 plt.xlabel(r"$\ell$", fontsize=15)
-                plt.ylabel(r"$C_\ell^\mathrm{%s} \; [\mu K_\mathrm{CMB}^2]$" % fp, # noqa
-                           fontsize=15)
+                plt.ylabel(
+                    r"$C_\ell^\mathrm{%s} \; [\mu K_\mathrm{CMB}^2]$" % fp,  # noqa
+                    fontsize=15,
+                )
 
                 for type in ["cross", "auto", "noise"]:
-                    plt.plot(lb, cells_coadd[type][(map_set1, map_set2)][fp],
-                             label=type,
-                             marker="o", lw=0.7, mfc="w", c=colors[type])
+                    plt.plot(
+                        lb,
+                        cells_coadd[type][(map_set1, map_set2)][fp],
+                        label=type,
+                        marker="o",
+                        lw=0.7,
+                        mfc="w",
+                        c=colors[type],
+                    )
                 if fp in field_pairs_theory:
                     ifp = field_pairs_theory[fp]
-                    cmb_cl = hp.read_cl(fiducial_cmb)[ifp, :lmax+1]
-                    dust_cl = hp.read_cl(
-                        fiducial_dust.format(nu1=nu1, nu2=nu2)
-                    )[ifp, :lmax+1]
-                    synch_cl = hp.read_cl(
-                        fiducial_synch.format(nu1=nu1, nu2=nu2)
-                    )[ifp, :lmax+1]
+                    cmb_cl = hp.read_cl(fiducial_cmb)[ifp, : lmax + 1]
+                    dust_cl = hp.read_cl(fiducial_dust.format(nu1=nu1, nu2=nu2))[
+                        ifp, : lmax + 1
+                    ]
+                    synch_cl = hp.read_cl(fiducial_synch.format(nu1=nu1, nu2=nu2))[
+                        ifp, : lmax + 1
+                    ]
                     clth = cmb_cl + dust_cl + synch_cl
 
                     plt.plot(ll, clth, c="k", ls="--", label="Theory")
@@ -151,7 +160,7 @@ def main(args):
                 plt.legend(fontsize=14)
                 plt.title(f"{map_set1} x {map_set2} | {fp}", fontsize=15)
 
-                plt.xlim(0, 2*meta.nside)
+                plt.xlim(0, 2 * meta.nside)
 
                 if fp == fp[::-1]:
                     plt.yscale("log")
@@ -169,7 +178,7 @@ def main(args):
 
                 plt.savefig(
                     f"{plot_dir}/pcls_{map_set1}_{map_set2}_{fp}.png",
-                    bbox_inches="tight"
+                    bbox_inches="tight",
                 )
                 plt.close()
 
@@ -177,8 +186,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pseudo-Cl calculator")
     parser.add_argument("--globals", type=str, help="Path to the yaml file")
-    parser.add_argument("--no_plots", action="store_true",
-                        help="Do not make plots")
+    parser.add_argument("--no_plots", action="store_true", help="Do not make plots")
 
     args = parser.parse_args()
 
