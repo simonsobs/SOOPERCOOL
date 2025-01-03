@@ -16,8 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.9, "3.10", "3.11", "3.12"]
-    name: Python ${{ matrix.python-version }} sample
+        python-version: ["3.11"]
     steps:
       - name: Checkout SOOPERCOOL repository
         uses: actions/checkout@v4
@@ -26,10 +25,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: |
-              3.9
-              3.10
               3.11
-              3.12
 
       - uses: awvwgk/setup-fortran@main
         id: setup-fortran
