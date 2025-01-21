@@ -222,19 +222,22 @@ def main(args):
         )
 
     # Compute and plot spin derivatives
-    first, second = su.get_spin_derivatives(analysis_mask)
+    if meta.pix_type == "car":
+        print("WARNING: Spin derivatives are not implemented yet. SKIPPING.")
+    else:
+        first, second = su.get_spin_derivatives(analysis_mask)
 
-    if do_plots:
-        mu.plot_map(
-            first,
-            title="First spin derivative",
-            file_name=f"{plot_dir}/first_spin_derivative"
-        )
-        mu.plot_map(
-            second,
-            title="Second spin derivative",
-            file_name=f"{plot_dir}/second_spin_derivative"
-        )
+        if do_plots:
+            mu.plot_map(
+                first,
+                title="First spin derivative",
+                file_name=f"{plot_dir}/first_spin_derivative"
+            )
+            mu.plot_map(
+                second,
+                title="Second spin derivative",
+                file_name=f"{plot_dir}/second_spin_derivative"
+            )
 
     if args.verbose:
         print("---------------------------------------------------------")

@@ -5,6 +5,8 @@ import pymaster as nmt
 import numpy as np
 import soopercool.utils as su
 
+from pixell import enmap
+
 
 def main(args):
     """
@@ -30,7 +32,14 @@ def main(args):
     nl = lmax + 1
 
     if meta.pix_type == "car":
-        _, wcs = mask.geometry
+        try:
+            _, wcs = mask.geometry
+            nmt.NmtField(mask, None, wcs=wcs)
+        except ValueError:
+            res = 10. * np.pi/180/60
+            _, wcs = enmap.fullsky_geometry(
+                res=res, proj='car', variant='CC'
+            )
     else:
         wcs = None
 

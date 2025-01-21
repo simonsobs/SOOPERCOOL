@@ -6,6 +6,9 @@ from soopercool import ps_utils
 from soopercool import mpi_utils as mpi
 from soopercool import map_utils as mu
 
+# DEBUG
+from pixell import enmap
+
 
 def main(args):
     """
@@ -76,7 +79,15 @@ def main(args):
 
                 wcs = None
                 if hasattr(map, 'wcs'):
-                    wcs = map.wcs 
+                    try:
+                        wcs = map.wcs
+                        nmt.NmtField(mask, None, wcs=wcs)
+                    except ValueError:
+                        res = 10. * np.pi/180/60
+                        _, wcs = enmap.fullsky_geometry(
+                            res=res, proj='car', variant='CC'
+                        )
+
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1], wcs=wcs),
                     "spin2": nmt.NmtField(mask, map[1:],
