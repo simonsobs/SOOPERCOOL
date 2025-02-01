@@ -1,4 +1,5 @@
 import argparse
+import os
 from soopercool import BBmeta
 import pymaster as nmt
 import numpy as np
@@ -82,10 +83,23 @@ def main(args):
                     filtered_map_file, pix_type=meta.pix_type,
                     fields_hp=[0, 1, 2]
                 )
+
                 if mask_file is None:
                     # If analysis_mask is none, compute binary mask on the fly.
-                    mask = mu.binary_mask_from_map(map_filtered,
-                                                   pix_type=meta.pix_type)
+                    weights_file = filtered_map_file.replace(".fits",
+                                                             "_weights.fits")
+                    if os.path.isfile(weights_file):
+                        weights = mu.read_map(
+                            weights_file, pix_type=meta.pix_type,
+                            fields_hp=[0, 1, 2]
+                        )
+                        mask = mu.binary_mask_from_map(
+                            weights, pix_type=meta.pix_type
+                        )
+                    else:
+                        raise FileNotFoundError("File does not exist: "
+                                                f"{weights_file}")
+
                     mu.plot_map(
                         mask,
                         file_name=f"{out_dir}/binary_mask_{pure_type}",
