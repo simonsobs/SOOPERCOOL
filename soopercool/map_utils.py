@@ -408,3 +408,41 @@ def template_from_map(map, ncomp, pix_type="hp"):
         new_shape = (ncomp,) + shape[-2:]
 
         return enmap.zeros(new_shape, wcs)
+
+
+def binary_mask_from_map(map, pix_type="hp"):
+    """
+    Generate a binary mask from a map.
+    Parameters
+    ----------
+    map : np.ndarray or enmap.ndmap
+        Input map.
+    ncomp : int
+        Number of components of the output template.
+    pix_type : str, optional
+        Pixellization type.
+
+    Returns
+    -------
+    binary_mask : np.ndarray or enmap.ndmap
+        Binary mask.
+    """
+    _check_pix_type(pix_type)
+    if pix_type == "hp":
+        if map.shape > 1:
+            map = np.sum(map, axis=0)
+    else:
+        shape, wcs = map.geometry
+        if len(shape) == 3:
+            map = np.sum(map, axis=0)
+            shape = shape[-2:]
+        map = enmap.ndmap(map, wcs)
+        binary = enmap.zeros(map.shape, wcs=wcs)
+
+    map = smooth_map(map, fwhm_deg=1, pix_type=pix_type)
+    hits_proxy = map
+    hits_proxy = np.abs(map)
+    hits_proxy /= np.amax(hits_proxy, axis=(0, 1))
+    binary[hits_proxy > 0.1] = 1.
+
+    return binary

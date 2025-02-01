@@ -5,8 +5,6 @@ import numpy as np
 from soopercool import ps_utils
 from soopercool import mpi_utils as mpi
 from soopercool import map_utils as mu
-
-# DEBUG
 from pixell import enmap
 
 
@@ -25,7 +23,15 @@ def main(args):
                                      binning["bin_high"] + 1)
 
     mask_file = meta.masks["analysis_mask"]
-    mask = mu.read_map(mask_file, pix_type=meta.pix_type)
+    if mask_file is not None:
+        mask = mu.read_map(mask_file, pix_type=meta.pix_type)
+        purify_b = meta.pure_B
+    else:
+        print("WARNING: The analysis mask is not specified. "
+              "Estimating TF sims power spectra with a binary mask "
+              "constructed from filtered data. "
+              "SWITCHING OFF purification.")
+        purify_b = False
 
     filtering_tags = meta.get_filtering_tags()
     filtering_tag_pairs = meta.get_independent_filtering_pairs()
@@ -76,6 +82,20 @@ def main(args):
                     filtered_map_file, pix_type=meta.pix_type,
                     fields_hp=[0, 1, 2]
                 )
+                if mask_file is None:
+                    # If analysis_mask is none, compute binary mask on the fly.
+                    mask = mu.binary_mask_from_map(map_filtered,
+                                                   pix_type=meta.pix_type)
+                    mu.plot_map(
+                        mask,
+                        file_name=f"{out_dir}/binary_mask_{pure_type}",
+                        lims=[-1, 1],
+                        title=pure_type,
+                        pix_type=meta.pix_type
+                    )
+                    print(
+                        f"Plot saved to {out_dir}/binary_mask_{pure_type}.png"
+                    )
 
                 wcs = None
                 if hasattr(map, 'wcs'):
@@ -91,13 +111,13 @@ def main(args):
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1], wcs=wcs),
                     "spin2": nmt.NmtField(mask, map[1:],
-                                          purify_b=meta.pure_B, wcs=wcs)
+                                          purify_b=purify_b, wcs=wcs)
                 }
 
                 field_filtered = {
                     "spin0": nmt.NmtField(mask, map_filtered[:1], wcs=wcs),
                     "spin2": nmt.NmtField(mask, map_filtered[1:],
-                                          purify_b=meta.pure_B, wcs=wcs)
+                                          purify_b=purify_b, wcs=wcs)
                 }
 
                 fields[ftag]["unfiltered"][pure_type] = field
