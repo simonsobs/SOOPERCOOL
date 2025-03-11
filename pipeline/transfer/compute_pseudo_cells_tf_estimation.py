@@ -12,8 +12,9 @@ from pixell import enmap
 def main(args):
     """
     """
+    rank, size, comm = mpi.init(True)
+
     meta = BBmeta(args.globals)
-    verbose = args.verbose
     out_dir = meta.output_directory
 
     pcls_tf_est_dir = f"{out_dir}/cells_tf_est"
@@ -43,22 +44,28 @@ def main(args):
                           compute a transfer function for it")
 
     tf_settings = meta.transfer_settings
+    sim_ids = range(tf_settings["tf_est_num_sims"])
 
-    mpi.init(True)
+    mpi_shared_list = [(id_sim, ftag1, ftag2)
+                       for ftag1, ftag2 in filtering_tag_pairs
+                       for id_sim in sim_ids]
+    # Every rank must have the same list order
+    mpi_shared_list = comm.bcast(mpi_shared_list, root=0)
 
-    for id_sim in mpi.taskrange(tf_settings["tf_est_num_sims"] - 1):
+    task_ids = mpi.distribute_tasks(size, rank, len(mpi_shared_list))
+    local_mpi_list = [mpi_shared_list[i] for i in task_ids]
 
+    for id_sim, ftag1, ftag2 in local_mpi_list:
+        ftags_unique = list(dict.fromkeys([ftag1, ftag2]))
         fields = {
             ftag: {
                 "filtered": {},
                 "unfiltered": {}
-            } for ftag in filtering_tags
+            } for ftag in ftags_unique
         }
 
-        for ftag in filtering_tags:
-            if verbose:
-                print(f"# {id_sim+1} | {ftag}")
-            for pure_type in ["pureT", "pureE", "pureB"]:
+        for pure_type in ["pureT", "pureE", "pureB"]:
+            for ftag in ftags_unique:
 
                 unfiltered_map_dir = tf_settings["unfiltered_map_dir"][ftag]
                 unfiltered_map_tmpl = tf_settings["unfiltered_map_template"][ftag] # noqa
@@ -89,12 +96,8 @@ def main(args):
                     weights_file = filtered_map_file.replace(".fits",
                                                              "_weights.fits")
                     if os.path.isfile(weights_file):
-                        weights = mu.read_map(
-                            weights_file, pix_type=meta.pix_type,
-                            fields_hp=[0, 1, 2]
-                        )
                         mask = mu.binary_mask_from_map(
-                            weights, pix_type=meta.pix_type
+                            weights_file, pix_type=meta.pix_type
                         )
                     else:
                         raise FileNotFoundError("File does not exist: "
@@ -107,27 +110,46 @@ def main(args):
                         title=pure_type,
                         pix_type=meta.pix_type
                     )
+                    mu.write_map(
+                        f"{out_dir}/binary_mask_{pure_type}_sim{id_sim:04d}_{ftag}.fits",  # noqa
+                        mask, pix_type=meta.pix_type
+                    )
                     print(
-                        f"Plot saved to {out_dir}/binary_mask_{pure_type}.png"
+                        f"Mask saved to {out_dir}/binary_mask_{pure_type}_sim{id_sim:04d}_{ftag}.png"  # noqa
                     )
 
                 wcs = None
                 if hasattr(map, 'wcs'):
-                    try:
-                        wcs = map.wcs
-                        nmt.NmtField(mask, None, wcs=wcs)
-                    except ValueError:
-                        res = 10. * np.pi/180/60
-                        _, wcs = enmap.fullsky_geometry(
-                            res=res, proj='car', variant='CC'
-                        )
+                    # This is a patch.
+                    # Reproject mask and maps onto template geometry.
+                    tshape, twcs = enmap.read_map_geometry(meta.car_template)
+                    shape, wcs = enmap.overlap(map.shape, map.wcs, tshape,
+                                               twcs)
+                    shape, wcs = enmap.overlap(map_filtered.shape,
+                                               map_filtered.wcs, shape, wcs)
+                    shape, wcs = enmap.overlap(mask.shape, mask.wcs, shape,
+                                               wcs)
+                    flat_template = enmap.zeros((3, shape[0], shape[1]), wcs)
+
+                    map = enmap.insert(flat_template.copy(), map)
+                    map_filtered = enmap.insert(flat_template.copy(),
+                                                map_filtered)
+                    mask = enmap.insert(flat_template[0].copy(), mask)
+
+                    # Deal with possibly missing atomics => different footprint
+                    mask_restrict = map_filtered.copy()
+                    mask_restrict = mask_restrict[
+                        ["pureT", "pureE", "pureB"].index(pure_type)
+                    ]
+                    mask_restrict[mask_restrict != 0] = 1.
+                    mask *= mask_restrict
+                    _, wcs = enmap.read_map_geometry(meta.car_template)
 
                 field = {
                     "spin0": nmt.NmtField(mask, map[:1], wcs=wcs),
                     "spin2": nmt.NmtField(mask, map[1:],
                                           purify_b=purify_b, wcs=wcs)
                 }
-
                 field_filtered = {
                     "spin0": nmt.NmtField(mask, map_filtered[:1], wcs=wcs),
                     "spin2": nmt.NmtField(mask, map_filtered[1:],
@@ -137,23 +159,25 @@ def main(args):
                 fields[ftag]["unfiltered"][pure_type] = field
                 fields[ftag]["filtered"][pure_type] = field_filtered
 
-        for ftag1, ftag2 in filtering_tag_pairs:
-            if ftag1 is None and ftag2 is None:
-                continue
+        if ftag1 is None and ftag2 is None:
+            continue
 
-            pcls_mat_filtered = ps_utils.get_pcls_mat_transfer(
-                fields[ftag1]["filtered"],
-                nmt_bins, fields2=fields[ftag2]["filtered"]
-            )
-            pcls_mat_unfiltered = ps_utils.get_pcls_mat_transfer(
-                fields[ftag1]["unfiltered"],
-                nmt_bins, fields2=fields[ftag2]["unfiltered"]
-            )
+        pcls_mat_filtered = ps_utils.get_pcls_mat_transfer(
+            fields[ftag1]["filtered"],
+            nmt_bins, fields2=fields[ftag2]["filtered"]
+        )
+        pcls_mat_unfiltered = ps_utils.get_pcls_mat_transfer(
+            fields[ftag1]["unfiltered"],
+            nmt_bins, fields2=fields[ftag2]["unfiltered"]
+        )
 
-            np.savez(f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_filtered_{id_sim:04d}.npz", # noqa
-                     pcls_mat=pcls_mat_filtered)
-            np.savez(f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_{id_sim:04d}.npz", # noqa
-                     pcls_mat=pcls_mat_unfiltered)
+        out_f = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_filtered_{id_sim:04d}.npz"  # noqa
+        out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_{id_sim:04d}.npz"  # noqa
+
+        np.savez(out_f, pcls_mat=pcls_mat_filtered)
+        np.savez(out_unf, pcls_mat=pcls_mat_unfiltered)
+
+        comm.Barrier()
 
 
 if __name__ == "__main__":

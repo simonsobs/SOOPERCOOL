@@ -47,8 +47,22 @@ def main(args):
 
             m = mu.read_map(map_fname, field=[0, 1, 2],
                             pix_type=meta.pix_type, convert_K_to_muK=True)
-            field_spin0 = nmt.NmtField(mask, m[:1])
-            field_spin2 = nmt.NmtField(mask, m[1:], purify_b=meta.pure_B)
+
+            wcs = None
+            if hasattr(m, 'wcs'):
+                # This is a patch. Reproject mask and map onto template
+                # geometry.
+                from pixell import enmap
+                tshape, twcs = enmap.read_map_geometry(meta.car_template)
+                shape, wcs = enmap.overlap(m.shape, m.wcs, tshape, twcs)
+                shape, wcs = enmap.overlap(mask.shape, mask.wcs, shape, wcs)
+                flat_template = enmap.zeros((3, shape[0], shape[1]), wcs)
+                mask = enmap.insert(flat_template.copy()[0], mask)
+                m = enmap.insert(flat_template.copy(), m)
+
+            field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs)
+            field_spin2 = nmt.NmtField(mask, m[1:], wcs=wcs,
+                                       purify_b=meta.pure_B)
 
             fields[map_set, id_bundle] = {
                 "spin0": field_spin0,

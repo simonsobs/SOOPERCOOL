@@ -81,7 +81,16 @@ def main(args):
                             f"bundle{id_bundle}_{f}.png")
                 plt.close()
 
-        wcs = m.wcs if meta.pix_type == "car" else None
+        wcs = None
+        if hasattr(m, 'wcs'):
+            # This is a patch. Reproject mask and map onto template geometry.
+            from pixell import enmap
+            tshape, twcs = enmap.read_map_geometry(meta.car_template)
+            shape, wcs = enmap.overlap(m.shape, m.wcs, tshape, twcs)
+            shape, wcs = enmap.overlap(mask.shape, mask.wcs, shape, wcs)
+            flat_template = enmap.zeros((3, shape[0], shape[1]), wcs)
+            mask = enmap.insert(flat_template.copy()[0], mask)
+            m = enmap.insert(flat_template.copy(), m)
 
         field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs)
         field_spin2 = nmt.NmtField(mask, m[1:], wcs=wcs, purify_b=meta.pure_B)
