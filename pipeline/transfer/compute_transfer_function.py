@@ -10,18 +10,19 @@ def main(args):
     meta = BBmeta(args.globals)
 
     out_dir = meta.output_directory
-    tf_dir = f"{out_dir}/transfer_functions"
-    BBmeta.make_dir(tf_dir)
 
     cells_dir = f"{out_dir}/cells_tf_est"
 
     tf_settings = meta.transfer_settings
+    tf_dir = tf_settings["transfer_directory"]
+    BBmeta.make_dir(tf_dir)
 
     filtering_pairs = meta.get_independent_filtering_pairs()
 
     pcls_mat_dict = cu.read_pcls_matrices(
         cells_dir, filtering_pairs,
-        tf_settings["tf_est_num_sims"]
+        tf_settings["tf_est_num_sims"],
+        tf_settings["sim_id_start"]
     )
 
     # Average the pseudo-cl matrices
@@ -46,6 +47,7 @@ def main(args):
 
     full_tf = {}
     for ftag1, ftag2 in filtering_pairs:
+        print(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
         tf = trans[ftag1, ftag2]
         np.savez(
             f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz",

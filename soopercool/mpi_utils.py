@@ -47,6 +47,7 @@ def init(switch=False):
     except ImportError as exc:
         sys.stderr.write("IMPORT ERROR: " + __file__ + " (" + str(exc) + "). "
                          "Could not load mpi4py. MPI will not be used.\n")
+    return rank, size, comm
 
 
 def is_initialized():
@@ -88,3 +89,52 @@ def taskrange(imax, imin=0, shift=0):
         subrange = np.arange(rank*perrank, (rank + 1)*perrank)
 
     return subrange
+
+
+def distribute_tasks(size, rank, ntasks, logger=None):
+    """
+    Distributes [ntasks] tasks among [size] workers, and outputs
+    the list of tasks assigned to a given rank.
+
+    Parameters
+    ----------
+        size: int
+            The number of workers available.
+        rank: int
+            The number (ID) of the current worker.
+        ntasks: int
+            The number of tasks.
+        logger: logging.Logger
+            Logging instance to write output. If None, ignore.
+    Returns
+    -------
+        local_task_ids: list
+            List with indices corresponding to the tasks assigned
+            to worker [rank]
+    """
+    if size > ntasks:
+        local_start = rank
+        local_stop = rank + 1
+    else:
+        local_start = rank * (ntasks // size)
+        local_stop = local_start + (ntasks // size)
+
+    local_task_ids = list(range(ntasks))[local_start:local_stop]
+
+    if rank >= ntasks:
+        local_task_ids = []
+
+    # If ntasks is not divisible by size, there will be a set of
+    # ntasks_left < size leftover tasks. Distribute one of them each to the
+    # first ntasks_left workers.
+    if ntasks % size != 0:
+        leftover = np.arange(ntasks)[-(ntasks % size):]
+        if rank < len(leftover):
+            local_task_ids.append(leftover[rank])
+
+    if logger is not None:
+        logger.info(f"Rank {rank} has {len(local_task_ids)} tasks")
+        logger.info(f"Total number of tasks is {ntasks}")
+    print("local_task_ids", np.array(local_task_ids, dtype=int))
+
+    return local_task_ids

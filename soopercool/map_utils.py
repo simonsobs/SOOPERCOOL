@@ -52,8 +52,8 @@ def lmax_from_map(map, pix_type="hp"):
 
     Parameters
     ----------
-    map : np.ndarray or enmap.ndmap
-        Input map.
+    map : str or np.ndarray or enmap.ndmap
+        Input filename or map.
     pix_type : str, optional
         Pixellization type.
 
@@ -63,6 +63,15 @@ def lmax_from_map(map, pix_type="hp"):
         Maximum multipole.
     """
     _check_pix_type(pix_type)
+
+    if isinstance(map, str):
+        if pix_type == "car":
+            _, wcs = enmap.read_map_geometry(map)
+            res = np.deg2rad(np.min(np.abs(wcs.wcs.cdelt)))
+            lmax = uharm.res2lmax(res)
+            return lmax
+        else:
+            map = read_map(map)
     if pix_type == "hp":
         nside = hp.npix2nside(map.shape[-1])
         return 3 * nside - 1
@@ -138,7 +147,7 @@ def read_map(map_file,
     return conv*m
 
 
-def write_map(map_file, map, dtype=None, pix_type='hp',
+def write_map(map_file, map, dtype=np.float64, pix_type='hp',
               convert_muK_to_K=False):
     """
     Write a map to a file, regardless of the pixellization type.
@@ -410,7 +419,7 @@ def template_from_map(map, ncomp, pix_type="hp"):
         return enmap.zeros(new_shape, wcs)
 
 
-def binary_mask_from_map(map, pix_type="hp"):
+def binary_mask_from_map(map, pix_type="hp", geometry=None):
     """
     Generate a binary mask from a map.
     Parameters
@@ -429,10 +438,16 @@ def binary_mask_from_map(map, pix_type="hp"):
     """
     _check_pix_type(pix_type)
     if pix_type == "hp":
+        if isinstance(map, str):
+            map = read_map(map, pix_type=pix_type)
         if map.shape > 1:
             map = np.sum(map, axis=0)
     else:
-        shape, wcs = map.geometry
+        if isinstance(map, str):
+            shape, wcs = enmap.read_map_geometry(map)
+            map = read_map(map, pix_type=pix_type)
+        else:
+            shape, wcs = map.geometry
         if len(shape) == 3:
             map = np.sum(map, axis=0)
             shape = shape[-2:]
