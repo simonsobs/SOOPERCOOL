@@ -4,11 +4,13 @@ from soopercool import BBmeta
 from soopercool import map_utils as mu
 from soopercool import utils as su
 import numpy as np
-
+import sys
+import os
 
 def main(args):
     """
     """
+    
     meta = BBmeta(args.globals)
     do_plots = not args.no_plots
     verbose = args.verbose
@@ -20,9 +22,13 @@ def main(args):
     BBmeta.make_dir(masks_dir)
     if do_plots:
         BBmeta.make_dir(plot_dir)
+        
+    log_file_path = os.path.join(masks_dir, "log.txt")
+    sys.stdout = open(log_file_path, 'w')
+    sys.stderr = sys.stdout 
 
     masks_settings = meta.masks
-
+    
     # If a global hits file is indicated in the paramter file, use it.
     if masks_settings["global_hits"] is not None:
         sum_hits = mu.read_map(
@@ -40,7 +46,6 @@ def main(args):
         for map_set in meta.map_sets_list:
             n_bundles = meta.n_bundles_from_map_set(map_set)
             for id_bundle in range(n_bundles):
-
                 map_dir = meta.map_dir_from_map_set(map_set)
                 map_template = meta.map_template_from_map_set(map_set)
                 map_file = map_template.replace(
@@ -80,8 +85,16 @@ def main(args):
                         type_options[0],
                         option
                     )
+                    
+                    if masks_settings["use_weights"]:
+                        # Use weights instead of hits
+                        map_file = map_file.replace(
+                            "hits",
+                            "weights"
+                        )
 
-                print(f"Reading hitmap for {map_set} - bundle {id_bundle}")
+                print(f"Reading map for {map_set} - bundle {id_bundle}")
+                print(f"    file_name: {map_dir}/{map_file}")
                 if verbose:
                     print(f"    file_name: {map_dir}/{map_file}")
 
@@ -90,20 +103,47 @@ def main(args):
                     pix_type=meta.pix_type
                 )
                 hit_maps.append(hits)
-
+        
         # Create binary and normalized hitmap
-        binary = hit_maps[0].copy()
-        sum_hits = hit_maps[0].copy()
+        mp = hit_maps[0]
+        if masks_settings["use_weights"]:
+            mp = mp[1]
+        binary = mp.copy()
+        sum_hits = mp.copy()
         binary[:] = 1
         sum_hits[:] = 0
         for hit_map in hit_maps:
+            if masks_settings["use_weights"]:
+                hit_map = np.sqrt(hit_map[1]**2 + hit_map[2]**2)
             binary[hit_map == 0] = 0
             sum_hits += hit_map
         sum_hits[binary == 0] = 0
-
+    
     # Normalize and smooth hitmaps
+    if masks_settings["use_weights"]:
+        # Select threshold
+        threshold = np.median(sum_hits[sum_hits > 0])
+        sum_hits[sum_hits < threshold] = 0
     sum_hits = mu.smooth_map(sum_hits, fwhm_deg=1, pix_type=meta.pix_type)
-    sum_hits /= np.amax(sum_hits)
+    if masks_settings["use_weights"]:
+        # Set boundaries at 0-1
+        sum_hits = (sum_hits - np.amin(sum_hits)) / (np.amax(sum_hits) - np.amin(sum_hits))
+        print("sum_hits", np.amin(sum_hits), np.amax(sum_hits))
+    else:
+        sum_hits /= np.amax(sum_hits)
+        
+    if masks_settings["box_mask"] is not None:
+        from pixell import enmap
+        box = np.deg2rad(masks_settings["box_mask"])
+        decs, ras = sum_hits.posmap()
+        mask_box = enmap.zeros(shape=sum_hits.shape, wcs=sum_hits.wcs, dtype=float)
+        mask_box[(box[0][0] < decs) & (decs < box[1][0]) & (box[0][1] < ras) & (ras < box[1][1])] = 1.
+        binary *= mask_box
+        sum_hits *= mask_box
+        
+    # Calculate and print the fraction of the sky covered by the mask
+    fsky = np.mean(sum_hits)
+    print(f"Fraction of the sky covered by the mask (fsky): {fsky}")
 
     # Save products
     mu.write_map(

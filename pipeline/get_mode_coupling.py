@@ -4,6 +4,7 @@ from soopercool import map_utils as mu
 import pymaster as nmt
 import numpy as np
 import soopercool.utils as su
+import os
 
 from pixell import enmap
 
@@ -107,19 +108,23 @@ def main(args):
 
     # Then the beamed MCM
     for map_set1, map_set2 in meta.get_ps_names_list("all", coadd=True):
-        m = beamed_mcm[map_set1, map_set2]
-        mcm_binned = np.einsum('ij,kjlm->kilm', binner, m)
-        np.savez(
-            f"{mcm_dir}/mcm_{map_set1}_{map_set2}.npz",
-            binner=binner,
-            spin0xspin0=m[0, :, 0, :].reshape([1, nl, 1, nl]),
-            spin0xspin2=m[1:3, :, 1:3, :],
-            spin2xspin2=m[3:, :, 3:, :],
-            spin0xspin0_binned=mcm_binned[0, :, 0, :].reshape([1, n_bins,
-                                                               1, nl]),
-            spin0xspin2_binned=mcm_binned[1:3, :, 1:3, :],
-            spin2xspin2_binned=mcm_binned[3:, :, 3:, :]
-        )
+        output_file = f"{mcm_dir}/mcm_{map_set1}_{map_set2}.npz"
+        if not os.path.exists(output_file):
+            m = beamed_mcm[map_set1, map_set2]
+            mcm_binned = np.einsum('ij,kjlm->kilm', binner, m)
+            np.savez(
+                output_file,
+                binner=binner,
+                spin0xspin0=m[0, :, 0, :].reshape([1, nl, 1, nl]),
+                spin0xspin2=m[1:3, :, 1:3, :],
+                spin2xspin2=m[3:, :, 3:, :],
+                spin0xspin0_binned=mcm_binned[0, :, 0, :].reshape([1, n_bins,
+                                                                   1, nl]),
+                spin0xspin2_binned=mcm_binned[1:3, :, 1:3, :],
+                spin2xspin2_binned=mcm_binned[3:, :, 3:, :]
+            )
+        else:
+            print(f"File {output_file} already exists. Skipping computation.")
 
 
 if __name__ == "__main__":

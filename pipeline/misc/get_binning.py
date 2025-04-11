@@ -33,12 +33,17 @@ def main(args):
 
     bin_low, bin_high, bin_center = create_binning(lmax,
                                                    args.deltal)
+    #if bin_low[0] < 2:
+    #    bin_low[0] = 2
+        
     print(bin_low, bin_high, bin_center)
     file_name = f"binning_{meta.pix_type}_lmax{lmax}_deltal{args.deltal}"
 
     bin_low2, bin_high2, bin_center2 = create_binning(lmax,
                                                       args.deltal,
-                                                      end_first_bin=30)
+                                                      end_first_bin=10)
+    
+    print()
     print(bin_low2, bin_high2, bin_center2)
 
     np.savez(
