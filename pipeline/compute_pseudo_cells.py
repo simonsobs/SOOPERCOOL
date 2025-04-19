@@ -13,6 +13,9 @@ def main(args):
     meta = BBmeta(args.globals)
     do_plots = not args.no_plots
 
+    # DEBUG
+    print("pix_type", meta.pix_type)
+
     out_dir = meta.output_directory
 
     cells_dir = f"{out_dir}/cells"
@@ -21,7 +24,8 @@ def main(args):
     BBmeta.make_dir(cells_dir)
 
     mask = mu.read_map(meta.masks["analysis_mask"],
-                       pix_type=meta.pix_type)
+                       pix_type=meta.pix_type,
+                       car_template=meta.car_template)
 
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
@@ -32,10 +36,10 @@ def main(args):
         import healpy as hp
         import matplotlib.pyplot as plt
 
-        lmax = 3*meta.nside - 1
-        ll = np.arange(lmax + 1)
-        cl2dl = ll*(ll+1)/2./np.pi
+        lmax = meta.lmax
         lb = nmt_bins.get_effective_ells()
+        lmax_bins = nmt_bins.get_ell_max(nmt_bins.get_n_bands() - 1)
+        lb_msk = lb < lmax + 10
         cb2db = lb*(lb+1)/2./np.pi
         field_pairs = ["TT", "EE", "BB", "TE"]
 
@@ -67,19 +71,17 @@ def main(args):
 
         map_file = map_file.replace(type_options, option)
 
-        m = mu.read_map(f"{map_dir}/{map_file}", pix_type=meta.pix_type,
+        m = mu.read_map(f"{map_dir}/{map_file}",
+                        pix_type=meta.pix_type,
                         fields_hp=[0, 1, 2],
+                        car_template=meta.car_template,
                         convert_K_to_muK=True)
         if do_plots:
-            for i, f in enumerate(["T", "Q", "U"]):
-                hp.mollview(m[i],
-                            cmap="RdYlBu_r",
-                            title=f"({map_set}, bundle {id_bundle}) | {f}",
-                            min=-300 if f == "T" else -10,
-                            max=300 if f == "T" else 10)
-                plt.savefig(f"{map_plot_dir}/map_{map_set}_"
-                            f"bundle{id_bundle}_{f}.png")
-                plt.close()
+            fname = f"{map_plot_dir}/map_{map_set}_bundle{id_bundle}"
+            lims = [[-5000, 5000], [-300, 300], [-300, 300]]
+            title = f"({map_set}, bundle {id_bundle})"
+            mu.plot_map(m, file_name=fname, lims=lims, title=title,
+                        pix_type=meta.pix_type)
 
         wcs = None
         if hasattr(m, 'wcs'):
@@ -126,23 +128,44 @@ def main(args):
             nu1 = meta.freq_tag_from_map_set(map_set1)
             nu2 = meta.freq_tag_from_map_set(map_set2)
 
-            for i, fp in enumerate(field_pairs):
-                cmb_cl = hp.read_cl(fiducial_cmb)[i, :lmax+1]
+            clb_th = None
+            if fiducial_cmb:
+                cmb_cl = hp.read_cl(fiducial_cmb)[:, :lmax_bins+1]
+                cmb_clb = nmt_bins.bin_cell(cmb_cl)[:, lb_msk]
+                clb_th = cmb_clb
+            if fiducial_dust:
                 dust_cl = hp.read_cl(
                     fiducial_dust.format(nu1=nu1, nu2=nu2)
-                )[i, :lmax+1]
+                )[:, :lmax_bins+1]
+                dust_clb = nmt_bins.bin_cell(dust_cl)[:, lb_msk]
+                if clb_th:
+                    clb_th += dust_clb
+                else:
+                    clb_th = dust_clb
+            if fiducial_synch:
                 synch_cl = hp.read_cl(
                     fiducial_synch.format(nu1=nu1, nu2=nu2)
-                )[i, :lmax+1]
-                clth = cmb_cl + dust_cl + synch_cl
+                )[:, :lmax_bins+1]
+                synch_clb = nmt_bins.bin_cell(synch_cl)[:, lb_msk]
+                if clb_th:
+                    clb_th += synch_clb
+                else:
+                    clb_th = synch_clb
 
+            for i, fp in enumerate(field_pairs):
                 plt.title(f"({map_set1}, bundle {id_bundle1}) "
-                          f"x ({map_set2}, bundle {id_bundle2}) | {fp}")
-                plt.loglog(lb, cb2db*decoupled_pcls[fp],
-                           c="navy", marker="o", mfc="w", ls="", label="Data")
-                plt.loglog(ll, cl2dl*clth,
-                           c="darkorange", ls="--", label="Theory")
-                plt.ylabel(r"$D_\ell$", fontsize=15)
+                          f"x ({map_set2}, bundle {id_bundle2}) | {fp}",
+                          fontsize=9)
+                plt.loglog(lb[lb_msk],
+                           cb2db[lb_msk]*decoupled_pcls[fp][lb_msk],
+                           c="navy", ls="-", label="Data")
+                if clb_th is not None:
+                    plt.loglog(lb[lb_msk], cb2db[lb_msk]*clb_th[i],
+                               c="k", ls="--", label="Theory")
+                plt.ylabel(
+                    r"$D_\ell^\mathrm{%s} \; [\mu K_\mathrm{CMB}^2]$" % fp,
+                    fontsize=15
+                )
                 plt.xlabel(r"$\ell$", fontsize=15)
                 plt.legend(fontsize=13)
                 plt.savefig(f"{cl_plot_dir}/pcls_{map_set1}_"

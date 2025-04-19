@@ -323,6 +323,7 @@ def _plot_map_hp(map, lims=None, file_name=None, title=None):
                 plt.savefig(f"{file_name}_{f}.png", bbox_inches="tight")
         else:
             plt.show()
+        plt.close()
 
 
 def _plot_map_car(map, lims=None, file_name=None):

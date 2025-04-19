@@ -25,6 +25,7 @@ def main(args):
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
                                      binning["bin_high"] + 1)
+    lmax_bins = nmt_bins.get_ell_max(nmt_bins.get_n_bands() - 1)
     lb = nmt_bins.get_effective_ells()
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
 
@@ -40,8 +41,8 @@ def main(args):
         import healpy as hp
         import matplotlib.pyplot as plt
 
-        lmax = 3*meta.nside - 1
-        ll = np.arange(lmax + 1)
+        lmax = meta.lmax
+        mask = lb < lmax
         field_pairs_theory = {"TT": 0, "EE": 1, "BB": 2, "TE": 3}
         colors = {"cross": "navy", "auto": "darkorange", "noise": "r"}
 
@@ -53,8 +54,6 @@ def main(args):
         fiducial_synch = meta.covariance["fiducial_synch"]
 
     # Load bundle C_ells
-
-    # Initialize output dictionary
     cells_coadd = {
         "cross": {
             (ms1, ms2): {
@@ -120,45 +119,67 @@ def main(args):
             )
 
     if do_plots:
+        conv = 1e12 if args.units_K else 1
         for map_set1, map_set2 in cross_map_set_list:
             nu1 = meta.freq_tag_from_map_set(map_set1)
             nu2 = meta.freq_tag_from_map_set(map_set2)
 
+            clb_th = None
+            if fiducial_cmb:
+                cmb_cl = hp.read_cl(fiducial_cmb)[:, :lmax_bins+1]
+                cmb_clb = nmt_bins.bin_cell(cmb_cl)[:, mask]
+                clb_th = cmb_clb
+            if fiducial_dust:
+                dust_cl = hp.read_cl(
+                    fiducial_dust.format(nu1=nu1, nu2=nu2)
+                )[:, :lmax_bins+1]
+                dust_clb = nmt_bins.bin_cell(dust_cl)[:, mask]
+                if clb_th:
+                    clb_th += dust_clb
+                else:
+                    clb_th = dust_clb
+            if fiducial_synch:
+                synch_cl = hp.read_cl(
+                    fiducial_synch.format(nu1=nu1, nu2=nu2)
+                )[:, :lmax_bins+1]
+                synch_clb = nmt_bins.bin_cell(synch_cl)[:, mask]
+                if clb_th:
+                    clb_th += synch_clb
+                else:
+                    clb_th = synch_clb
+
             for fp in field_pairs:
 
+                ifp = None if fp not in field_pairs_theory else field_pairs_theory[fp]  # noqa
                 plt.figure(figsize=(10, 8))
                 plt.xlabel(r"$\ell$", fontsize=15)
                 plt.ylabel(r"$C_\ell^\mathrm{%s} \; [\mu K_\mathrm{CMB}^2]$" % fp, # noqa
                            fontsize=15)
 
-                for type in ["cross", "auto", "noise"]:
-                    plt.plot(lb, cells_coadd[type][(map_set1, map_set2)][fp],
-                             label=type,
-                             marker="o", lw=0.7, mfc="w", c=colors[type])
-                if fp in field_pairs_theory:
-                    ifp = field_pairs_theory[fp]
-                    cmb_cl = hp.read_cl(fiducial_cmb)[ifp, :lmax+1]
-                    dust_cl = hp.read_cl(
-                        fiducial_dust.format(nu1=nu1, nu2=nu2)
-                    )[ifp, :lmax+1]
-                    synch_cl = hp.read_cl(
-                        fiducial_synch.format(nu1=nu1, nu2=nu2)
-                    )[ifp, :lmax+1]
-                    clth = cmb_cl + dust_cl + synch_cl
+                if clb_th is not None and ifp is not None:
+                    plt.plot(lb[mask], conv*clb_th[ifp], c="k", ls="--",
+                             label="Theory")
 
-                    plt.plot(ll, clth, c="k", ls="--", label="Theory")
+                for type in ["cross", "auto", "noise"]:
+                    plt.plot(
+                        lb[mask],
+                        conv*cells_coadd[type][(map_set1, map_set2)][fp][mask],
+                        label=type, marker="o", lw=0.7, mfc="w",
+                        c=colors[type]
+                    )
 
                 plt.legend(fontsize=14)
                 plt.title(f"{map_set1} x {map_set2} | {fp}", fontsize=15)
-
-                plt.xlim(0, 2*meta.nside)
+                plt.xlim(0, meta.lmax)
 
                 if fp == fp[::-1]:
                     plt.yscale("log")
                     if fp == "TT":
                         plt.ylim(1e-2, 1e9)
-                    elif fp in ["EE", "BB"]:
+                    elif fp == "EE":
                         plt.ylim(1e-6, 1e3)
+                    elif fp == "BB":
+                        plt.ylim(1e-8, 1e3)
 
                 else:
                     plt.axhline(0, color="k", linestyle="--")
@@ -175,11 +196,22 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Pseudo-Cl calculator")
-    parser.add_argument("--globals", type=str, help="Path to the yaml file")
-    parser.add_argument("--no_plots", action="store_true",
-                        help="Do not make plots")
-
+    parser = argparse.ArgumentParser(
+        description="Coadd the cross-bundle power spectra fr data"
+    )
+    parser.add_argument(
+        "--globals",
+        help="Path to the soopercool parameter file"
+    )
+    parser.add_argument(
+        "--no_plots",
+        action="store_true",
+        help="Do not make plots"
+    )
+    parser.add_argument(
+        "--units_K", action="store_true",
+        help="For plotting only. Assume Cls are in K^2, otherwise muK^2."
+    )
     args = parser.parse_args()
 
     main(args)

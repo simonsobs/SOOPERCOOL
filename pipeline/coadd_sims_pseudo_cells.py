@@ -234,9 +234,11 @@ def main(args):
                 if fp == fp[::-1]:
                     main.set_yscale("log")
                     if fp == "TT":
-                        main.set_ylim(1e-2, 1e9)
-                    elif fp in ["EE", "BB"]:
-                        main.set_ylim(1e-6, 1e3)
+                        plt.ylim(1e-2, 1e9)
+                    elif fp == "EE":
+                        plt.ylim(1e-6, 1e3)
+                    elif fp == "BB":
+                        plt.ylim(1e-8, 1e3)
                 else:
                     main.axhline(0, color="k", linestyle="--")
                     if fp in ["EB", "BE"]:
