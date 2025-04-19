@@ -7,7 +7,7 @@ import pymaster as nmt
 
 def main(args):
     """
-    This script is used to coadd the cross-split power spectra
+    This script is used to coadd the cross-bundle power spectra
     (e.g. SAT1_f093__0 x SAT_f093__1) into cross-map-set power
     spectra (e.g. SAT1_f093 x SAT_f093). It will produce both
     cross and auto map-set power spectra from which we derive
@@ -28,6 +28,14 @@ def main(args):
     lb = nmt_bins.get_effective_ells()
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
 
+    ps_names = {
+        "cross": meta.get_ps_names_list(type="cross", coadd=False),
+        "auto": meta.get_ps_names_list(type="auto", coadd=False)
+    }
+
+    cross_bundle_list = meta.get_ps_names_list(type="all", coadd=False)
+    cross_map_set_list = meta.get_ps_names_list(type="all", coadd=True)
+
     if do_plots:
         import healpy as hp
         import matplotlib.pyplot as plt
@@ -44,15 +52,7 @@ def main(args):
         fiducial_dust = meta.covariance["fiducial_dust"]
         fiducial_synch = meta.covariance["fiducial_synch"]
 
-    ps_names = {
-        "cross": meta.get_ps_names_list(type="cross", coadd=False),
-        "auto": meta.get_ps_names_list(type="auto", coadd=False)
-    }
-
-    cross_split_list = meta.get_ps_names_list(type="all", coadd=False)
-    cross_map_set_list = meta.get_ps_names_list(type="all", coadd=True)
-
-    # Load split C_ells
+    # Load bundle C_ells
 
     # Initialize output dictionary
     cells_coadd = {
@@ -69,7 +69,7 @@ def main(args):
     }
 
     # Loop over all map set pairs
-    for map_name1, map_name2 in cross_split_list:
+    for map_name1, map_name2 in cross_bundle_list:
 
         map_set1, _ = map_name1.split("__")
         map_set2, _ = map_name2.split("__")
@@ -87,7 +87,7 @@ def main(args):
 
             cells_coadd[type][map_set1, map_set2][field_pair] += [cells_dict[field_pair]] # noqa
 
-    # Average the cross-split power spectra
+    # Average the cross-bundle power spectra
     cells_coadd["noise"] = {}
     for map_set1, map_set2 in cross_map_set_list:
         cells_coadd["noise"][(map_set1, map_set2)] = {}
