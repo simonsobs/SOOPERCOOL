@@ -19,7 +19,9 @@ def main(args):
     BBmeta.make_dir(sims_dir)
     BBmeta.make_dir(plot_dir)
 
-    mask = mu.read_map(meta.masks["analysis_mask"], pix_type=meta.pix_type)
+    mask = mu.read_map(meta.masks["analysis_mask"],
+                       pix_type=meta.pix_type,
+                       car_template=meta.car_template)
     lmax = mu.lmax_from_map(mask, pix_type=meta.pix_type)
     lmax_sim = lmax + 500
 
