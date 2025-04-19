@@ -15,6 +15,7 @@ def main(args):
     rank, size, comm = mpi.init(True)
 
     meta = BBmeta(args.globals)
+    verbose = args.verbose
     out_dir = meta.output_directory
 
     pcls_tf_est_dir = f"{out_dir}/cells_tf_est"
@@ -26,7 +27,9 @@ def main(args):
 
     mask_file = meta.masks["analysis_mask"]
     if mask_file is not None:
-        mask = mu.read_map(mask_file, pix_type=meta.pix_type)
+        mask = mu.read_map(mask_file,
+                           pix_type=meta.pix_type,
+                           car_template=meta.car_template)
         purify_b = meta.pure_B
     else:
         print("WARNING: The analysis mask is not specified. "
@@ -56,6 +59,8 @@ def main(args):
     local_mpi_list = [mpi_shared_list[i] for i in task_ids]
 
     for id_sim, ftag1, ftag2 in local_mpi_list:
+        if verbose:
+            print(f" Doing id_sim {id_sim} | {ftag1} x {ftag2}")
         ftags_unique = list(dict.fromkeys([ftag1, ftag2]))
         fields = {
             ftag: {
@@ -83,12 +88,16 @@ def main(args):
                 filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}"
 
                 map = mu.read_map(
-                    unfiltered_map_file, pix_type=meta.pix_type,
-                    fields_hp=[0, 1, 2]
+                    unfiltered_map_file,
+                    pix_type=meta.pix_type,
+                    fields_hp=[0, 1, 2],
+                    car_template=meta.car_template
                 )
                 map_filtered = mu.read_map(
-                    filtered_map_file, pix_type=meta.pix_type,
-                    fields_hp=[0, 1, 2]
+                    filtered_map_file,
+                    pix_type=meta.pix_type,
+                    fields_hp=[0, 1, 2],
+                    car_template=meta.car_template
                 )
 
                 if mask_file is None:
@@ -173,6 +182,10 @@ def main(args):
 
         out_f = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_filtered_{id_sim:04d}.npz"  # noqa
         out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_{id_sim:04d}.npz"  # noqa
+
+        # DEBUG
+        print("pcls_mat_unfiltered", np.any(pcls_mat_unfiltered))
+        print("pcls_mat_filtered", np.any(pcls_mat_filtered))
 
         np.savez(out_f, pcls_mat=pcls_mat_filtered)
         np.savez(out_unf, pcls_mat=pcls_mat_unfiltered)

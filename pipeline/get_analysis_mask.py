@@ -27,7 +27,8 @@ def main(args):
     if masks_settings["global_hits"] is not None:
         sum_hits = mu.read_map(
             masks_settings["global_hits"],
-            pix_type=meta.pix_type
+            pix_type=meta.pix_type,
+            car_template=meta.car_template
         )
         # Create binary
         binary = sum_hits.copy()
@@ -87,7 +88,8 @@ def main(args):
 
                 hits = mu.read_map(
                     f"{map_dir}/{map_file}",
-                    pix_type=meta.pix_type
+                    pix_type=meta.pix_type,
+                    car_template=meta.car_template
                 )
                 hit_maps.append(hits)
 

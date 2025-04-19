@@ -28,7 +28,9 @@ def main(args):
 
     mask_file = meta.masks["analysis_mask"]
     if mask_file is not None:
-        mask = mu.read_map(mask_file, pix_type=meta.pix_type)
+        mask = mu.read_map(mask_file,
+                           pix_type=meta.pix_type,
+                           car_template=meta.car_template)
         lmax = mu.lmax_from_map(mask_file, pix_type=meta.pix_type)
     else:
         raise FileNotFoundError("The analysis mask must be specified.")
