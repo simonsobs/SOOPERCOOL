@@ -6,4 +6,4 @@ sacc
 camb
 Jinja2
 wget
-pixell
+pixell==0.26.1
