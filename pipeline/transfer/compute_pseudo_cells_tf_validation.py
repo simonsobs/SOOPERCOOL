@@ -20,14 +20,12 @@ def main(args):
     cls_tf_val_dir = f"{out_dir}/cells_tf_val"
     BBmeta.make_dir(cls_tf_val_dir)
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
     ps_pairs = meta.get_ps_names_list(type="all", coadd=True)
 
-    inv_couplings_filtered = meta.get_inverse_couplings(filtered=True)
-    inv_couplings_unfiltered = meta.get_inverse_couplings(filtered=False)
+    inv_couplings_filtered = meta.get_inverse_couplings()["filtered"]
+    inv_couplings_unfiltered = meta.get_inverse_couplings()["unfiltered"]
 
     simdir_unfiltered = meta.transfer_settings["unfiltered_map_dir"]
     if "validation" not in simdir_unfiltered:
