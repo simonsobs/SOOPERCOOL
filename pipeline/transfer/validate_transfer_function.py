@@ -4,6 +4,10 @@ from soopercool import BBmeta
 import matplotlib.pyplot as plt
 from soopercool import coupling_utils as cu
 
+# TODO:
+# Read in beam for validation and correct C_ell estimator by it. Currently we
+# assume a bean FWHM of 30 arcmin by default.
+
 
 def read_transfer(transfer_file):
     """
