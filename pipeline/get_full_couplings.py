@@ -39,16 +39,25 @@ def main(args):
         for ms1, ms2 in ps_names
     }
 
-    couplings = cu.get_couplings_dict(
+    couplings_filtered = cu.get_couplings_dict(
         mcms_dict, nmt_bins,
         transfer_dict=tf_dict,
+        ps_names_and_ftags=ps_names_and_ftags
+    )
+    couplings_unfiltered = cu.get_couplings_dict(
+        mcms_dict, nmt_bins,
+        transfer_dict=None,
         ps_names_and_ftags=ps_names_and_ftags
     )
 
     for ms1, ms2 in ps_names:
         np.savez(
             f"{couplings_dir}/couplings_{ms1}_{ms2}.npz",
-            **couplings[ms1, ms2]
+            **couplings_filtered[ms1, ms2]
+        )
+        np.savez(
+            f"{couplings_dir}/couplings_unfiltered_{ms1}_{ms2}.npz",
+            **couplings_unfiltered[ms1, ms2]
         )
 
 

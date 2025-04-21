@@ -517,8 +517,8 @@ class BBmeta(object):
             noise-biased spectra, while "cross" returns all unique
             noise-biased spectra. "all" is the union of both.
         coadd: bool, optional
-            If True, return the cross (and/or auto) bundle power spectra names.
-            Else, return the (bundle-)coadded power spectra names.
+            If True, return the (bundle-)coadded power spectra names.
+            If False, return cross (and/or auto) bundle power spectra names.
         """
         map_iterable = self.map_sets_list if coadd else self.maps_list
 
@@ -620,30 +620,31 @@ class BBmeta(object):
             filtering_pairs.append((fp1, fp2))
         return list(set(filtering_pairs))
 
-    def get_inverse_couplings(self, beamed=False):
+    def get_inverse_couplings(self, filtered=True):
         """
         This function outputs a dictionary with the inverse mode coupling
         matrices
         """
-        filter_flags = [""] if beamed else ["filtered", "unfiltered"]
-        map_set_pairs = (self.get_ps_names_list(type="all", coadd=True)
-                         if beamed else [("", "")])
+        # This is a patch. TODO: add coupling dir as a meta attribute
+        couplings_dir = f"{self.output_directory}/couplings"
+        if "couplings_dir" in self.transfer_settings:
+            couplings_dir = self.transfer_settings["couplings_dir"]
+
+        filter_flags = {"filtered": "", "unfiltered": "_unfiltered"}
+        map_set_pairs = self.get_ps_names_list(type="all", coadd=True)
         inv_couplings = {}
 
         for ms1, ms2 in map_set_pairs:
-            for filter_flag in filter_flags:
-                map_label = f"{ms1}_{ms2}" if beamed else ""
-                fname = f"couplings_{map_label}{filter_flag}"
-                couplings = np.load(f"{self.coupling_directory}/{fname}.npz")
+            for filter_flag, filter_tag in filter_flags.items():
+                fname = f"couplings{filter_tag}_{ms1}_{ms2}"
+                couplings = np.load(f"{couplings_dir}/{fname}.npz")
                 npairs, ndata, _, _ = np.shape(couplings['inv_coupling'])
                 c = couplings['inv_coupling'].reshape((npairs*ndata,
                                                        npairs*ndata))
-                if beamed:
-                    inv_couplings[ms1, ms2] = c
-                    if ms1 != ms2:
-                        inv_couplings[ms2, ms1] = c
-                else:
-                    inv_couplings[filter_flag] = c
+                inv_couplings[ms1, ms2] = c
+                if ms1 != ms2:
+                    inv_couplings[ms2, ms1] = c
+
         return inv_couplings
 
     @classmethod

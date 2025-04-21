@@ -17,9 +17,7 @@ def main(args):
     print("pix_type", meta.pix_type)
 
     out_dir = meta.output_directory
-
     cells_dir = f"{out_dir}/cells"
-    couplings_dir = f"{out_dir}/couplings"
 
     BBmeta.make_dir(cells_dir)
 
@@ -30,7 +28,6 @@ def main(args):
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
                                      binning["bin_high"] + 1)
-    n_bins = nmt_bins.get_n_bands()
 
     if do_plots:
         import healpy as hp
@@ -102,10 +99,7 @@ def main(args):
             "spin2": field_spin2
         }
 
-    inv_couplings_beamed = {}
-
-    for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
-        inv_couplings_beamed[ms1, ms2] = np.load(f"{couplings_dir}/couplings_{ms1}_{ms2}.npz")["inv_coupling"].reshape([n_bins*9, n_bins*9]) # noqa
+    inv_couplings_beamed = meta.get_inverse_couplings(filtered=True)
 
     for map_name1, map_name2 in meta.get_ps_names_list(type="all",
                                                        coadd=False):
