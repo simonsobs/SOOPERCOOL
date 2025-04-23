@@ -19,8 +19,12 @@ def main(args):
     out_dir = meta.output_directory
 
     cells_dir = f"{out_dir}/cells"
-    couplings_dir = f"{out_dir}/couplings"
 
+    if 'external_couplings_dir' in meta.transfer_settings:
+        couplings_dir = meta.transfer_settings['external_couplings_dir']
+    else:
+        couplings_dir = f"{out_dir}/couplings"
+    
     BBmeta.make_dir(cells_dir)
 
     mask = mu.read_map(meta.masks["analysis_mask"],
@@ -104,8 +108,8 @@ def main(args):
 
     inv_couplings_beamed = {}
 
-    for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
-        inv_couplings_beamed[ms1, ms2] = np.load(f"{couplings_dir}/couplings_{ms1}_{ms2}.npz")["inv_coupling"].reshape([n_bins*9, n_bins*9]) # noqa
+    for filtering_tag1, filtering_tag2 in meta.get_independent_filtering_pairs():
+        inv_couplings_beamed[filtering_tag1, filtering_tag2] = np.load(f"{couplings_dir}/couplings_{filtering_tag1}_{filtering_tag2}.npz")["inv_coupling"].reshape([n_bins*9, n_bins*9]) # noqa
 
     for map_name1, map_name2 in meta.get_ps_names_list(type="all",
                                                        coadd=False):
@@ -117,8 +121,10 @@ def main(args):
                 nmt_bins
                 )
 
+        filtering_tag1 = meta.filtering_tag_from_map_set(map_set1)
+        filtering_tag2 = meta.filtering_tag_from_map_set(map_set2)
         decoupled_pcls = pu.decouple_pseudo_cls(
-                pcls, inv_couplings_beamed[map_set1, map_set2]
+                pcls, inv_couplings_beamed[filtering_tag1, filtering_tag2]
                 )
 
         np.savez(f"{cells_dir}/decoupled_pcls_{map_name1}_x_{map_name2}.npz",
