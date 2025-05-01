@@ -99,12 +99,14 @@ def main(args):
             "spin2": field_spin2
         }
 
-    inv_couplings_beamed = meta.get_inverse_couplings(filtered=True)
+    inv_couplings_beamed = meta.get_inverse_couplings()
 
     for map_name1, map_name2 in meta.get_ps_names_list(type="all",
                                                        coadd=False):
         map_set1, id_bundle1 = map_name1.split("__")
         map_set2, id_bundle2 = map_name2.split("__")
+        ftag1 = meta.filtering_tag_from_map_set(map_set1)
+        ftag2 = meta.filtering_tag_from_map_set(map_set2)
         pcls = pu.get_coupled_pseudo_cls(
                 fields[map_set1, id_bundle1],
                 fields[map_set2, id_bundle2],
@@ -112,7 +114,7 @@ def main(args):
                 )
 
         decoupled_pcls = pu.decouple_pseudo_cls(
-                pcls, inv_couplings_beamed[map_set1, map_set2]
+                pcls, inv_couplings_beamed["filtered"][ftag1, ftag2]
                 )
 
         np.savez(f"{cells_dir}/decoupled_pcls_{map_name1}_x_{map_name2}.npz",
