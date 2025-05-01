@@ -24,7 +24,7 @@ def get_transfer_with_error(mean_pcls_mat_filt,
             mean_pcls_mat_unfilt,
             mean_pcls_mat_filt
         )
-    )
+    ).transpose([1, 0, 2])
 
     tferr = np.std(
         np.array(
