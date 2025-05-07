@@ -514,9 +514,9 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
             ylims = [0, 1.05] if f1 == f2 else [-0.01, 0.01]
 
             ax.axhline(expected, color="k", ls="--", zorder=6)
-            # Need to understand why labels are reversed - purification results
-            # suggest this is the right way.
-            ax.set_title(f"{f2} $\\rightarrow$ {f1}", fontsize=14)
+            # We need to understand the offdigonal TF panels in the presence of
+            # NaMaster purification - we don't have a clear interpretation.
+            ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
             ax.plot(lb, tf_dict[f"{f1}_to_{f2}"], color="navy")
 
             if id1 == 8:
