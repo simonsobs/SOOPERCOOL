@@ -2,6 +2,7 @@ import soopercool.map_utils as mu
 from itertools import product
 import pymaster as nmt
 import numpy as np
+from pixell import enmap
 
 
 def get_validation_power_spectra(meta, id_sim, mask, nmt_binning,
@@ -80,7 +81,7 @@ def get_binned_cls(bp_win_dict, cls_dict_unbinned):
     return field_pairs_from_spins(cls_dict_binned)
 
 
-def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
+def get_coupled_pseudo_cls(fields1, fields2, nmt_binning, return_unbinned=False):
     """
     Compute the binned coupled pseudo-C_ell estimates from two
     (spin-0 or spin-2) NaMaster fields and a multipole binning scheme.
@@ -94,6 +95,8 @@ def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
     spins = list(fields1.keys())
 
     pcls = {}
+    if return_unbinned:
+        pcls_unbinned = {}
     for spin1 in spins:
         for spin2 in spins:
 
@@ -104,6 +107,11 @@ def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
             coupled_cell = coupled_cell[:, :nmt_binning.lmax+1]
 
             pcls[f"{spin1}x{spin2}"] = nmt_binning.bin_cell(coupled_cell)
+            if return_unbinned:
+                pcls_unbinned[f"{spin1}x{spin2}"] = coupled_cell
+    if return_unbinned:
+        return pcls, pcls_unbinned
+
     return pcls
 
 
@@ -135,6 +143,24 @@ def decouple_pseudo_cls(coupled_pseudo_cells, coupling_inv):
     for i, fp in enumerate(field_pairs):
         decoupled_pcls[fp] = decoupled_pcls_vec[i*nbins:(i+1)*nbins]
     return decoupled_pcls
+
+
+def get_weighted_pcls(pcls, mask, pix_type="car"):
+    """
+    """
+    pcls_dict = field_pairs_from_spins(pcls)
+
+    if pix_type == "hp":
+        weights = np.mean(mask ** 2)
+    elif pix_type == "car":
+        shape, wcs = mask.geometry
+        pixsizemap = enmap.pixsizemap(shape, wcs) # sterradians
+        weights = np.sum(mask ** 2 * pixsizemap) / (4*np.pi)
+    
+    for k in pcls_dict:
+        pcls_dict[k] = pcls_dict[k] / weights
+
+    return pcls_dict
 
 
 def field_pairs_from_spins(cls_in_dict):

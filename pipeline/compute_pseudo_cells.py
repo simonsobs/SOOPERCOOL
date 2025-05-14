@@ -21,7 +21,8 @@ def main(args):
     BBmeta.make_dir(cells_dir)
 
     mask = mu.read_map(meta.masks["analysis_mask"],
-                       pix_type=meta.pix_type)
+                       pix_type=meta.pix_type,
+                       car_template=meta.car_template)
 
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
@@ -69,6 +70,7 @@ def main(args):
 
         m = mu.read_map(f"{map_dir}/{map_file}", pix_type=meta.pix_type,
                         fields_hp=[0, 1, 2],
+                        car_template=meta.car_template,
                         convert_K_to_muK=True)
         if do_plots:
             for i, f in enumerate(["T", "Q", "U"]):
@@ -100,11 +102,16 @@ def main(args):
                                                        coadd=False):
         map_set1, id_bundle1 = map_name1.split("__")
         map_set2, id_bundle2 = map_name2.split("__")
-        pcls = pu.get_coupled_pseudo_cls(
+        pcls, pcls_unbinned = pu.get_coupled_pseudo_cls(
                 fields[map_set1, id_bundle1],
                 fields[map_set2, id_bundle2],
-                nmt_bins
+                nmt_bins,
+                return_unbinned=True
                 )
+        
+        weighted_pcls = pu.get_weighted_pcls(pcls_unbinned, mask, pix_type=meta.pix_type)
+        np.savez(f"{cells_dir}/weighted_pcls_{map_name1}_x_{map_name2}.npz",
+                 **weighted_pcls, ell=np.arange(len(weighted_pcls["TT"])))
 
         decoupled_pcls = pu.decouple_pseudo_cls(
                 pcls, inv_couplings_beamed[map_set1, map_set2]
