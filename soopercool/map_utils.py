@@ -1,6 +1,6 @@
 import numpy as np
 import healpy as hp
-from pixell import enmap, enplot
+from pixell import enmap, enplot, curvedsky
 import matplotlib.pyplot as plt
 from pixell import uharm
 import pymaster as nmt
@@ -17,6 +17,31 @@ def _check_pix_type(pix_type):
     """
     if not (pix_type in ['hp', 'car']):
         raise ValueError(f"Unknown pixelisation type {pix_type}.")
+
+
+def add_map(imap, omap, pix_type):
+    """
+    Add a single map imap to an existing omap. omap is modified in place.
+    """
+    _check_pix_type(pix_type)
+    if pix_type == 'hp':
+        omap += imap
+    elif pix_type == 'car':
+        enmap.extract(imap, omap.shape, omap.wcs, omap=omap,
+                      op=np.ndarray.__iadd__)
+
+
+def multiply_map(imap, omap, pix_type):
+    """
+    Multiply a single map imap with an existing omap.
+    omap is modified in-place.
+    """
+    _check_pix_type(pix_type)
+    if pix_type == 'hp':
+        omap += imap
+    elif pix_type == 'car':
+        enmap.extract(imap, omap.shape, omap.wcs, omap=omap,
+                      op=np.ndarray.__imul__)
 
 
 def ud_grade(map_in, nside_out, power=None, pix_type='hp'):
@@ -45,6 +70,41 @@ def ud_grade(map_in, nside_out, power=None, pix_type='hp'):
     return hp.ud_grade(map_in, nside_out=nside_out, power=power)
 
 
+def map2alm(map, pix_type="hp"):
+    """
+    """
+    _check_pix_type(pix_type)
+
+    if isinstance(map, str):
+        map = read_map(map, pix_type=pix_type)
+    lmax = lmax_from_map(map, pix_type=pix_type)
+
+    if pix_type == "hp":
+        return hp.map2alm(map, lmax=lmax)
+    else:
+        return curvedsky.map2alm(map, lmax=lmax)
+
+
+def alm2map(alm, pix_type="hp", nside=None, car_map_template=None):
+    """
+    """
+    _check_pix_type(pix_type)
+    if isinstance(alm, list):
+        alm = np.array(alm, dtype=np.float64)
+
+    if pix_type == "hp":
+        assert nside is not None, "nside is required"
+        return hp.alm2map(alm, nside=nside)
+    else:
+        if isinstance(car_map_template, str):
+            shape, wcs = enmap.read_map_geometry(car_map_template)
+        else:
+            shape, wcs = car_map_template.geometry
+        map = enmap.zeros((3,) + shape, wcs)
+        curvedsky.alm2map(alm, map)
+        return map
+
+
 def lmax_from_map(map, pix_type="hp"):
     """
     Determine the maximum multipole from a map and its
@@ -52,8 +112,8 @@ def lmax_from_map(map, pix_type="hp"):
 
     Parameters
     ----------
-    map : np.ndarray or enmap.ndmap
-        Input map.
+    map : str or np.ndarray or enmap.ndmap
+        Input filename or map.
     pix_type : str, optional
         Pixellization type.
 
@@ -63,6 +123,15 @@ def lmax_from_map(map, pix_type="hp"):
         Maximum multipole.
     """
     _check_pix_type(pix_type)
+
+    if isinstance(map, str):
+        if pix_type == "car":
+            _, wcs = enmap.read_map_geometry(map)
+            res = np.deg2rad(np.min(np.abs(wcs.wcs.cdelt)))
+            lmax = uharm.res2lmax(res)
+            return lmax
+        else:
+            map = read_map(map)
     if pix_type == "hp":
         nside = hp.npix2nside(map.shape[-1])
         return 3 * nside - 1
@@ -103,7 +172,8 @@ def read_map(map_file,
              pix_type='hp',
              fields_hp=None,
              convert_K_to_muK=False,
-             geometry=None):
+             geometry=None,
+             car_template=None):
     """
     Read a map from a file, regardless of the pixellization type.
 
@@ -119,6 +189,8 @@ def read_map(map_file,
         Convert K to muK.
     geometry : enmap.geometry, optional
         Enmap geometry.
+    car_template: str
+        Path to CAR geometry template.
 
     Returns
     -------
@@ -133,12 +205,14 @@ def read_map(map_file,
         kwargs = {"field": fields_hp} if fields_hp is not None else {}
         m = hp.read_map(map_file, **kwargs)
     else:
+        if geometry is None:
+            geometry = enmap.read_map_geometry(car_template)
         m = enmap.read_map(map_file, geometry=geometry)
 
     return conv*m
 
 
-def write_map(map_file, map, dtype=None, pix_type='hp',
+def write_map(map_file, map, dtype=np.float64, pix_type='hp',
               convert_muK_to_K=False):
     """
     Write a map to a file, regardless of the pixellization type.
@@ -221,7 +295,7 @@ def _plot_map_hp(map, lims=None, file_name=None, title=None):
             "min": lims[0],
             "max": lims[1]
         }]
-    if ncomp == 3 and lims is not None:
+    if ncomp != 1 and lims is not None:
         range_args = [
             {
                 "min": lims[i][0],
@@ -246,6 +320,7 @@ def _plot_map_hp(map, lims=None, file_name=None, title=None):
                 plt.savefig(f"{file_name}_{f}.png", bbox_inches="tight")
         else:
             plt.show()
+        plt.close()
 
 
 def _plot_map_car(map, lims=None, file_name=None):
@@ -408,3 +483,47 @@ def template_from_map(map, ncomp, pix_type="hp"):
         new_shape = (ncomp,) + shape[-2:]
 
         return enmap.zeros(new_shape, wcs)
+
+
+def binary_mask_from_map(map, pix_type="hp", geometry=None):
+    """
+    Generate a binary mask from a map.
+    Parameters
+    ----------
+    map : np.ndarray or enmap.ndmap
+        Input map.
+    ncomp : int
+        Number of components of the output template.
+    pix_type : str, optional
+        Pixellization type.
+
+    Returns
+    -------
+    binary_mask : np.ndarray or enmap.ndmap
+        Binary mask.
+    """
+    _check_pix_type(pix_type)
+    if pix_type == "hp":
+        if isinstance(map, str):
+            map = read_map(map, pix_type=pix_type)
+        if map.shape > 1:
+            map = np.sum(map, axis=0)
+    else:
+        if isinstance(map, str):
+            shape, wcs = enmap.read_map_geometry(map)
+            map = read_map(map, pix_type=pix_type)
+        else:
+            shape, wcs = map.geometry
+        if len(shape) == 3:
+            map = np.sum(map, axis=0)
+            shape = shape[-2:]
+        map = enmap.ndmap(map, wcs)
+        binary = enmap.zeros(map.shape, wcs=wcs)
+
+    map = smooth_map(map, fwhm_deg=1, pix_type=pix_type)
+    hits_proxy = map
+    hits_proxy = np.abs(map)
+    hits_proxy /= np.amax(hits_proxy, axis=(0, 1))
+    binary[hits_proxy > 0.1] = 1.
+
+    return binary

@@ -27,7 +27,8 @@ def main(args):
     if masks_settings["global_hits"] is not None:
         sum_hits = mu.read_map(
             masks_settings["global_hits"],
-            pix_type=meta.pix_type
+            pix_type=meta.pix_type,
+            car_template=meta.car_template
         )
         # Create binary
         binary = sum_hits.copy()
@@ -87,7 +88,8 @@ def main(args):
 
                 hits = mu.read_map(
                     f"{map_dir}/{map_file}",
-                    pix_type=meta.pix_type
+                    pix_type=meta.pix_type,
+                    car_template=meta.car_template
                 )
                 hit_maps.append(hits)
 
@@ -222,19 +224,22 @@ def main(args):
         )
 
     # Compute and plot spin derivatives
-    first, second = su.get_spin_derivatives(analysis_mask)
+    if meta.pix_type == "car":
+        print("WARNING: Spin derivatives are not implemented yet. SKIPPING.")
+    else:
+        first, second = su.get_spin_derivatives(analysis_mask)
 
-    if do_plots:
-        mu.plot_map(
-            first,
-            title="First spin derivative",
-            file_name=f"{plot_dir}/first_spin_derivative"
-        )
-        mu.plot_map(
-            second,
-            title="Second spin derivative",
-            file_name=f"{plot_dir}/second_spin_derivative"
-        )
+        if do_plots:
+            mu.plot_map(
+                first,
+                title="First spin derivative",
+                file_name=f"{plot_dir}/first_spin_derivative"
+            )
+            mu.plot_map(
+                second,
+                title="Second spin derivative",
+                file_name=f"{plot_dir}/second_spin_derivative"
+            )
 
     if args.verbose:
         print("---------------------------------------------------------")

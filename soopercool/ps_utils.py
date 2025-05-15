@@ -216,3 +216,57 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
         ])
 
     return pcls_mat
+
+
+def plot_pcls_mat_transfer(pcls_mat_unfilt, pcls_mat_filt, file_name):
+    """
+    """
+    import matplotlib.pyplot as plt
+
+    field_pairs = [f"{p}{q}" for (p, q) in product("TEB", "TEB")]
+    plt.figure(figsize=(25, 25))
+    grid = plt.GridSpec(9, 9, hspace=0.3, wspace=0.3)
+
+    for id1, f1 in enumerate(field_pairs):
+        for id2, f2 in enumerate(field_pairs):
+            ax = plt.subplot(grid[id1, id2])
+            ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
+            ax.plot(pcls_mat_unfilt[id1, id2], c="navy", label="filtered")
+            ax.plot(pcls_mat_filt[id1, id2], c="darkorange",
+                    label="unfiltered")
+            if id1 == 8:
+                ax.set_xlabel(r"$\ell$", fontsize=14)
+            else:
+                ax.set_xticks([])
+            if f1 != f2:
+                ax.ticklabel_format(axis="y", style="scientific",
+                                    scilimits=(0, 0), useMathText=True)
+            if (id1, id2) == (0, 0):
+                ax.legend(fontsize=14)
+
+    plt.savefig(file_name, bbox_inches="tight")
+
+
+def bin_theory_cls(cls, bpwf):
+    """
+    """
+    fields_theory = {"TT": 0, "EE": 1, "BB": 2, "TE": 3}
+    fields_all = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
+    nl_th = cls["TT"].shape[0]
+
+    size, n_bins, _, nl = bpwf.shape
+    assert size == 9, "Unexpected number of fields in coupling matrix"
+    assert nl <= nl_th, f"Theory spectrum must contain ell up to {nl}."
+
+    cls_dict = {}
+    for fp in fields_all:
+        if fp in fields_theory:
+            cls_dict[fp] = cls[fp][:nl]
+        else:
+            cls_dict[fp] = np.zeros(nl)
+    cls_vec = np.array([cls_dict[fp] for fp in fields_all])
+
+    clb = np.dot(bpwf.reshape(size*n_bins, size*nl), cls_vec.reshape(size*nl))
+    clb = clb.reshape(size, n_bins)
+
+    return {fp: clb[ifp] for ifp, fp in enumerate(fields_all)}

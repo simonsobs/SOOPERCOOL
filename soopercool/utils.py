@@ -7,19 +7,37 @@ from matplotlib import cm
 import camb
 
 
-def get_theory_cls(cosmo_params, lmax, lmin=0):
+def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30):
     """
     """
+    print("\nTheory C_ells:")
+    if cosmo_params is None:
+        print("\n  WARNING: "
+              "Loading Planck standard CMB parameters with r=0, AL=1\n")
+        cosmo_params = {
+            "cosmomc_theta": 0.0104085,
+            "As": 2.1e-9,
+            "ombh2": 0.02237,
+            "omch2": 0.1200,
+            "ns": 0.9649,
+            "Alens": 1.0,
+            "tau": 0.0544,
+            "r": 0.0,
+        }
+    print(f"  Beam FWHM: {fwhm_amin} arcmin\n")
     params = camb.set_params(**cosmo_params)
     results = camb.get_results(params)
-    powers = results.get_cmb_power_spectra(params, CMB_unit='muK', raw_cl=True)
+    powers = results.get_cmb_power_spectra(
+        params, CMB_unit='muK', raw_cl=True, lmax=lmax
+    )
     lth = np.arange(lmin, lmax+1)
+    bl_sq = beam_gaussian(lth, fwhm_amin)**2
 
     cl_th = {
-        "TT": powers["total"][:, 0][lmin:lmax+1],
-        "EE": powers["total"][:, 1][lmin:lmax+1],
-        "TE": powers["total"][:, 3][lmin:lmax+1],
-        "BB": powers["total"][:, 2][lmin:lmax+1]
+        "TT": powers["total"][:, 0][lmin:lmax+1]*bl_sq,
+        "EE": powers["total"][:, 1][lmin:lmax+1]*bl_sq,
+        "TE": powers["total"][:, 3][lmin:lmax+1]*bl_sq,
+        "BB": powers["total"][:, 2][lmin:lmax+1]*bl_sq,
     }
     for spec in ["EB", "TB"]:
         cl_th[spec] = np.zeros_like(lth)
@@ -492,140 +510,28 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
     for id1, f1 in enumerate(field_pairs):
         for id2, f2 in enumerate(field_pairs):
             ax = plt.subplot(grid[id1, id2])
+            expected = 1. if f1 == f2 else 0.
+            ylims = [0, 1.05] if f1 == f2 else [-0.01, 0.01]
 
+            ax.axhline(expected, color="k", ls="--", zorder=6)
+            # We need to understand the offdigonal TF panels in the presence of
+            # NaMaster purification - we don't have a clear interpretation.
             ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
-
-            ax.errorbar(
-                lb, tf_dict[f"{f1}_to_{f2}"], tf_dict[f"{f1}_to_{f2}_std"],
-                marker=".", markerfacecolor="white",
-                color="navy")
+            ax.plot(lb, tf_dict[f"{f1}_to_{f2}"], color="navy")
 
             if id1 == 8:
                 ax.set_xlabel(r"$\ell$", fontsize=14)
             else:
                 ax.set_xticks([])
 
-            if f1 == f2:
-                ax.axhline(1., color="k", ls="--")
-            else:
-                ax.axhline(0, color="k", ls="--")
+            if f1 != f2:
                 ax.ticklabel_format(axis="y", style="scientific",
                                     scilimits=(0, 0), useMathText=True)
 
             ax.set_xlim(lmin, lmax)
+            ax.set_ylim(ylims[0], ylims[1])
 
     plt.savefig(file_name, bbox_inches="tight")
-
-
-def plot_transfer_validation(meta, map_set_1, map_set_2,
-                             cls_theory, cls_theory_binned,
-                             cls_mean_dict, cls_std_dict):
-    """
-    Plot the transfer function validation power spectra and save to disk.
-    """
-    nmt_binning = meta.read_nmt_binning()
-    lb = nmt_binning.get_effective_ells()
-
-    for val_type in ["tf_val", "cosmo"]:
-        plt.figure(figsize=(16, 16))
-        grid = plt.GridSpec(9, 3, hspace=0.3, wspace=0.3)
-
-        for id1, id2 in [(i, j) for i in range(3) for j in range(3)]:
-            f1, f2 = "TEB"[id1], "TEB"[id2]
-            spec = f2 + f1 if id1 > id2 else f1 + f2
-
-            main = plt.subplot(grid[3*id1:3*(id1+1)-1, id2])
-            sub = plt.subplot(grid[3*(id1+1)-1, id2])
-
-            # Plot theory
-            ell = cls_theory[val_type]["l"]
-            rescaling = 1 if val_type == "tf_val" \
-                else ell * (ell + 1) / (2*np.pi)
-            main.plot(ell, rescaling*cls_theory[val_type][spec], color="k")
-
-            offset = 0.5
-            rescaling = 1 if val_type == "tf_val" else lb*(lb + 1) / (2*np.pi)
-
-            # Plot filtered & unfiltered (decoupled)
-            if not meta.validate_beam:
-                main.errorbar(
-                    lb - offset, rescaling*cls_mean_dict[val_type,
-                                                         "unfiltered",
-                                                         spec],
-                    rescaling*cls_std_dict[val_type, "unfiltered", spec],
-                    color="navy", marker=".", markerfacecolor="white",
-                    label=r"Unfiltered decoupled $C_\ell$", ls="None"
-                )
-            main.errorbar(
-                lb + offset, rescaling*cls_mean_dict[val_type,
-                                                     "filtered",
-                                                     spec],
-                rescaling*cls_std_dict[val_type, "filtered", spec],
-                color="darkorange", marker=".", markerfacecolor="white",
-                label=r"Filtered decoupled $C_\ell$", ls="None"
-            )
-
-            if f1 == f2:
-                main.set_yscale("log")
-
-            # Plot residuals
-            sub.axhspan(-2, 2, color="gray", alpha=0.2)
-            sub.axhspan(-1, 1, color="gray", alpha=0.7)
-            sub.axhline(0, color="k")
-
-            if not meta.validate_beam:
-                residual_unfiltered = (
-                    (cls_mean_dict[val_type, "unfiltered", spec]
-                     - cls_theory_binned[val_type, spec])
-                    / cls_std_dict[val_type, "unfiltered", spec]
-                )
-                sub.plot(
-                    lb - offset,
-                    residual_unfiltered * np.sqrt(meta.tf_est_num_sims),
-                    color="navy", marker=".", markerfacecolor="white",
-                    ls="None"
-                )
-            residual_filtered = (
-                (cls_mean_dict[val_type, "filtered", spec]
-                 - cls_theory_binned[val_type, spec])
-                / cls_std_dict[val_type, "filtered", spec]
-            )
-            sub.plot(lb + offset,
-                     residual_filtered * np.sqrt(meta.tf_est_num_sims),
-                     color="darkorange", marker=".",
-                     markerfacecolor="white", ls="None")
-
-            # Multipole range
-            main.set_xlim(2, meta.lmax)
-            sub.set_xlim(*main.get_xlim())
-
-            # Suplot y range
-            sub.set_ylim((-5., 5.))
-
-            # Cosmetix
-            main.set_title(f1+f2, fontsize=14)
-            if spec == "TT":
-                main.legend(fontsize=13)
-            main.set_xticklabels([])
-            if id1 != 2:
-                sub.set_xticklabels([])
-            else:
-                sub.set_xlabel(r"$\ell$", fontsize=13)
-
-            if id2 == 0:
-                if isinstance(rescaling, float):
-                    main.set_ylabel(r"$C_\ell$", fontsize=13)
-                else:
-                    main.set_ylabel(r"$\ell(\ell+1)C_\ell/2\pi$",
-                                    fontsize=13)
-                sub.set_ylabel(r"$\Delta C_\ell / (\sigma/\sqrt{N_\mathrm{sims}})$",  # noqa
-                               fontsize=13)
-
-        plot_dir = meta.plot_dir_from_output_dir(meta.coupling_directory)
-        plot_suffix = (f"__{map_set_1}_{map_set_2}" if meta.validate_beam
-                       else "")
-        plt.savefig(f"{plot_dir}/decoupled_{val_type}{plot_suffix}.pdf",
-                    bbox_inches="tight")
 
 
 def get_binary_mask_from_nhits(nhits_map, nside, zero_threshold=1e-3):

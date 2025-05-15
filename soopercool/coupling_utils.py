@@ -71,7 +71,7 @@ def get_transfer_dict(mean_pcls_mat_filt_dict,
     return tf_dict
 
 
-def read_pcls_matrices(pcls_mat_dir, filtering_pairs, Nsims):
+def read_pcls_matrices(pcls_mat_dir, filtering_pairs, Nsims, sim_id_start=0):
     """
     """
     pcls_mat_dict = {
@@ -83,7 +83,7 @@ def read_pcls_matrices(pcls_mat_dir, filtering_pairs, Nsims):
 
     # Load the pseudo-cl matrices for each simulation
     # Should be (n_comb_pure, n_comb_mode, n_bins)
-    for id_sim in range(Nsims):
+    for id_sim in range(sim_id_start, Nsims + sim_id_start):
         for label in ["filtered", "unfiltered"]:
             for ftag1, ftag2 in filtering_pairs:
                 suffix = f"{ftag1}_x_{ftag2}_{label}_{id_sim:04d}"
@@ -216,7 +216,6 @@ def get_couplings_dict(mcm_dict, nmt_binning,
                 mcm, nmt_binning, transfer
             )
             couplings[ftag1, ftag2]["bp_win"] = bpw_win
-            couplings[ftag1, ftag2][
-                "inv_coupling"] = inv_coupling
+            couplings[ftag1, ftag2]["inv_coupling"] = inv_coupling
 
     return couplings

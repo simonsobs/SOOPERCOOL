@@ -14,9 +14,14 @@ def main(args):
     binning_dir = f"{out_dir}/binning"
     BBmeta.make_dir(binning_dir)
 
-    mask = mu.read_map(meta.masks["analysis_mask"], pix_type=meta.pix_type)
+    mask_file = meta.masks["analysis_mask"]
+    if mask_file is None:
+        raise ValueError("You did not provide a path to an analysis mask.")
+
+    mask = mu.read_map(mask_file,
+                       pix_type=meta.pix_type,
+                       car_template=meta.car_template)
     lmax = mu.lmax_from_map(mask, pix_type=meta.pix_type)
-    print(lmax)
 
     bin_low, bin_high, bin_center = create_binning(lmax,
                                                    args.deltal)

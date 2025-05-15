@@ -1,9 +1,8 @@
 import argparse
 from soopercool import BBmeta
 from soopercool import mpi_utils as mpi
+from soopercool import map_utils as mu
 import healpy as hp
-import numpy as np
-import matplotlib.pyplot as plt
 
 
 def main(args):
@@ -20,14 +19,15 @@ def main(args):
     sims_dir = f"{out_dir}/cov_sims"
     BBmeta.make_dir(sims_dir)
 
-    signal_alm_dir = meta.covariance["signal_alm_sims_dir"]
-    signal_alm_template = meta.covariance["signal_alm_sims_template"]
+    signal_alm_dirs = meta.covariance["signal_alm_sims_dir"]
+    signal_alm_templates = meta.covariance["signal_alm_sims_template"]
 
-    binary = hp.read_map(f"{masks_dir}/binary_mask.fits")
+    binary = mu.read_map(f"{masks_dir}/binary_mask.fits",
+                         pix_type=meta.pix_type,
+                         car_template=meta.car_template)
 
-    lmax = 3*meta.nside - 1
-    ll = np.arange(lmax + 1)
-    cl2dl = ll*(ll+1)/2./np.pi
+    mu._check_pix_type(meta.pix_type)
+    lmax = meta.lmax
 
     beams = {
         ms: meta.read_beam(ms)[1][:lmax+1]
@@ -70,59 +70,68 @@ def main(args):
             noise_map_dir = meta.covariance["noise_map_sims_dir"][ms]
             noise_map_template = meta.covariance["noise_map_sims_template"][ms]
 
-            ft = meta.freq_tag_from_map_set(ms)
-            fname = signal_alm_template.format(id_sim=id_sim, freq_tag=ft)
-
-            alms = hp.read_alm(f"{signal_alm_dir}/{fname}", hdu=(1, 2, 3))
-            alms_beamed = [hp.almxfl(alm, beams[ms]) for alm in alms]
-            signal = hp.alm2map(alms_beamed, nside=meta.nside)
-
-            if do_plots:
-                signal_cl = {fp: hp.anafast(signal)[i]
-                             for i, fp in enumerate(field_pairs)}
-
             for id_bundle in range(meta.n_bundles_from_map_set(ms)):
 
                 fname = noise_map_template.format(id_sim=id_sim, map_set=ms,
                                                   id_bundle=id_bundle)
-                noise = hp.read_map(
-                    f"{noise_map_dir}/{fname}", field=[0, 1, 2]
+                bundle_map = mu.read_map(
+                    f"{noise_map_dir}/{fname}",
+                    pix_type=meta.pix_type,
+                    fields_hp=[0, 1, 2],
+                    car_template=meta.car_template
                 )
                 if do_plots and id_bundle == 0:
-                    noise_cl = {
-                        fp: hp.anafast(noise)[i]
-                        for i, fp in enumerate(field_pairs)
-                    }
-                    for i, fp in enumerate(field_pairs):
-                        plt.title(f"{ms} | bundle {id_bundle} | {fp}")
-                        plt.loglog(ll, cl2dl*signal_cl[fp], c="navy",
-                                   label="Signal")
-                        plt.loglog(ll, cl2dl*noise_cl[fp], c="grey", alpha=0.5,
-                                   label="Noise")
-                        plt.loglog(ll, cl2dl*clth[ms, fp], c="darkorange",
-                                   label="Theory (beamed)")
-                        plt.xlabel(r"$\ell$", fontsize=15)
-                        plt.ylabel(r"$D_\ell$", fontsize=15)
-                        plt.legend()
-                        plt.savefig(f"{plots_dir}/cl_{ms}_bundle{id_bundle}_{fp}.png")  # noqa
-                        plt.close()
+                    pass
+                    # # TODO: Generalize to masked noise realisation
+                    # noise_cl = {
+                    #     fp: hp.anafast(bundle_map)[i]
+                    #     for i, fp in enumerate(field_pairs)
+                    # }
+                    # for i, fp in enumerate(field_pairs):
+                    #     plt.title(f"{ms} | bundle {id_bundle} | {fp}")
+                    #     plt.loglog(ll, cl2dl*signal_cl[fp], c="navy",
+                    #                label="Signal")
+                    #     plt.loglog(ll, cl2dl*noise_cl[fp], c="grey", alpha=0.5,  # noqa
+                    #                label="Noise")
+                    #     plt.loglog(ll, cl2dl*clth[ms, fp], c="darkorange",
+                    #                label="Theory (beamed)")
+                    #     plt.xlabel(r"$\ell$", fontsize=15)
+                    #     plt.ylabel(r"$D_\ell$", fontsize=15)
+                    #     plt.legend()
+                    #     plt.savefig(f"{plots_dir}/cl_{ms}_bundle{id_bundle}_{fp}.png")  # noqa
+                    #     plt.close()
 
-                split_map = signal + noise
+                # Add signal if exists, otherwise just use noise
+                if signal_alm_templates[ms]:
+                    ft = meta.freq_tag_from_map_set(ms)
+                    fname = signal_alm_templates[ms].format(id_sim=id_sim,
+                                                            freq_tag=ft)
+                    alms = hp.read_alm(f"{signal_alm_dirs[ms]}/{fname}",
+                                       hdu=(1, 2, 3))
+                    alms_beamed = [hp.almxfl(alm, beams[ms]) for alm in alms]
+
+                    # # TODO
+                    # if do_plots:
+                    #     signal_cl = {fp: hp.alm2cl(alms_beamed)[i]
+                    #                  for i, fp in enumerate(field_pairs)}
+                    signal = mu.alm2map(alms_beamed,
+                                        pix_type=meta.pix_type,
+                                        nside=meta.nside,
+                                        car_map_template=meta.car_template)
+
+                    mu.add_map(signal, bundle_map, meta.pix_type)
 
                 map_name = f"cov_sims_{ms}_bundle{id_bundle}.fits"
-                hp.write_map(f"{base_dir}/{map_name}", split_map*binary,
-                             overwrite=True,
-                             dtype=np.float32)
+                map_masked = bundle_map.copy()
+                mu.multiply_map(binary, map_masked, meta.pix_type)
+                mu.write_map(
+                    f"{base_dir}/{map_name}",
+                    map_masked,
+                    pix_type=meta.pix_type
+                )
 
                 if do_plots:
-                    for i, f in enumerate("TQU"):
-                        hp.mollview(split_map[i]*binary,
-                                    cmap="RdYlBu_r",
-                                    title=f"{ms} - {id_sim} - {f}",
-                                    min=-300 if f == "T" else -10,
-                                    max=300 if f == "T" else 10)
-                        plt.savefig(f"{plots_dir}/map_{ms}_bundle{id_bundle}_{f}.png") # noqa
-                        plt.close()
+                    mu.plot_map(map_masked, pix_type=meta.pix_type)
 
 
 if __name__ == "__main__":
