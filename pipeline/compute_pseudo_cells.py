@@ -108,8 +108,12 @@ def main(args):
                 nmt_bins,
                 return_unbinned=True
                 )
-        
-        weighted_pcls = pu.get_weighted_pcls(pcls_unbinned, mask, pix_type=meta.pix_type)
+
+        weighted_pcls = pu.get_weighted_pcls(
+            pcls_unbinned,
+            mask,
+            pix_type=meta.pix_type
+        )
         np.savez(f"{cells_dir}/weighted_pcls_{map_name1}_x_{map_name2}.npz",
                  **weighted_pcls, ell=np.arange(len(weighted_pcls["TT"])))
 
