@@ -3,8 +3,6 @@ from soopercool import BBmeta
 from soopercool import mpi_utils as mpi
 from soopercool import map_utils as mu
 import healpy as hp
-# import numpy as np
-# import matplotlib.pyplot as plt
 
 
 def main(args):
