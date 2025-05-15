@@ -245,3 +245,28 @@ def plot_pcls_mat_transfer(pcls_mat_unfilt, pcls_mat_filt, file_name):
                 ax.legend(fontsize=14)
 
     plt.savefig(file_name, bbox_inches="tight")
+
+
+def bin_theory_cls(cls, bpwf):
+    """
+    """
+    fields_theory = {"TT": 0, "EE": 1, "BB": 2, "TE": 3}
+    fields_all = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
+    nl_th = cls["TT"].shape[0]
+
+    size, n_bins, _, nl = bpwf.shape
+    assert size == 9, "Unexpected number of fields in coupling matrix"
+    assert nl <= nl_th, f"Theory spectrum must contain ell up to {nl}."
+
+    cls_dict = {}
+    for fp in fields_all:
+        if fp in fields_theory:
+            cls_dict[fp] = cls[fp][:nl]
+        else:
+            cls_dict[fp] = np.zeros(nl)
+    cls_vec = np.array([cls_dict[fp] for fp in fields_all])
+
+    clb = np.dot(bpwf.reshape(size*n_bins, size*nl), cls_vec.reshape(size*nl))
+    clb = clb.reshape(size, n_bins)
+
+    return {fp: clb[ifp] for ifp, fp in enumerate(fields_all)}

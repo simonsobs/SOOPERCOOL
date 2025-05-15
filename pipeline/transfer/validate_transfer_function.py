@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 from soopercool import BBmeta
 import matplotlib.pyplot as plt
-from soopercool import coupling_utils as cu
+from soopercool import ps_utils as pu
 
 # TODO:
 # Read in beam for validation and correct C_ell estimator by it. Currently we
@@ -93,7 +93,7 @@ def main(args):
         for ms1, ms2 in ps_pairs:
             ftag1 = meta.filtering_tag_from_map_set(ms1)
             ftag2 = meta.filtering_tag_from_map_set(ms2)
-            cls_theory_binned[type][ms1, ms2] = cu.bin_theory_cls(
+            cls_theory_binned[type][ms1, ms2] = pu.bin_theory_cls(
                 cls_theory[ms1, ms2], bpwf[type][ftag1, ftag2]
             )
 
