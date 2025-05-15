@@ -216,3 +216,32 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
         ])
 
     return pcls_mat
+
+
+def plot_pcls_mat_transfer(pcls_mat_unfilt, pcls_mat_filt, file_name):
+    """
+    """
+    import matplotlib.pyplot as plt
+
+    field_pairs = [f"{p}{q}" for (p, q) in product("TEB", "TEB")]
+    plt.figure(figsize=(25, 25))
+    grid = plt.GridSpec(9, 9, hspace=0.3, wspace=0.3)
+
+    for id1, f1 in enumerate(field_pairs):
+        for id2, f2 in enumerate(field_pairs):
+            ax = plt.subplot(grid[id1, id2])
+            ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
+            ax.plot(pcls_mat_unfilt[id1, id2], c="navy", label="filtered")
+            ax.plot(pcls_mat_filt[id1, id2], c="darkorange",
+                    label="unfiltered")
+            if id1 == 8:
+                ax.set_xlabel(r"$\ell$", fontsize=14)
+            else:
+                ax.set_xticks([])
+            if f1 != f2:
+                ax.ticklabel_format(axis="y", style="scientific",
+                                    scilimits=(0, 0), useMathText=True)
+            if (id1, id2) == (0, 0):
+                ax.legend(fontsize=14)
+
+    plt.savefig(file_name, bbox_inches="tight")

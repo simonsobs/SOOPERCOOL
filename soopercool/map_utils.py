@@ -76,24 +76,21 @@ def map2alm(map, pix_type="hp"):
     _check_pix_type(pix_type)
 
     if isinstance(map, str):
-        if pix_type == "car":
-            _, wcs = enmap.read_map_geometry(map)
-            res = np.deg2rad(np.min(np.abs(wcs.wcs.cdelt)))
-            lmax = uharm.res2lmax(res)
-            return lmax
-        else:
-            map = read_map(map)
+        map = read_map(map, pix_type=pix_type)
+    lmax = lmax_from_map(map, pix_type=pix_type)
 
     if pix_type == "hp":
-        return hp.map2alm(map)
+        return hp.map2alm(map, lmax=lmax)
     else:
-        return curvedsky.map2alm(map)
+        return curvedsky.map2alm(map, lmax=lmax)
 
 
 def alm2map(alm, pix_type="hp", nside=None, car_map_template=None):
     """
     """
     _check_pix_type(pix_type)
+    if isinstance(alm, list):
+        alm = np.array(alm, dtype=np.float64)
 
     if pix_type == "hp":
         assert nside is not None, "nside is required"

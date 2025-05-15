@@ -189,10 +189,6 @@ def main(args):
         out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_{id_sim:04d}.npz"  # noqa
         fplt = f"{plot_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_{id_sim:04d}.pdf"  # noqa
 
-        # DEBUG
-        print("pcls_mat_unfiltered", np.any(pcls_mat_unfiltered))
-        print("pcls_mat_filtered", np.any(pcls_mat_filtered))
-
         if do_plot:
             ps_utils.plot_pcls_mat_transfer(
                 pcls_mat_unfiltered, pcls_mat_filtered, fplt
