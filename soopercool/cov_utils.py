@@ -72,7 +72,7 @@ def compute_covariance_workspace(analysis_mask,
                 wsp[s0, s1].write_to(fname_wsp)
         else:
             wsp[s0, s1] = nmt.NmtWorkspace.from_file(fname_wsp)
-        
+
         for j, (s2, s3) in enumerate(spin_pairs):
             if save_dir is not None:
                 fname_cwsp = f"{save_dir}/cwsp_{s0}_{s1}_{s2}_{s3}"
@@ -91,7 +91,9 @@ def compute_covariance_workspace(analysis_mask,
                 if fname_cwsp is not None:
                     cwsp[s0, s1, s2, s3].write_to(fname_cwsp)
             else:
-                cwsp[s0, s1, s2, s3] = nmt.NmtCovarianceWorkspace.from_file(fname_cwsp)
+                cwsp[s0, s1, s2, s3] = nmt.NmtCovarianceWorkspace.from_file(
+                    fname_cwsp
+                )
     return wsp, cwsp
 
 
