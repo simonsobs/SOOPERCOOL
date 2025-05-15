@@ -18,6 +18,11 @@ def main(args):
     verbose = args.verbose
     out_dir = meta.output_directory
 
+    do_plot = not args.no_plots
+    if do_plot:
+        plot_dir = f"{out_dir}/plots/cells_tf_est"
+        BBmeta.make_dir(plot_dir)
+
     pcls_tf_est_dir = f"{out_dir}/cells_tf_est"
     BBmeta.make_dir(pcls_tf_est_dir)
 
@@ -182,10 +187,16 @@ def main(args):
 
         out_f = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_filtered_{id_sim:04d}.npz"  # noqa
         out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_{id_sim:04d}.npz"  # noqa
+        fplt = f"{plot_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_{id_sim:04d}.pdf"  # noqa
 
         # DEBUG
         print("pcls_mat_unfiltered", np.any(pcls_mat_unfiltered))
         print("pcls_mat_filtered", np.any(pcls_mat_filtered))
+
+        if do_plot:
+            ps_utils.plot_pcls_mat_transfer(
+                pcls_mat_unfiltered, pcls_mat_filtered, fplt
+            )
 
         np.savez(out_f, pcls_mat=pcls_mat_filtered)
         np.savez(out_unf, pcls_mat=pcls_mat_unfiltered)
@@ -197,5 +208,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--no_plots", action="store_true")
     args = parser.parse_args()
     main(args)
