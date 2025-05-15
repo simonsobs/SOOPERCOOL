@@ -17,7 +17,7 @@ def main(args):
     meta = BBmeta(args.globals)
 
     out_dir = meta.output_directory
-    cells_dir =  f"{out_dir}/cells"
+    cells_dir = f"{out_dir}/cells"
 
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
@@ -118,12 +118,13 @@ def main(args):
             )
             tfint = tfint(ell)
             tfint[ell > 600] = tfint[600]
-            tfint[ell <= ell[tfint<0][-1]] = tfint[ell[tfint<0][-1]+1]
+            tfint[ell <= ell[tfint < 0][-1]] = tfint[ell[tfint < 0][-1]+1]
             tf_interp[fp] = tfint
 
         for type in ["cross", "noise"]:
             cells_to_save = {
-                # ansatz for the fitlering to be improved. This is a temporary placeholder
+                # ansatz for the fitlering to be improved.
+                # This is a temporary placeholder
                 # Need to fit for the TF exponent
                 fp: cells_coadd[type][map_set1, map_set2][fp] / tf_interp[fp] * tf_interp[fp] ** 0.75  # noqa
                 for fp in field_pairs
@@ -143,6 +144,7 @@ def main(args):
                 ell=np.arange(len(cells_to_save["TT"])),
                 **cells_to_save
                 )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
