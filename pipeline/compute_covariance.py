@@ -4,7 +4,7 @@ import numpy as np
 from soopercool import cov_utils as cov
 from soopercool import map_utils as mu
 import pymaster as nmt
-from soopercool import utils
+from soopercool import utils as su
 
 
 def main(args):
@@ -19,8 +19,7 @@ def main(args):
     # Define output directory
     cov_dir = f"{out_dir}/covariances"
     meta.make_dir(cov_dir)
-    ps_dir = f"/home/al5147/sat_covariances/cells"
-
+    ps_dir = f"{out_dir}/cells"
 
     # Load binning
     binning = np.load(meta.binning_file)
@@ -34,7 +33,6 @@ def main(args):
     cross_ps_names = meta.get_ps_names_list(type="all", coadd=True)
 
     # Load beams
-    from soopercool import utils as su
     beams = {}
     for map_set in meta.map_sets_list:
         beam_dir = meta.beam_dir_from_map_set(map_set)
@@ -72,9 +70,13 @@ def main(args):
         if ms1 != ms2:
             for fp in field_pairs:
                 if fp == fp[::-1]:
-                    noise_interp[ms2, ms1, fp] = noise_interp[ms1, ms2, fp].copy()
+                    noise_interp[ms2, ms1, fp] = (
+                        noise_interp[ms1, ms2, fp].copy()
+                    )
                 else:
-                    noise_interp[ms2, ms1, fp] = noise_interp[ms1, ms2, fp[::-1]].copy()
+                    noise_interp[ms2, ms1, fp] = (
+                        noise_interp[ms1, ms2, fp[::-1]].copy()
+                    )
 
     # Lists all covmat elements to compute
     cov_names = []
@@ -136,11 +138,13 @@ def main(args):
         beam34 = beams[ms3] * beams[ms4]
 
         # Normalize with transfer function
+        # and beams
         for fp1 in field_pairs:
             for fp2 in field_pairs:
                 tf1 = tf_dict[ms1, ms2][f"{fp1}_to_{fp1}"]
                 tf2 = tf_dict[ms3, ms4][f"{fp2}_to_{fp2}"]
-                cov_dict[fp1, fp2] /= tf1[:, None] * tf2[None, :] * beam12[:, None] * beam34[None, :]
+                cov_dict[fp1, fp2] /= tf1[:, None] * tf2[None, :]
+                cov_dict[fp1, fp2] /= beam12[:, None] * beam34[None, :]
 
         full_cov = np.zeros((n_bins*len(field_pairs), n_bins*len(field_pairs)))
         print(field_pairs)
