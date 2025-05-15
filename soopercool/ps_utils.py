@@ -81,7 +81,8 @@ def get_binned_cls(bp_win_dict, cls_dict_unbinned):
     return field_pairs_from_spins(cls_dict_binned)
 
 
-def get_coupled_pseudo_cls(fields1, fields2, nmt_binning, return_unbinned=False):
+def get_coupled_pseudo_cls(fields1, fields2, nmt_binning,
+                           return_unbinned=False):
     """
     Compute the binned coupled pseudo-C_ell estimates from two
     (spin-0 or spin-2) NaMaster fields and a multipole binning scheme.
@@ -154,7 +155,7 @@ def get_weighted_pcls(pcls, mask, pix_type="car"):
         weights = np.mean(mask ** 2)
     elif pix_type == "car":
         shape, wcs = mask.geometry
-        pixsizemap = enmap.pixsizemap(shape, wcs) # sterradians
+        pixsizemap = enmap.pixsizemap(shape, wcs)  # sterradians
         weights = np.sum(mask ** 2 * pixsizemap) / (4*np.pi)
     
     for k in pcls_dict:
