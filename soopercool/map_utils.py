@@ -90,7 +90,7 @@ def alm2map(alm, pix_type="hp", nside=None, car_map_template=None):
     """
     _check_pix_type(pix_type)
     if isinstance(alm, list):
-        alm = np.array(alm, dtype=np.float64)
+        alm = np.array(alm)
 
     if pix_type == "hp":
         assert nside is not None, "nside is required"
@@ -101,8 +101,7 @@ def alm2map(alm, pix_type="hp", nside=None, car_map_template=None):
         else:
             shape, wcs = car_map_template.geometry
         map = enmap.zeros((3,) + shape, wcs)
-        curvedsky.alm2map(alm, map)
-        return map
+        return curvedsky.alm2map(alm, map)
 
 
 def lmax_from_map(map, pix_type="hp"):
