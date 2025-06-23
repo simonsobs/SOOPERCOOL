@@ -145,7 +145,7 @@ def main(args):
         plt.errorbar(ells[tag], means_tt[tag], yerr=std_tt[tag], label=labels[tag], **formatting)
     plt.legend()
     plt.xlabel(r"Multipole $\ell$")
-    plt.ylabel(r"$C_b^{TT} \; [\mu\mathrm{K}]$")
+    plt.ylabel(r"$C_b^{TT} \; [\mu\mathrm{K}^2]$")
     plt.savefig(os.path.join(plot_dir, "mask_validation_TT.png"), bbox_inches='tight')
     plt.close()
 
@@ -155,7 +155,7 @@ def main(args):
         plt.errorbar(ells[tag], means_ee[tag], yerr=std_ee[tag], label=labels[tag], **formatting)
     plt.legend()
     plt.xlabel(r"Multipole $\ell$")
-    plt.ylabel(r"$C_b^{EE} \; [\mu\mathrm{K}]$")
+    plt.ylabel(r"$C_b^{EE} \; [\mu\mathrm{K}^2]$")
     plt.savefig(os.path.join(plot_dir, "mask_validation_EE.png"), bbox_inches='tight')
     plt.close()
 
@@ -165,7 +165,7 @@ def main(args):
         plt.errorbar(ells[tag], means_bb[tag], yerr=std_bb[tag], label=labels[tag], **formatting)
     plt.legend()
     plt.xlabel(r"Multipole $\ell$")
-    plt.ylabel(r"$C_b^{BB} \; [\mu\mathrm{K}]$")
+    plt.ylabel(r"$C_b^{BB} \; [\mu\mathrm{K}^2]$")
     plt.savefig(os.path.join(plot_dir, "mask_validation_BB.png"), bbox_inches='tight')
     plt.close()
 
