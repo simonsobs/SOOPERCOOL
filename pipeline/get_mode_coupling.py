@@ -26,6 +26,11 @@ def main(args):
 
     nspec = 7
 
+    binning = np.load(meta.binning_file)
+    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
+                                     binning["bin_high"] + 1)
+    n_bins = nmt_bins.get_n_bands()
+
     mask_file = meta.masks["analysis_mask"]
     if mask_file is not None:
         mask = mu.read_map(mask_file,
@@ -34,7 +39,13 @@ def main(args):
         lmax = mu.lmax_from_map(mask_file, pix_type=meta.pix_type)
     else:
         raise FileNotFoundError("The analysis mask must be specified.")
+
+    if nmt_bins.lmax < lmax:  # In case bins are lower than mask's lmax
+        lmax = nmt_bins.lmax
     nl = lmax + 1
+
+    binner = np.array([nmt_bins.bin_cell(np.array([cl]))[0]
+                       for cl in np.eye(nl)]).T
 
     wcs = None
     if hasattr(mask, 'wcs'):
@@ -48,23 +59,17 @@ def main(args):
         mask,
         None,
         wcs=wcs,
-        spin=0
+        spin=0,
+        lmax=lmax
     )
     field_spin2 = nmt.NmtField(
         mask,
         None,
         wcs=wcs,
         spin=2,
+        lmax=lmax,
         purify_b=meta.pure_B
     )
-
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
-    n_bins = nmt_bins.get_n_bands()
-
-    binner = np.array([nmt_bins.bin_cell(np.array([cl]))[0]
-                       for cl in np.eye(nl)]).T
 
     # Alright, compute and reshape coupling matrix.
     print("Computing MCM")
