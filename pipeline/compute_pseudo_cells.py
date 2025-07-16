@@ -12,10 +12,6 @@ def main(args):
     """
     meta = BBmeta(args.globals)
     do_plots = not args.no_plots
-
-    # DEBUG
-    print("pix_type", meta.pix_type)
-
     out_dir = meta.output_directory
     cells_dir = f"{out_dir}/cells"
 
@@ -53,6 +49,9 @@ def main(args):
     fields = {}
     for map_name in meta.maps_list:
         map_set, id_bundle = map_name.split("__")
+
+        if args.verbose:
+            print(f"  Computing fields for ({map_set}, bundle {id_bundle})")
 
         # Load maps
         map_dir = meta.map_dir_from_map_set(map_set)
@@ -107,6 +106,8 @@ def main(args):
         map_set2, id_bundle2 = map_name2.split("__")
         ftag1 = meta.filtering_tag_from_map_set(map_set1)
         ftag2 = meta.filtering_tag_from_map_set(map_set2)
+        if args.verbose:
+            print(f"  Computing ({map_set1}, {ftag1}) x ({map_set1}, {ftag1})")
         pcls = pu.get_coupled_pseudo_cls(
                 fields[map_set1, id_bundle1],
                 fields[map_set2, id_bundle2],
@@ -173,6 +174,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
+    parser.add_argument("--verbose", action="store_true", help="Verbose mode")
     parser.add_argument("--no_plots", action="store_true",
                         help="Do not make plots.")
     args = parser.parse_args()

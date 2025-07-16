@@ -2,7 +2,7 @@ import numpy as np
 import healpy as hp
 from pixell import enmap, enplot, curvedsky
 import matplotlib.pyplot as plt
-from pixell import uharm, utils
+from pixell import uharm
 import pymaster as nmt
 
 
@@ -453,6 +453,7 @@ def apodize_mask(mask, apod_radius_deg, apod_type, pix_type="hp"):
         #         np.sin(2 * np.pi * distance / apod_radius_deg) / (2 * np.pi)
         #     )
         # else:
+<<<<<<< HEAD
         #     raise ValueError(f"Unknown apodization type {apod_type}")
         # mask_apo[idx] = 1
         if apod_type == "C1":
@@ -461,6 +462,9 @@ def apodize_mask(mask, apod_radius_deg, apod_type, pix_type="hp"):
             )
         else:
             raise NotImplementedError(f"Unknown apodization type {apod_type}")
+=======
+        #     raise NotImplementedError(f"Unknown apodization type {apod_type}")  # noqa
+>>>>>>> 632268f (mostly plotting improvements)
 
     return mask_apo
 
@@ -540,3 +544,15 @@ def binary_mask_from_map(map, pix_type="hp", geometry=None):
     binary[hits_proxy > 0.1] = 1.
 
     return binary
+
+
+def get_fsky_from_hits(mask, pix_type="hp"):
+    """
+    Get sky fraction of a given hits map.
+    """
+    assert np.max(mask) <= 1, "No proper normalization: need max <= 1"
+    if pix_type == "hp":
+        return np.mean(mask)
+    else:  # car
+        shape, wcs = mask.geometry
+        return np.sum(mask * enmap.pixsizemap(shape, wcs) / (4*np.pi))

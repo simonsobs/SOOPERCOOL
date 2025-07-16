@@ -16,14 +16,16 @@ def load_bpwins(coupling_file):
     return bp_win["bp_win"]
 
 
-def binned_theory_from_unbinned(clth, bpw_mat):
+def binned_theory_from_unbinned(clth, bpw_mat, lb, lmax):
     """
     """
     modes = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
     clth_vec = np.concatenate(
         [clth[mode] for mode in modes]
     ).reshape(len(modes), -1)
-    clth_binned = np.einsum("ijkl,kl->ij", bpw_mat, clth_vec)
+    msk = np.arange(bpw_mat.shape[-1]) <= lmax
+    bpw_mat_crop = bpw_mat[:, :, :, msk]
+    clth_binned = np.einsum("ijkl,kl->ij", bpw_mat_crop, clth_vec)
     cl_out = {}
     for i, m in enumerate(modes):
         cl_out[m] = clth_binned[i]
@@ -128,7 +130,10 @@ def main(args):
 
     out_dir = meta.output_directory
     sacc_dir = f"{out_dir}/saccs"
-    coupling_dir = f"{out_dir}/couplings"
+    couplings_dir = f"{out_dir}/couplings"
+    if "couplings_directory" in meta.covariance:
+        if meta.covariance["couplings_directory"] is not None:
+            couplings_dir = meta.covariance["couplings_directory"]
 
     plot_dir = f"{out_dir}/plots/sacc_spectra"
     BBmeta.make_dir(plot_dir)
@@ -137,7 +142,12 @@ def main(args):
     nmt_binning = nmt.NmtBin.from_edges(binning["bin_low"],
                                         binning["bin_high"] + 1)
     lb = nmt_binning.get_effective_ells()
-    lmax = 3*meta.nside - 1
+    lmax = meta.lmax
+
+    beams = {
+        ms: meta.read_beam(ms)[1][:lmax+1]
+        for ms in meta.map_sets_list
+    }
 
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
     ps_names = meta.get_ps_names_list(type="all", coadd=True)
@@ -161,7 +171,7 @@ def main(args):
 
     for ms1, ms2 in ps_names:
         bpw_file = f"couplings_{ms1}_{ms2}.npz"
-        bpw_mats[ms1, ms2] = load_bpwins(f"{coupling_dir}/{bpw_file}")
+        bpw_mats[ms1, ms2] = load_bpwins(f"{couplings_dir}/{bpw_file}")
 
     plot_sims = {
         (ms1, ms2, fp): {
@@ -188,14 +198,16 @@ def main(args):
         clth = {}
 
         for i, fp in enumerate(["TT", "EE", "BB", "TE"]):
-            cmb_cl = hp.read_cl(fiducial_cmb)[i, :lmax+1]
-            dust_cl = hp.read_cl(
-                fiducial_dust.format(nu1=nu1, nu2=nu2)
-            )[i, :lmax+1]
-            synch_cl = hp.read_cl(
-                fiducial_synch.format(nu1=nu1, nu2=nu2)
-            )[i, :lmax+1]
-            clth[fp] = (cmb_cl + dust_cl + synch_cl)
+            clth[fp] = hp.read_cl(fiducial_cmb)[i, :lmax+1]
+            if fiducial_dust is not None:
+                clth[fp] += hp.read_cl(
+                    fiducial_dust.format(nu1=nu1, nu2=nu2)
+                )[i, :lmax+1]
+            if fiducial_synch is not None:
+                clth[fp] += hp.read_cl(
+                    fiducial_synch.format(nu1=nu1, nu2=nu2)
+                )[i, :lmax+1]
+            clth[fp] *= beams[ms1]*beams[ms2]
         clth["EB"] = np.zeros(lmax+1)
         clth["TB"] = np.zeros(lmax+1)
         clth["l"] = np.arange(lmax+1)
@@ -208,18 +220,16 @@ def main(args):
                 # reverse the order of the two fields
                 cl_th[fp] = clth[fp[::-1]]
 
-        clth_binned = binned_theory_from_unbinned(cl_th, bpw_mats[(ms1, ms2)])
+        clth_binned = binned_theory_from_unbinned(cl_th, bpw_mats[(ms1, ms2)],
+                                                  lb, lmax)
 
         ftag1 = meta.filtering_tag_from_map_set(ms1)
         ftag2 = meta.filtering_tag_from_map_set(ms2)
 
         for fp in field_pairs:
-            mask_th = (clth["l"] <= 2 * meta.nside - 1)
+            mask_th = (clth["l"] <= meta.lmax)
             x_th, y_th = clth["l"][mask_th], cl_th[fp][mask_th]
-
-            idx_bad = idx_bad_tf[ftag1, ftag2][fp]
-            mask = ((np.arange(len(lb)) > idx_bad) &
-                    (lb <= 2 * meta.nside - 1))
+            mask = lb <= meta.lmax
             th_binned = clth_binned[fp][mask]
 
             plot_sims[ms1, ms2, fp]["x_th"] = x_th
@@ -230,6 +240,7 @@ def main(args):
     plot_data = {
         (ms1, ms2, fp): {
             "y": None,
+            "err": None,
         } for ms1, ms2 in ps_names
         for fp in field_pairs
     }
@@ -252,13 +263,9 @@ def main(args):
                     ms1,
                     ms2,
                     return_cov=True)
-
-                idx_bad = idx_bad_tf[ftag1, ftag2][fp]
-                mask = (
-                    (np.arange(len(ell)) > idx_bad) &
-                    (ell <= 2 * meta.nside - 1))
-                x, y, err = ell, cl, np.sqrt(cov.diagonal())
-                x, y, err = x[mask], y[mask], err[mask]
+                mask = ell <= meta.lmax
+                x, y, err = (ell, cl, np.sqrt(cov.diagonal()))
+                x, y, err = (x[mask], y[mask], err[mask])
 
                 plot_data[ms1, ms2, fp]["x"] = x
                 plot_data[ms1, ms2, fp]["y"] = y
@@ -283,12 +290,9 @@ def main(args):
                     f"cl_{types[f1]}{types[f2]}",
                     ms1,
                     ms2,
-                    return_cov=True)
-
-                idx_bad = idx_bad_tf[ftag1, ftag2][fp]
-                mask = (
-                    (np.arange(len(ell)) > idx_bad) &
-                    (ell <= 2 * meta.nside - 1))
+                    return_cov=True
+                )
+                mask = ell <= meta.lmax
                 x, y, err = ell, cl, np.sqrt(cov.diagonal())
                 x, y, err = x[mask], y[mask], err[mask]
 
@@ -315,13 +319,14 @@ def main(args):
                 cb_data_err=plot_data[ms1, ms2, fp]["err"],
                 title=plot_sims[ms1, ms2, fp]["title"],
                 ylabel=plot_sims[ms1, ms2, fp]["ylabel"],
-                xlim=(30, 2 * meta.nside - 1),
+                xlim=(2, meta.lmax),
                 add_theory=True,
                 lth=plot_sims[ms1, ms2, fp]["x_th"],
                 clth=plot_sims[ms1, ms2, fp]["y_th"],
                 cbth=plot_sims[ms1, ms2, fp]["th_binned"],
                 save_file=f"{plot_dir}/{plot_name}"
             )
+    print(f"  PLOTS: {plot_dir}")
 
 
 if __name__ == '__main__':
