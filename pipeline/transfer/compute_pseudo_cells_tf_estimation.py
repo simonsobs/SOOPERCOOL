@@ -29,6 +29,7 @@ def main(args):
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
                                      binning["bin_high"] + 1)
+    lb = nmt_bins.get_effective_ells()
 
     mask_file = meta.masks["analysis_mask"]
     if mask_file is not None:
@@ -52,7 +53,8 @@ def main(args):
                           compute a transfer function for it")
 
     tf_settings = meta.transfer_settings
-    sim_ids = range(tf_settings["tf_est_num_sims"])
+    sim_ids = range(tf_settings["sim_id_start"],
+                    tf_settings["sim_id_start"]+tf_settings["tf_est_num_sims"])
 
     mpi_shared_list = [(id_sim, ftag1, ftag2)
                        for ftag1, ftag2 in filtering_tag_pairs
@@ -191,7 +193,8 @@ def main(args):
 
         if do_plot:
             ps_utils.plot_pcls_mat_transfer(
-                pcls_mat_unfiltered, pcls_mat_filtered, fplt
+                pcls_mat_unfiltered, pcls_mat_filtered, lb, fplt,
+                lmax=600
             )
 
         np.savez(out_f, pcls_mat=pcls_mat_filtered)
