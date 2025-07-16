@@ -32,7 +32,7 @@ def noise_fit(lb, nlb, ls):
         return Nwhite * (1. + (ls/lknee)**alpha_knee)
 
     lknee, alpha_knee = curve_fit(
-        noise_curve, lb, nlb, p0=p0, bounds=([2, -3.], [250, -1.])
+        noise_curve, lb, nlb, p0=p0, bounds=([2, -4.], [250, -1.])
     )[0]
     nl_best = noise_curve(ls, int(lknee), alpha_knee)
 
