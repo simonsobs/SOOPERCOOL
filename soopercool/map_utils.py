@@ -440,28 +440,28 @@ def apodize_mask(mask, apod_radius_deg, apod_type, pix_type="hp"):
             apod_type
         )
     else:
-        distance = enmap.distance_transform(mask)
-        distance = np.rad2deg(distance)
+        # distance = enmap.distance_transform(mask)
+        # distance = np.rad2deg(distance)
 
-        mask_apo = mask.copy()
-        idx = np.where(distance > apod_radius_deg)
+        # mask_apo = mask.copy()
+        # idx = np.where(distance > apod_radius_deg)
 
-        if apod_type == "C1":
-            mask_apo = 0.5 - 0.5 * np.cos(-np.pi * distance / apod_radius_deg)
-        elif apod_type == "C2":
-            mask_apo = (
-                distance / apod_radius_deg -
-                np.sin(2 * np.pi * distance / apod_radius_deg) / (2 * np.pi)
-            )
-        else:
-            raise ValueError(f"Unknown apodization type {apod_type}")
-        mask_apo[idx] = 1
         # if apod_type == "C1":
-        #     mask_apo = enmap.apod_mask(
-        #         mask, width=apod_radius_deg*utils.degree
+        #     mask_apo = 0.5 - 0.5 * np.cos(-np.pi*distance/apod_radius_deg)
+        # elif apod_type == "C2":
+        #     mask_apo = (
+        #         distance / apod_radius_deg -
+        #         np.sin(2 * np.pi * distance / apod_radius_deg) / (2 * np.pi)
         #     )
         # else:
-        #     raise NotImplementedError(f"Unknown apodization type {apod_type}")  # noqa
+        #     raise ValueError(f"Unknown apodization type {apod_type}")
+        # mask_apo[idx] = 1
+        if apod_type == "C1":
+            mask_apo = enmap.apod_mask(
+                mask, width=np.deg2rad(apod_radius_deg)
+            )
+        else:
+            raise NotImplementedError(f"Unknown apodization type {apod_type}")  # noqa
 
     return mask_apo
 
