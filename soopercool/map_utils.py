@@ -2,7 +2,7 @@ import numpy as np
 import healpy as hp
 from pixell import enmap, enplot, curvedsky
 import matplotlib.pyplot as plt
-from pixell import uharm
+from pixell import uharm, utils
 import pymaster as nmt
 
 
@@ -453,7 +453,6 @@ def apodize_mask(mask, apod_radius_deg, apod_type, pix_type="hp"):
         #         np.sin(2 * np.pi * distance / apod_radius_deg) / (2 * np.pi)
         #     )
         # else:
-<<<<<<< HEAD
         #     raise ValueError(f"Unknown apodization type {apod_type}")
         # mask_apo[idx] = 1
         if apod_type == "C1":
@@ -462,9 +461,6 @@ def apodize_mask(mask, apod_radius_deg, apod_type, pix_type="hp"):
             )
         else:
             raise NotImplementedError(f"Unknown apodization type {apod_type}")
-=======
-        #     raise NotImplementedError(f"Unknown apodization type {apod_type}")  # noqa
->>>>>>> 632268f (mostly plotting improvements)
 
     return mask_apo
 
