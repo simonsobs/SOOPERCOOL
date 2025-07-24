@@ -504,8 +504,9 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
     """
     Plot the transfer function given an input dictionary.
     """
-    plt.figure(figsize=(25, 25))
-    grid = plt.GridSpec(9, 9, hspace=0.3, wspace=0.3)
+    npan = len(field_pairs)
+    plt.figure(figsize=(25*npan/9, 25*npan/9))
+    grid = plt.GridSpec(npan, npan, hspace=0.3, wspace=0.3)
 
     for id1, f1 in enumerate(field_pairs):
         for id2, f2 in enumerate(field_pairs):
@@ -519,7 +520,7 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
             ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
             ax.plot(lb, tf_dict[f"{f1}_to_{f2}"], color="navy")
 
-            if id1 == 8:
+            if id1 == npan-1:
                 ax.set_xlabel(r"$\ell$", fontsize=14)
             else:
                 ax.set_xticks([])
@@ -532,6 +533,8 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
             ax.set_ylim(ylims[0], ylims[1])
 
     plt.savefig(file_name, bbox_inches="tight")
+    plt.close()
+    plt.clf()
 
 
 def get_binary_mask_from_nhits(nhits_map, nside, zero_threshold=1e-3):

@@ -685,7 +685,9 @@ class BBmeta(object):
             for f_type, filter_label in filter_labels.items():
                 fname = f"couplings{filter_label}_{ftag1}_{ftag2}"
                 if not os.path.isfile(f"{couplings_dir}/{fname}.npz"):
-                    raise ValueError("Coupling file does not exist.")
+                    raise ValueError(
+                        f"Coupling file does not exist: {couplings_dir}/{fname}.npz"  # noqa
+                    )
 
                 couplings = np.load(f"{couplings_dir}/{fname}.npz")
                 npairs, ndata, _, _ = np.shape(couplings['inv_coupling'])

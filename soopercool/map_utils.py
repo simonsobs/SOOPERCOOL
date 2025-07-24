@@ -2,7 +2,7 @@ import numpy as np
 import healpy as hp
 from pixell import enmap, enplot, curvedsky
 import matplotlib.pyplot as plt
-from pixell import uharm
+from pixell import uharm, utils
 import pymaster as nmt
 
 
@@ -90,7 +90,7 @@ def alm2map(alm, pix_type="hp", nside=None, car_map_template=None):
     """
     _check_pix_type(pix_type)
     if isinstance(alm, list):
-        alm = np.array(alm)
+        alm = np.array(alm, dtype=np.complex128)
 
     if pix_type == "hp":
         assert nside is not None, "nside is required"
@@ -102,6 +102,15 @@ def alm2map(alm, pix_type="hp", nside=None, car_map_template=None):
             shape, wcs = car_map_template.geometry
         map = enmap.zeros((3,) + shape, wcs)
         return curvedsky.alm2map(alm, map)
+
+
+def _lmax_from_car_geometry(geometry):
+    """
+    """
+    _, wcs = geometry
+    res = np.deg2rad(np.min(np.abs(wcs.wcs.cdelt)))
+
+    return uharm.res2lmax(res)
 
 
 def lmax_from_map(map, pix_type="hp"):
@@ -125,9 +134,8 @@ def lmax_from_map(map, pix_type="hp"):
 
     if isinstance(map, str):
         if pix_type == "car":
-            _, wcs = enmap.read_map_geometry(map)
-            res = np.deg2rad(np.min(np.abs(wcs.wcs.cdelt)))
-            lmax = uharm.res2lmax(res)
+            geometry = enmap.read_map_geometry(map)
+            lmax = _lmax_from_car_geometry(geometry)
             return lmax
         else:
             map = read_map(map)
@@ -431,22 +439,28 @@ def apodize_mask(mask, apod_radius_deg, apod_type, pix_type="hp"):
             apod_type
         )
     else:
-        distance = enmap.distance_transform(mask)
-        distance = np.rad2deg(distance)
+        # distance = enmap.distance_transform(mask)
+        # distance = np.rad2deg(distance)
 
-        mask_apo = mask.copy()
-        idx = np.where(distance > apod_radius_deg)
+        # mask_apo = mask.copy()
+        # idx = np.where(distance > apod_radius_deg)
 
+        # if apod_type == "C1":
+        #     mask_apo = 0.5 - 0.5 * np.cos(-np.pi * distance / apod_radius_deg)  # noqa
+        # elif apod_type == "C2":
+        #     mask_apo = (
+        #         distance / apod_radius_deg -
+        #         np.sin(2 * np.pi * distance / apod_radius_deg) / (2 * np.pi)
+        #     )
+        # else:
+        #     raise ValueError(f"Unknown apodization type {apod_type}")
+        # mask_apo[idx] = 1
         if apod_type == "C1":
-            mask_apo = 0.5 - 0.5 * np.cos(-np.pi * distance / apod_radius_deg)
-        elif apod_type == "C2":
-            mask_apo = (
-                distance / apod_radius_deg -
-                np.sin(2 * np.pi * distance / apod_radius_deg) / (2 * np.pi)
+            mask_apo = enmap.apod_mask(
+                mask, width=apod_radius_deg*utils.degree
             )
         else:
-            raise ValueError(f"Unknown apodization type {apod_type}")
-        mask_apo[idx] = 1
+            raise NotImplementedError(f"Unknown apodization type {apod_type}")
 
     return mask_apo
 
