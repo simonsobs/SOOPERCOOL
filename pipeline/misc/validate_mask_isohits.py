@@ -59,17 +59,27 @@ def main(args):
     simdir_unfiltered = meta.mask_validation["unfiltered_map_dir"]
     unfiltered_map_tmpl = meta.mask_validation["unfiltered_map_template"]
 
-    # Directory tree as structured in get_analysis_mask.py
-    out_dir = meta.output_directory
-    mask_dir = f"{out_dir}/masks"
-    plot_dir = f"{out_dir}/plots/masks"
-    BBmeta.make_dir(plot_dir)
+    if os.path.exists(meta.masks["analysis_mask"]):
+        # Mask directory specified in config file
+        mask_dir = os.path.dirname(meta.masks["analysis_mask"])
+        plot_dir = f"{mask_dir}/plots"
+        BBmeta.make_dir(plot_dir)
 
-    # Check mask directory for masks
-    mask_basename = "analysis_mask"
-    mask_tags = get_filename_tags(mask_dir, mask_basename, ".fits")
-    if len(mask_tags) == 0:
-        raise FileNotFoundError(f"No masks found in {mask_dir} with names matching {mask_basename}<tag>.fits.")
+        # Mask filename
+        mask_basename = os.path.basename(meta.masks["analysis_mask"]).split('.')[0]
+        mask_tags = ['']
+    else:
+        # Directory tree as structured in get_analysis_mask.py
+        out_dir = meta.output_directory
+        mask_dir = f"{out_dir}/masks"
+        plot_dir = f"{out_dir}/plots/masks"
+        BBmeta.make_dir(plot_dir)
+
+        # Check mask directory for masks
+        mask_basename = "analysis_mask"
+        mask_tags = get_filename_tags(mask_dir, mask_basename, ".fits")
+        if len(mask_tags) == 0:
+            raise FileNotFoundError(f"No masks found in {mask_dir} with names matching {mask_basename}<tag>.fits.")
 
     # Binning
     nmt_bins = meta.read_nmt_binning()
@@ -184,6 +194,8 @@ def main(args):
     plt.ylabel(r"$\sigma(C_b^{\mathrm{CMB}})/\sigma(C_b^{\mathrm{B\ only}})$")
     plt.savefig(os.path.join(plot_dir, "mask_validation_compare_bonly.png"), bbox_inches='tight')
     plt.close()
+
+    print(f"Mask validation plots saved to {plot_dir}")
 
 
 if __name__ == "__main__":
