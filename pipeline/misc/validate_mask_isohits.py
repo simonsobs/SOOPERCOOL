@@ -53,7 +53,7 @@ def main(args):
     purify_b = args.no_purify
     fwhm_amin = args.fwhm
     pix_type = meta.pix_type
-    pure_type = args.puretype
+    sim_type = args.sim_type
     conv = args.no_unit_conversion
     norm_std = args.no_norm_std
     simdir_unfiltered = meta.mask_validation["unfiltered_map_dir"]
@@ -115,7 +115,7 @@ def main(args):
 
         cl00[tag] = []; cl22[tag] = []; cl22b[tag] = []
         for i in range(sim_id_start, sim_id_start+nsims):
-            cmb_map_file = os.path.join(simdir_unfiltered, unfiltered_map_tmpl.format(pure_type=pure_type, id_sim=i))
+            cmb_map_file = os.path.join(simdir_unfiltered, unfiltered_map_tmpl.format(sim_type=sim_type, id_sim=i))
             mpt, mpq, mpu = mu.read_map(cmb_map_file, convert_K_to_muK=conv, pix_type=pix_type, geometry=(shape, wcs))
 
             f0 = nmt.NmtField(mask, [mpt], spin=0, wcs=wcs, lmax=lmax, lmax_mask=lmax)
@@ -125,7 +125,7 @@ def main(args):
             cl22[tag].append(nmt.compute_full_master(f2, f2, nmt_bins))
 
             # B-only sims: no purification
-            bonly_map_file = os.path.join(simdir_unfiltered, unfiltered_map_tmpl.format(pure_type="cmbB", id_sim=i))
+            bonly_map_file = os.path.join(simdir_unfiltered, unfiltered_map_tmpl.format(sim_type="cmbB", id_sim=i))
             _, mpqb, mpub = mu.read_map(bonly_map_file, convert_K_to_muK=conv, pix_type=pix_type, geometry=(shape, wcs))
 
             f2b = nmt.NmtField(mask, [mpqb, mpub], purify_b=False, wcs=wcs, lmax=lmax, lmax_mask=lmax)
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", required=True, help="Path to paramfile")
     parser.add_argument("--fwhm", default=30, help="Beam size (arcmin). Default: 30")
-    parser.add_argument("--puretype", default='cmbTEB', help="Input sim pure type (T/E/B). Default: 'cmbTEB'")
+    parser.add_argument("--sim-type", default='cmbTEB', help="Input sim type (T/E/B). Default: 'cmbTEB'")
     parser.add_argument("--no-purify", action="store_false", help="Do not purify B-modes with NaMaster")
     parser.add_argument("--no-unit-conversion", action="store_false", help="Do not convert map from K to muK")
     parser.add_argument("--no-norm-std", default="store_false", help="Do not normalize errorbars by sqrt(nsims)")
