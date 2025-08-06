@@ -181,15 +181,23 @@ def main(args):
 
     plt.figure()
     for tag in mask_tags:
-        plt.plot(ells[tag], (means_bb[tag]-cbbb)/std_bb[tag], label=labels[tag])
+        plt.plot(ells[tag], (means_ee[tag]-cbee)/std_ee[tag], label=labels[tag])
     plt.xlabel(r"Multipole $\ell$")
     plt.ylabel(r"$(\^{C}_b - C_b^{\mathrm{th}})/\sigma(\^{C}_b)$")
-    plt.savefig(os.path.join(plot_dir, "mask_validation_sigmas.png"), bbox_inches='tight')
+    plt.savefig(os.path.join(plot_dir, "mask_validation_EE_sigmas.png"), bbox_inches='tight')
     plt.close()
 
     plt.figure()
     for tag in mask_tags:
-        plt.plot(ells[tag], std_bb[tag]/std_bb_bonly[tag], label=labels[tag])
+        plt.plot(ells[tag], (means_bb[tag]-cbbb)/std_bb[tag], label=labels[tag])
+    plt.xlabel(r"Multipole $\ell$")
+    plt.ylabel(r"$(\^{C}_b - C_b^{\mathrm{th}})/\sigma(\^{C}_b)$")
+    plt.savefig(os.path.join(plot_dir, "mask_validation_BB_sigmas.png"), bbox_inches='tight')
+    plt.close()
+
+    plt.figure()
+    for tag in mask_tags:
+        plt.semilogy(ells[tag], std_bb[tag]/std_bb_bonly[tag], label=labels[tag])
     plt.xlabel(r"Multipole $\ell$")
     plt.ylabel(r"$\sigma(C_b^{\mathrm{CMB}})/\sigma(C_b^{\mathrm{B\ only}})$")
     plt.savefig(os.path.join(plot_dir, "mask_validation_compare_bonly.png"), bbox_inches='tight')
