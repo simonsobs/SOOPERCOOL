@@ -12,18 +12,13 @@ def main(args):
     """
     """
     meta = BBmeta(args.globals)
-    # do_plots = not args.no_plots
     verbose = args.verbose
 
     out_dir = meta.output_directory
     external_dir = meta.external_dir
     signflip_dir = meta.signflip_dir
-    #cells_dir = f"{'/'.join(out_dir.split('/')[:-1])}/cells/{out_dir.split('/')[-1]}"
-    #os.makedirs(cells_dir, exist_ok=True)
     cells_dir = f"{out_dir}/cells_signflip/"
     couplings_dir = f"{out_dir}/couplings"
-    #couplings_dir = f"{'/'.join(out_dir.split('/')[:-1])}/couplings/{out_dir.split('/')[-1]}"
-    #couplings_dir = f"{external_dir}couplings/"
     sims_dir = f"{signflip_dir}/"
 
     BBmeta.make_dir(cells_dir)
@@ -45,7 +40,6 @@ def main(args):
 
     for id_sim in mpi.taskrange(meta.covariance["cov_num_sims"] - 1):
         print(f"Sim {id_sim}")
-        #base_dir = f"{sims_dir}/{id_sim:04d}"
         base_dir = f"{sims_dir}/"
 
         # Create namaster fields
@@ -53,13 +47,15 @@ def main(args):
         for map_name in meta.maps_list:
             
             map_set, id_bundle = map_name.split("__")
-            sat = map_set.split('_')[0].lower()
-            frq = map_set.split('_')[1]
-            area = map_set.split('_')[2]
-            ssplit = '_'.join(map_set.split('_')[3:])
+            sat_parts = map_set.split('_')
+            sat = '_'.join([part.lower() for part in sat_parts if part.startswith('SAT')])
+            non_sat_parts = [p for p in sat_parts if not p.startswith('SAT')]
+            frq = non_sat_parts[0] if len(non_sat_parts) > 0 else None
+            area = non_sat_parts[1] if len(non_sat_parts) > 1 else None
+            ssplit = '_'.join(non_sat_parts[2:]) if len(non_sat_parts) > 2 else ''
 
-            #map_fname = f"{base_dir}/cov_sims_{map_set}_bundle{id_bundle}.fits"
             map_fname = f"{base_dir}{sat}_{frq}_{ssplit}_bundle{id_bundle}_{id_sim:04d}_map.fits"
+            print(map_fname)
 
             m = mu.read_map(map_fname, #field=[0, 1, 2],
                             pix_type=meta.pix_type, convert_K_to_muK=True)
@@ -88,21 +84,11 @@ def main(args):
         for map_name1, map_name2 in meta.get_ps_names_list(type="all",
                                                            coadd=False):
             map_set1, id_split1 = map_name1.split("__")
-            #sat1 = map_set1.split('_')[0].lower()
-            #frq1 = map_set1.split('_')[1]
-            #area1 = map_set1.split('_')[2]
-            #ssplit1 = '_'.join(map_set1.split('_')[3:])
             map_set2, id_split2 = map_name2.split("__")
-            #sat2 = map_set2.split('_')[0].lower()
-            #frq2 = map_set2.split('_')[1]
-            #area2 = map_set2.split('_')[2]
-            #ssplit2 = '_'.join(map_set2.split('_')[3:])
             
             ofile = f"{cells_dir}/decoupled_pcls_{map_name1}_x_{map_name2}_{id_sim:04d}.npz"
             if os.path.exists(ofile):
                 continue
-            
-            #print(f"# {id_sim+1}")
             
             if verbose:
                 print(f"# {id_sim+1} | ({map_set1}, split {id_split1}) x "
@@ -120,7 +106,6 @@ def main(args):
 
             np.savez(ofile,
                      **decoupled_pcls, lb=nmt_bins.get_effective_ells())
-            #print(ofile)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
