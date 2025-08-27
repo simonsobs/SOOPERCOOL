@@ -668,11 +668,7 @@ class BBmeta(object):
         inverse mode coupling matrices and (optionally,) the bandpower window
         functions.
         """
-        # This is a patch. TODO: add coupling dir as a meta attribute
         couplings_dir = f"{self.output_directory}/couplings"
-        if "couplings_dir" in self.transfer_settings:
-            couplings_dir = self.transfer_settings["couplings_dir"]
-
         filter_labels = {"filtered": "", "unfiltered": "_unfiltered"}
         ps_pairs = self.get_ps_names_list(type="all", coadd=True)
         inv_couplings = {f_type: {} for f_type in filter_labels}
@@ -685,7 +681,9 @@ class BBmeta(object):
             for f_type, filter_label in filter_labels.items():
                 fname = f"couplings{filter_label}_{ftag1}_{ftag2}"
                 if not os.path.isfile(f"{couplings_dir}/{fname}.npz"):
-                    raise ValueError("Coupling file does not exist.")
+                    raise ValueError(
+                        f"Coupling file does not exist: {couplings_dir}/{fname}.npz"  # noqa
+                    )
 
                 couplings = np.load(f"{couplings_dir}/{fname}.npz")
                 npairs, ndata, _, _ = np.shape(couplings['inv_coupling'])

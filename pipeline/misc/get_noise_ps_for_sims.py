@@ -5,6 +5,9 @@ import numpy as np
 from itertools import product
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+import soopercool.map_utils as mu
 
 
 def smooth_array(arr, kernel_size):
@@ -18,6 +21,24 @@ def interp_array(x, y):
     return interp1d(x, y, fill_value='extrapolate')
 
 
+def noise_fit(lb, nlb, ls):
+    """
+    """
+
+    p0 = [50., -2.]
+    Nwhite = np.median(nlb[lb > 250])
+
+    def noise_curve(ls, lknee, alpha_knee):
+        return Nwhite * (1. + (ls/lknee)**alpha_knee)
+
+    lknee, alpha_knee = curve_fit(
+        noise_curve, lb, nlb, p0=p0, bounds=([2, -4.], [250, -1.])
+    )[0]
+    nl_best = noise_curve(ls, int(lknee), alpha_knee)
+
+    return nl_best, Nwhite, int(lknee), alpha_knee
+
+
 def main(args):
     """
     """
@@ -28,9 +49,7 @@ def main(args):
     out_dir = meta.output_directory
 
     cells_dir = f"{out_dir}/cells"
-    noise_dir = f"{out_dir}/noise_interp"
-    BBmeta.make_dir(noise_dir)
-    plot_dir = f"{out_dir}/plots/noise_interpolation"
+    plot_dir = f"{out_dir}/plots/noise"
     if do_plots:
         BBmeta.make_dir(plot_dir)
 
@@ -39,8 +58,13 @@ def main(args):
                                      binning["bin_high"] + 1)
     lb = nmt_bins.get_effective_ells()
 
-    nl = 3 * meta.nside
+    lmax = mu.lmax_from_map(meta.masks["analysis_mask"],
+                            pix_type=meta.pix_type)
+    nl = lmax + 1
     ell = np.arange(nl)
+    lmin_fit = 60 if args.lmin_fit is None else args.lmin_fit
+    lmax_fit = 60 if args.lmax_fit is None else args.lmax_fit
+
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
 
     # Only estimate noise from SAT data
@@ -68,50 +92,60 @@ def main(args):
         if verbose:
             print(f"{map_set1} {map_set2}")
 
-        noise_dict = np.load(f"{cells_dir}/decoupled_noise_pcls_{map_set1}_x_{map_set2}.npz") # noqa
+        noise_dict = np.load(f"{cells_dir}/decoupled_noise_pcls_{map_set1}_x_{map_set2}.npz")  # noqa
 
-        nb1, nb2 = (meta.n_bundles_from_map_set(map_set1),
-                    meta.n_bundles_from_map_set(map_set2))
-        interp_noise = {}
         for field_pair in field_pairs:
             nb = noise_dict[field_pair]
 
             # Ensure positivity
-            if len(nb[nb > 0]) <= 1:
-                nl = np.zeros_like(ell)
-                interp_noise[field_pair] = np.zeros_like(ell)
-            else:
-                n_int = interp_array(lb[nb > 0], nb[nb > 0])
-                nl = n_int(ell) * beams[map_set1] * beams[map_set2]
+            msk = np.array(nb > 0) & np.array(lb >= lmin_fit) & np.array(lb < lmax_fit)  # noqa
 
-                interp_noise[field_pair] = nl * np.sqrt(nb1) * np.sqrt(nb2)
+            try:
+                # Fit white noise and 1/f model
+                nl_fit, Nw, lk, alk = noise_fit(lb[msk], nb[msk], ell)
+            except ValueError:  # fit gone wrong
+                print(f"Fit did not converge: {map_set1}x{map_set2} "
+                      f"| {field_pair}")
+                continue
 
-            np.savez(f"{noise_dir}/nl_{map_set1}_x_{map_set2}.npz",
-                     ell=ell, **interp_noise)
+            msg = fr"$N_w={Nw:.2e}$, $\ell_k={lk}$, $\alpha_k={alk:.1f}$"
 
             if do_plots:
                 plt.figure(figsize=(10, 8))
-                plt.title(f"{map_set1} x {map_set2} - {field_pair}")
+                plt.title(fr"{map_set1} x {map_set2} - {field_pair}")
                 plt.xlabel(r"$\ell$", fontsize=15)
                 plt.ylabel(r"$N_\ell^\mathrm{%s}$" % field_pair, fontsize=15)
-                plt.plot(lb, nb, label="Original")
-                plt.plot(ell, nl, ls="--",
-                         label="Interpolated + Beam deconvolved")
-                plt.legend()
+                plt.plot(lb, nb, c="navy", ls="", marker=".", alpha=0.2,
+                         label="Original")
+                plt.plot(lb[msk], nb[msk], c="navy", ls="", marker=".",
+                         label="Fitted to")
+                plt.axhline(2*Nw, color="r", ls=":")
+                plt.axvline(lk, color="r", ls=":")
+                plt.plot(ell, nl_fit, c="r", ls="--", label=fr"Fit {msg}")
+                plt.legend(fontsize=14)
                 plt.yscale("log")
-                plt.xlim(0, 2 * meta.nside)
-                plt.savefig(f"{plot_dir}/noise_interp_{map_set1}_x_{map_set2}_{field_pair}.png") # noqa
+                plt.xlim(0, meta.lmax)
+                lims = (1e-1, 1e7) if field_pair == "TT" else (1e-5, 1e2)
+                plt.ylim(lims)
+                plt.savefig(f"{plot_dir}/noise_{map_set1}_x_{map_set2}_{field_pair}.png") # noqa
                 plt.close()
+
+        if do_plots:
+            print(f"  Plots: {plot_dir}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Compute mask mode coupling matrices"
+        description="Get N_ell parameters from data"
     )
     parser.add_argument("--globals", help="Path to the paramfile")
     parser.add_argument("--verbose", action="store_true", help="Verbose mode.")
     parser.add_argument("--no-plots", help="Plot the results",
                         action="store_true")
+    parser.add_argument("--lmin_fit", type=int, default=None,
+                        help="Minimum ell used for fit")
+    parser.add_argument("--lmax_fit", type=int, default=None,
+                        help="Maximum ell used for fit")
 
     args = parser.parse_args()
 

@@ -50,7 +50,7 @@ def main(args):
         import healpy as hp
         import matplotlib.pyplot as plt
 
-        lmax = meta.lmax
+        lmax = 600  # meta.lmax
         lb = nmt_bins.get_effective_ells()
         lmax_bins = nmt_bins.get_ell_max(nmt_bins.get_n_bands() - 1)
         lb_msk = lb < lmax + 10
@@ -66,9 +66,20 @@ def main(args):
         fiducial_dust = meta.covariance["fiducial_dust"]
         fiducial_synch = meta.covariance["fiducial_synch"]
 
-    rank, size, comm = mpi.init(True)
+    rank, size, comm = mpi.init(True, logger=None)
+    id_start = meta.covariance["cov_id_start"]
+    nsims = meta.covariance["cov_num_sims"]
 
-    for id_sim in mpi.taskrange(nsims - 1):
+    # Initialize tasks for MPI sharing
+    mpi_shared_list = [id_sim for id_sim in range(id_start, id_start+nsims)]
+
+    # Every rank must have the same shared list
+    mpi_shared_list = comm.bcast(mpi_shared_list, root=0)
+    task_ids = mpi.distribute_tasks(size, rank, len(mpi_shared_list),
+                                    logger=None)
+    local_mpi_list = [mpi_shared_list[i] for i in task_ids]
+
+    for id_sim in local_mpi_list:
         base_dir = f"{sims_dir}/{id_sim:04d}"
 
         # Create namaster fields
@@ -77,23 +88,32 @@ def main(args):
             map_set, id_bundle = map_name.split("__")
             map_fname = f"{base_dir}/cov_sims_{map_set}_bundle{id_bundle}.fits"
 
+            if verbose:
+                print(f"Namaster field for sim {id_sim+1} | "
+                      f"({map_set}, bundle {id_bundle})")
+
             m = mu.read_map(map_fname,
                             pix_type=meta.pix_type,
                             fields_hp=[0, 1, 2],
                             car_template=meta.car_template,
-                            convert_K_to_muK=True)
+                            convert_K_to_muK=False)  # Sim maps are in muK_CMB
 
             wcs = None
-            if hasattr(m, 'wcs'):
-                # This is a patch. Reproject mask and map onto template
+            if meta.pix_type == "car":
+                # # This is a patch. Reproject mask and map onto template
                 # geometry.
                 tshape, twcs = enmap.read_map_geometry(meta.car_template)
-                shape, wcs = enmap.overlap(m.shape, m.wcs, tshape, twcs)
-                shape, wcs = enmap.overlap(mask.shape, mask.wcs, shape, wcs)
-                flat_template = enmap.zeros((3, shape[0], shape[1]), wcs)
-                mask = enmap.insert(flat_template.copy()[0], mask)
-                m = enmap.insert(flat_template.copy(), m)
-
+                if twcs != m.wcs:
+                    shape, wcs = enmap.overlap(m.shape, m.wcs, tshape, twcs)
+                else:
+                    shape, wcs = tshape, twcs
+                if mask.wcs != wcs:
+                    shape, wcs = enmap.overlap(mask.shape, mask.wcs,
+                                               shape, wcs)
+                if not (m.wcs == mask.wcs == twcs):
+                    flat_template = enmap.zeros((3, shape[0], shape[1]), wcs)
+                    mask = enmap.insert(flat_template.copy()[0], mask)
+                    m = enmap.insert(flat_template.copy(), m)
             field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs)
             field_spin2 = nmt.NmtField(mask, m[1:], wcs=wcs,
                                        purify_b=meta.pure_B)
@@ -105,13 +125,14 @@ def main(args):
 
         for map_name1, map_name2 in ps_pairs:
             fname = f"{cells_dir}/decoupled_pcls_{map_name1}_x_{map_name2}_{id_sim:04d}.npz"  # noqa
-            map_set1, id_split1 = map_name1.split("__")
-            map_set2, id_split2 = map_name2.split("__")
+            map_set1, id_bundle1 = map_name1.split("__")
+            map_set2, id_bundle2 = map_name2.split("__")
 
             if verbose:
-                print(f"# {id_sim+1} | ({map_set1}, split {id_split1}) x "
-                      f"({map_set2}, split {id_split2})")
-            if os.path.isfile(fname) and not args.overwrite:
+                print(f"Coupled C_ells for sim {id_sim+1} | "
+                      f"({map_set1}, bundle {id_bundle1}) x "
+                      f"({map_set2}, bundle {id_bundle2})")
+            if os.path.isfile(fname) and args.no_overwrite:
                 cls_dict = np.load(fname)
                 for fp, cls in cls_dict.items():
                     if fp not in cls_dict_sims[(map_name1, map_name2)]:
@@ -120,10 +141,20 @@ def main(args):
                 continue
 
             pcls = pu.get_coupled_pseudo_cls(
-                    fields[map_set1, id_split1],
-                    fields[map_set2, id_split2],
-                    nmt_bins
-                    )
+                fields[map_set1, id_bundle1],
+                fields[map_set2, id_bundle2],
+                nmt_bins
+            )
+            if do_plots:
+                plt.loglog(lb[lb_msk], pcls["spin2xspin2"][0][lb_msk],
+                           label="EE")
+                plt.legend()
+                plt.savefig(
+                    f"{cl_plot_dir}/pcl_EE_{map_name1}_x_{map_name2}.png"
+                )
+                print(f"{cl_plot_dir}/pcl_EE_{map_name1}_x_"
+                      f"{map_name2}_{id_sim:04}.png")
+                plt.close()
 
             decoupled_pcls = pu.decouple_pseudo_cls(
                     pcls, inv_couplings_beamed[map_set1, map_set2]
@@ -199,12 +230,13 @@ def main(args):
                     lb[lb_msk],
                     conv*cb2db[lb_msk]*cls_dict_mean[(m1, m2)][fp][lb_msk],
                     yerr=conv*cb2db[lb_msk]*cls_dict_std[(m1, m2)][fp][lb_msk],
-                    c="navy", marker="o", mfc="w", ls="",
+                    c="navy", marker=".", mfc="w", capsize=3, ls="",
                     label=f"{fp} ({nsims} sims)"
                 )
                 if clb_th is not None:
-                    plt.loglog(lb[lb_msk], conv*cb2db[lb_msk]*clb_th[i],
-                               c="k", ls="--", label="Theory")
+                    plt.plot(lb[lb_msk], cb2db[lb_msk]*clb_th[i],
+                             c="k", ls="--", label="Theory")
+                plt.yscale("log")
                 plt.ylabel(
                     r"$D_\ell^\mathrm{%s} \; [\mu K_\mathrm{CMB}^2]$" % fp,
                     fontsize=15
@@ -215,6 +247,8 @@ def main(args):
                             f"bundle{id_bundle1}_{map_set2}_"
                             f"bundle{id_bundle2}_{fp}.png")
                 plt.close()
+        if args.verbose:
+            print(f" PLOTS: {cl_plot_dir}")
 
 
 if __name__ == "__main__":
@@ -234,9 +268,9 @@ if __name__ == "__main__":
         help="Verbose mode."
     )
     parser.add_argument(
-        "--overwrite",
+        "--no_overwrite",
         action="store_true",
-        help="Overwrite spectra if existing."
+        help="Do not overwrite spectra if existing."
     )
     parser.add_argument(
         "--units_K", action="store_true",

@@ -44,6 +44,7 @@ def main(args):
         mask = lb < meta.lmax
         field_pairs_theory = {"TT": 0, "EE": 1, "BB": 2, "TE": 3}
         colors = {"cross": "navy", "auto": "darkorange", "noise": "r"}
+        mst = {"cross": "x", "auto": "o", "noise": "v"}
 
         plot_dir = f"{out_dir}/plots/cells_sims"
         BBmeta.make_dir(plot_dir)
@@ -212,7 +213,7 @@ def main(args):
                          / cells_dict_std[type][(map_set1, map_set2)][fp][mask]),  # noqa
                         c=colors["cross"]
                     )
-                    main.plot(lb[mask], conv*clb_th[ifp], c="k", ls="--",
+                    main.plot(lb[mask], clb_th[ifp], c="k", ls="--",
                               label="Theory")
                     sub.tick_params(
                         axis='x', which="both", bottom=True, top=True,
@@ -227,7 +228,7 @@ def main(args):
                         lb,
                         conv*cells_dict_mean[type][(map_set1, map_set2)][fp],
                         yerr=conv*cells_dict_std[type][(map_set1, map_set2)][fp],  # noqa
-                        label=type, marker="o", lw=0.7, mfc="w",
+                        label=type, marker=mst[type], lw=0.7,
                         c=colors[type]
                     )
 

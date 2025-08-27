@@ -164,8 +164,7 @@ def main(args):
                     plt.plot(
                         lb[mask],
                         conv*cells_coadd[type][(map_set1, map_set2)][fp][mask],
-                        label=type, marker="o", lw=0.7, mfc="w",
-                        c=colors[type]
+                        label=type, c=colors[type]
                     )
 
                 plt.legend(fontsize=14)
@@ -197,7 +196,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Coadd the cross-bundle power spectra fr data"
+        description="Coadd the cross-bundle power spectra for data"
     )
     parser.add_argument(
         "--globals",
