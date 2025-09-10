@@ -12,7 +12,7 @@ def main(args):
 
     out_dir = meta.output_directory
     cells_dir = f"{out_dir}/cells_tf_est"
-    do_plot = not args.no_plots
+    do_plot = not args.no_plots if args.no_plots is not None else False
 
     tf_settings = meta.transfer_settings
     tf_dir = tf_settings["transfer_directory"]
