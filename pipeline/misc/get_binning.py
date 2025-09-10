@@ -24,25 +24,15 @@ def main(args):
     # coupled_cells would have len == lmax < nmt_bins.lmax+1
     bin_low, bin_high, bin_center = create_binning(lmax-1,
                                                    args.deltal)
-<<<<<<< HEAD
-=======
-    #if bin_low[0] < 2:
-    #    bin_low[0] = 2
-        
     print(bin_low, bin_high, bin_center)
->>>>>>> origin/sa_dev
     file_name = f"binning_{meta.pix_type}_lmax{lmax}_deltal{args.deltal}"
 
     bin_low2, bin_high2, bin_center2 = create_binning(lmax-1,
                                                       args.deltal,
-<<<<<<< HEAD
-                                                      end_first_bin=30)
-=======
                                                       end_first_bin=10)
     
     print()
     print(bin_low2, bin_high2, bin_center2)
->>>>>>> origin/sa_dev
 
     np.savez(
         f"{binning_dir}/{file_name}.npz",
