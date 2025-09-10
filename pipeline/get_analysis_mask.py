@@ -4,12 +4,12 @@ from soopercool import BBmeta
 from soopercool import map_utils as mu
 from soopercool import utils as su
 import numpy as np
-
+import sys
+import os
 
 def main(args):
     """
     """
-    print("hello")
     meta = BBmeta(args.globals)
     do_plots = not args.no_plots
     verbose = args.verbose
@@ -21,9 +21,13 @@ def main(args):
     BBmeta.make_dir(masks_dir)
     if do_plots:
         BBmeta.make_dir(plot_dir)
+        
+    log_file_path = os.path.join(masks_dir, "log.txt")
+    sys.stdout = open(log_file_path, 'w')
+    sys.stderr = sys.stdout 
 
     masks_settings = meta.masks
-
+    
     # If a global hits file is indicated in the paramter file, use it.
     if masks_settings["global_hits"] is not None:
         sum_hits = mu.read_map(
@@ -67,7 +71,7 @@ def main(args):
                         type_options[0],
                         option
                     )
-
+                    
                     if masks_settings["use_weights"]:
                         # Use weights instead of hits
                         map_file = map_file.replace(
@@ -86,7 +90,7 @@ def main(args):
                     car_template=meta.car_template
                 )
                 hit_maps.append(hits)
-
+        
         # Create binary and normalized hitmap
         mp = hit_maps[0]
         if masks_settings["use_weights"]:
@@ -101,12 +105,20 @@ def main(args):
             binary[hit_map == 0] = 0
             sum_hits += hit_map
         sum_hits[binary == 0] = 0
-
-        if masks_settings["use_weights"]:
-            # Select threshold
-            threshold = np.median(sum_hits[sum_hits > 0])
-            sum_hits[sum_hits < threshold] = 0
-
+    
+    # Normalize and smooth hitmaps
+    if masks_settings["use_weights"]:
+        # Select threshold
+        threshold = np.median(sum_hits[sum_hits > 0])
+        sum_hits[sum_hits < threshold] = 0
+    sum_hits = mu.smooth_map(sum_hits, fwhm_deg=1, pix_type=meta.pix_type)
+    if masks_settings["use_weights"]:
+        # Set boundaries at 0-1
+        sum_hits = (sum_hits - np.amin(sum_hits)) / (np.amax(sum_hits) - np.amin(sum_hits))
+        print("sum_hits", np.amin(sum_hits), np.amax(sum_hits))
+    else:
+        sum_hits /= np.amax(sum_hits)
+        
     if masks_settings["box_mask"] is not None:
         from pixell import enmap
         box = np.deg2rad(masks_settings["box_mask"])
