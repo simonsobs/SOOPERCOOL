@@ -108,11 +108,20 @@ def main(args):
         ftag2 = meta.filtering_tag_from_map_set(map_set2)
         if args.verbose:
             print(f"  Computing ({map_set1}, {ftag1}) x ({map_set1}, {ftag1})")
-        pcls = pu.get_coupled_pseudo_cls(
+        pcls, pcls_unbinned = pu.get_coupled_pseudo_cls(
                 fields[map_set1, id_bundle1],
                 fields[map_set2, id_bundle2],
-                nmt_bins
+                nmt_bins,
+                return_unbinned=True
                 )
+
+        weighted_pcls = pu.get_weighted_pcls(
+            pcls_unbinned,
+            mask,
+            pix_type=meta.pix_type
+        )
+        np.savez(f"{cells_dir}/weighted_pcls_{map_name1}_x_{map_name2}.npz",
+                 **weighted_pcls, ell=np.arange(len(weighted_pcls["TT"])))
 
         decoupled_pcls = pu.decouple_pseudo_cls(
                 pcls, inv_couplings_beamed["filtered"][ftag1, ftag2]
