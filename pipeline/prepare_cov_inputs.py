@@ -105,20 +105,44 @@ def main(args):
         # First attempt at introducing filtering corrections
         # This is a handwavy approach to interpolate the per
         # multipole TF
+        #
+        # Robust interpolation and clipping of per-multipole TF
         tf_settings = meta.transfer_settings
         tf_dir = tf_settings["transfer_directory"]
         ftag1 = meta.filtering_tag_from_map_set(map_set1)
         ftag2 = meta.filtering_tag_from_map_set(map_set2)
         tf = np.load(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
+
         tf_interp = {}
+        cap_ell = min(600, nmt_bins.lmax)  # don't index past lmax
+        tiny = 1e-8
+
         for fp in field_pairs:
-            tfint = interp1d(
-                lb, tf[f"{fp}_to_{fp}"],
-                fill_value="extrapolate"
+            name = f"{fp}_to_{fp}"
+            # interpolate TF defined at bandpower centers lb onto all ell
+            tfint_fn = interp1d(
+                lb, tf[name],
+                kind="linear",
+                bounds_error=False,
+                fill_value=(tf[name][0], tf[name][-1])  # edge-hold instead of extrapolate
             )
-            tfint = tfint(ell)
-            tfint[ell > 600] = tfint[600]
-            tfint[ell <= ell[tfint < 0][-1]] = tfint[ell[tfint < 0][-1]+1]
+            tfint = tfint_fn(ell)
+
+            # sanitize NaNs/Infs
+            tfint = np.nan_to_num(tfint, nan=tiny, posinf=np.max(tfint[np.isfinite(tfint)]), neginf=tiny)
+
+            # cap high-ell tail to a constant to avoid noise blow-up
+            tfint[ell > cap_ell] = tfint[cap_ell]
+
+            # if any negatives slipped in, flatten up to last-negative; else just clip to tiny
+            neg_idx = np.where(tfint < 0)[0]
+            if neg_idx.size > 0:
+                k = neg_idx.max()
+                rep = min(k + 1, tfint.size - 1)
+                tfint[:k+1] = max(tfint[rep], tiny)
+            else:
+                tfint = np.maximum(tfint, tiny)
+
             tf_interp[fp] = tfint
 
         for type in ["cross", "noise"]:
