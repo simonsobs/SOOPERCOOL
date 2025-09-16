@@ -1,6 +1,7 @@
 from soopercool import BBmeta
 from soopercool import ps_utils as pu
 from soopercool import map_utils as mu
+from pixell import enmap
 from soopercool import mpi_utils as mpi
 import argparse
 import numpy as np
@@ -13,6 +14,10 @@ def main(args):
     """
     meta = BBmeta(args.globals)
     verbose = args.verbose
+    # Preferred template priority:
+    # 1) CLI --car-template
+    # 2) meta.car_template (if present)
+    car_template = args.car_template or getattr(meta, "car_template", None)
 
     out_dir = meta.output_directory
     external_dir = meta.external_dir
@@ -23,8 +28,10 @@ def main(args):
 
     BBmeta.make_dir(cells_dir)
 
-    mask = mu.read_map(meta.masks["analysis_mask"],
-                       pix_type=meta.pix_type)
+    #mask = mu.read_map(meta.masks["analysis_mask"],
+    #                   pix_type=meta.pix_type)
+    # Defer reading mask until we know a valid template (first map if needed)
+    mask = None
 
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
@@ -56,16 +63,35 @@ def main(args):
 
             map_fname = f"{base_dir}{sat}_{frq}_{ssplit}_bundle{id_bundle}_{id_sim:04d}_map.fits"
             print(map_fname)
+            
+            # Choose a usable template for this run:
+            # prefer --car-template or meta.car_template; otherwise use the first map file
+            template_for_this_run = car_template or map_fname
 
-            m = mu.read_map(map_fname, #field=[0, 1, 2],
-                            pix_type=meta.pix_type, convert_K_to_muK=True)
+            m = mu.read_map(
+                map_fname,
+                pix_type=meta.pix_type,
+                car_template=template_for_this_run,
+                convert_K_to_muK=True
+            )
+
+            # Read mask now that we have a template
+            if mask is None:
+                mask = mu.read_map(
+                    meta.masks["analysis_mask"],
+                    pix_type=meta.pix_type,
+                    car_template=template_for_this_run
+                )
 
             wcs = None
-            if hasattr(m, 'wcs'):
-                # This is a patch. Reproject mask and map onto template
-                # geometry.
-                from pixell import enmap
-                tshape, twcs = enmap.read_map_geometry(meta.car_template)
+            # Align to a common CAR footprint if available
+            wcs = getattr(m, "wcs", None)
+            if wcs is not None:
+                # If we have a declared template, use it; otherwise use map's own geometry
+                if car_template is not None:
+                    tshape, twcs = enmap.read_map_geometry(car_template)
+                else:
+                    tshape, twcs = m.shape, m.wcs
                 shape, wcs = enmap.overlap(m.shape, m.wcs, tshape, twcs)
                 shape, wcs = enmap.overlap(mask.shape, mask.wcs, shape, wcs)
                 flat_template = enmap.zeros((3, shape[0], shape[1]), wcs)
@@ -112,5 +138,6 @@ if __name__ == "__main__":
     parser.add_argument("--globals", help="Path to the global parameter file.")
     parser.add_argument("--no-plots", action="store_false", help="Do not make plots.") # noqa
     parser.add_argument("--verbose", action="store_true", help="Verbose mode.")
+    parser.add_argument("--car-template", type=str, default=None, help="Path to a CAR template map (overrides meta.car_template).")
     args = parser.parse_args()
     main(args)
