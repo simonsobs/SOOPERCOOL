@@ -500,38 +500,49 @@ def bin_validation_power_spectra(cls_dict, nmt_binning,
     return cls_binned_dict
 
 
-def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
+def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
+                           file_name=None):
     """
     Plot the transfer function given an input dictionary.
     """
-    plt.figure(figsize=(25, 25))
-    grid = plt.GridSpec(9, 9, hspace=0.3, wspace=0.3)
+    nfield = len(field_pairs)
+    plt.figure(figsize=(25*nfield/9., 25*nfield/9.))
+    grid = plt.GridSpec(nfield, nfield, hspace=0.3, wspace=0.3)
 
-    for id1, f1 in enumerate(field_pairs):
-        for id2, f2 in enumerate(field_pairs):
-            ax = plt.subplot(grid[id1, id2])
-            expected = 1. if f1 == f2 else 0.
-            ylims = [0, 1.05] if f1 == f2 else [-0.01, 0.01]
+    for label, tf in tf_dict.items():
+        for id1, f1 in enumerate(field_pairs):
+            for id2, f2 in enumerate(field_pairs):
+                ax = plt.subplot(grid[id1, id2])
+                expected = 1. if f1 == f2 else 0.
+                ylims = [0, 1.05] if f1 == f2 else [-0.01, 0.01]
 
-            ax.axhline(expected, color="k", ls="--", zorder=6)
-            # We need to understand the offdigonal TF panels in the presence of
-            # NaMaster purification - we don't have a clear interpretation.
-            ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
-            ax.plot(lb, tf_dict[f"{f1}_to_{f2}"], color="navy")
+                ax.axhline(expected, color="k", ls="--", zorder=6)
+                # We need to understand the offdigonal TF panels in the presence of
+                # NaMaster purification - we don't have a clear interpretation.
+                ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
+                ax.plot(lb, tf[f"{f1}_to_{f2}"], label=label)
 
-            if id1 == 8:
-                ax.set_xlabel(r"$\ell$", fontsize=14)
-            else:
-                ax.set_xticks([])
+                if id2 == 0:
+                    ax.set_ylabel(r"$T_\ell$", fontsize=14)
+                if id1 == nfield-1:
+                    ax.set_xlabel(r"$\ell$", fontsize=14)
+                else:
+                    ax.set_xticks([])
 
-            if f1 != f2:
-                ax.ticklabel_format(axis="y", style="scientific",
-                                    scilimits=(0, 0), useMathText=True)
+                if f1 != f2:
+                    ax.ticklabel_format(axis="y", style="scientific",
+                                        scilimits=(0, 0), useMathText=True)
 
-            ax.set_xlim(lmin, lmax)
-            ax.set_ylim(ylims[0], ylims[1])
+                ax.set_xlim(lmin, lmax)
+                ax.set_ylim(ylims[0], ylims[1])
+                if label is not None and id1 == 0 and id2 == nfield-1:
+                    ax.legend(fontsize=10, bbox_to_anchor=[1,1],
+                              loc="upper left")
 
-    plt.savefig(file_name, bbox_inches="tight")
+    if file_name is not None:
+        plt.savefig(file_name, bbox_inches="tight")
+    else:
+        return
 
 
 def get_binary_mask_from_nhits(nhits_map, nside, zero_threshold=1e-3):
