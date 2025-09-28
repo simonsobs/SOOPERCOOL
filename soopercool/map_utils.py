@@ -1,6 +1,6 @@
 import numpy as np
 import healpy as hp
-from pixell import enmap, enplot, curvedsky
+from pixell import enmap, enplot, curvedsky, utils
 import matplotlib.pyplot as plt
 from pixell import uharm
 import pymaster as nmt
@@ -85,7 +85,8 @@ def map2alm(map, pix_type="hp"):
         return curvedsky.map2alm(map, lmax=lmax)
 
 
-def alm2map(alm, pix_type="hp", nside=None, car_map_template=None):
+def alm2map(alm, pix_type="hp", nside=None, car_template=None,
+            geometry=None):
     """
     """
     _check_pix_type(pix_type)
@@ -96,11 +97,16 @@ def alm2map(alm, pix_type="hp", nside=None, car_map_template=None):
         assert nside is not None, "nside is required"
         return hp.alm2map(alm, nside=nside)
     else:
-        if isinstance(car_map_template, str):
-            shape, wcs = enmap.read_map_geometry(car_map_template)
+        assert geometry is not None or car_template is not None, "geometry info required"
+        if isinstance(car_template, str):
+            shape, wcs = enmap.read_map_geometry(car_template)
+        elif car_template is None:
+            shape, wcs = geometry
         else:
-            shape, wcs = car_map_template.geometry
-        map = enmap.zeros((3,) + shape, wcs)
+            shape, wcs = car_template.geometry
+        # shape = (dim,) + shape if dim > 1 else shape
+        map = enmap.zeros(shape, wcs)
+
         return curvedsky.alm2map(alm, map)
 
 
@@ -205,7 +211,10 @@ def read_map(map_file,
         m = hp.read_map(map_file, **kwargs)
     else:
         if geometry is None:
-            geometry = enmap.read_map_geometry(car_template)
+            try:
+                geometry = enmap.read_map_geometry(car_template)
+            except AttributeError:
+                pass
         m = enmap.read_map(map_file, geometry=geometry)
 
     return conv*m
@@ -304,7 +313,6 @@ def _plot_map_hp(map, lims=None, file_name=None, title=None):
     for i in range(ncomp):
         if ncomp != 1:
             f = "TQU"[i]
-        print("np.shape(map)", np.shape(np.atleast_2d(map)))
         hp.mollview(
             np.atleast_2d(map)[i],
             cmap=cmap,
@@ -431,22 +439,29 @@ def apodize_mask(mask, apod_radius_deg, apod_type, pix_type="hp"):
             apod_type
         )
     else:
-        distance = enmap.distance_transform(mask)
-        distance = np.rad2deg(distance)
+        ## OLD - not identical to enmap.apod_mask - TODO: check
+        # distance = enmap.distance_transform(mask)
+        # distance = np.rad2deg(distance)
 
-        mask_apo = mask.copy()
-        idx = np.where(distance > apod_radius_deg)
+        # mask_apo = mask.copy()
+        # idx = np.where(distance > apod_radius_deg)
 
+        # if apod_type == "C1":
+        #     mask_apo = 0.5 - 0.5 * np.cos(-np.pi * distance / apod_radius_deg)
+        # elif apod_type == "C2":
+        #     mask_apo = (
+        #         distance / apod_radius_deg -
+        #         np.sin(2 * np.pi * distance / apod_radius_deg) / (2 * np.pi)
+        #     )
+        # else:
+        #     raise ValueError(f"Unknown apodization type {apod_type}")
+        # mask_apo[idx] = 1
         if apod_type == "C1":
-            mask_apo = 0.5 - 0.5 * np.cos(-np.pi * distance / apod_radius_deg)
-        elif apod_type == "C2":
-            mask_apo = (
-                distance / apod_radius_deg -
-                np.sin(2 * np.pi * distance / apod_radius_deg) / (2 * np.pi)
+            mask_apo = enmap.apod_mask(
+                mask, width=apod_radius_deg*utils.degree
             )
         else:
-            raise ValueError(f"Unknown apodization type {apod_type}")
-        mask_apo[idx] = 1
+            raise NotImplementedError(f"Unknown apodization type {apod_type}")
 
     return mask_apo
 
@@ -526,3 +541,34 @@ def binary_mask_from_map(map, pix_type="hp", geometry=None):
     binary[hits_proxy > 0.1] = 1.
 
     return binary
+
+
+def get_spin_derivatives(map_file):
+    """
+    First and second spin derivatives of a given spin-0 map.
+    """
+    from matplotlib import cm
+
+    pix_type = _get_pix_type(map_file)
+    map = read_map(map_file, pix_type=pix_type)
+    nside, geometry = (None, None)
+    ell = np.arange(lmax_from_map(map, pix_type=pix_type) + 1)
+    alpha1i = np.sqrt(ell*(ell + 1.))
+    alpha2i = np.sqrt((ell - 1.)*ell*(ell + 1.)*(ell + 2.))
+
+    if pix_type == "car":
+        geometry = (map.shape, map.wcs)
+    else:
+        nside = hp.npix2nside(np.shape(map)[-1])
+    
+    def almtomap(alm):
+        return alm2map(alm, pix_type=pix_type, nside=nside, geometry=geometry)
+    def maptoalm(map):
+        return map2alm(map, pix_type=pix_type)
+
+    first = almtomap(hp.almxfl(maptoalm(map), alpha1i))
+    second = almtomap(hp.almxfl(maptoalm(map), alpha2i))
+    cmap = cm.YlOrRd
+    cmap.set_under("w")
+
+    return first, second
