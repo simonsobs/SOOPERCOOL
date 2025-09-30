@@ -1,0 +1,331 @@
+context_file: /shared_home/kwolz/bbdev/SOOPERCOOL/reference_pipeline_isov1_20250928/paramfiles/use_this_local_satp1_20241124.yaml
+plot_dir: /cephfs/soukdata/user_scratch/jkania/end_to_end_iso/preprocessing/satp1_20250108_init/preprocess_plots
+
+subobs:
+  use: ['wafer_slot', 'wafer.bandpass']
+  label: wafer_slot
+  
+archive:
+  index: /cephfs/soukdata/user_scratch/jkania/end_to_end_iso/preprocessing/satp1_20250108_init/process_archive.sqlite
+  policy:
+    type: 'simple'
+    filename: /cephfs/soukdata/user_scratch/jkania/end_to_end_iso/preprocessing/satp1_20250108_init/preprocess_archive.h5
+
+process_pipe:
+    - name: "pointing_model"
+      skip_on_sim: True  # Not relevant since we load sim TODs with a given pointing model
+      process: True
+
+    - name: "hwp_angle_model"
+      skip_on_sim: True  # HWP angle model already applied before loading sim into TODs
+      process: True
+      calc:
+        on_sign_ambiguous: 'fail'
+      save: True
+
+    - name: "dark_dets"
+      skip_on_sim: False # Keep selection steps
+      signal: "signal"
+      calc: True
+      save: True
+      select: True
+
+    - name : "fp_flags"
+      skip_on_sim: False # Keep selection steps
+      calc:
+        merge: False
+      save: True
+      select: True
+
+    - name: "flag_turnarounds"
+      skip_on_sim: False # Keep selection steps
+      process: 
+        method: "scanspeed"
+      calc:
+        method: "scanspeed"
+      save: True
+      
+    - name: "det_bias_flags"
+      skip_on_sim: False # Keep selection steps
+      calc: 
+        rfrac_range: [0.2, 0.8]
+        #psat_range: [0.1, 10]  
+      save: True
+      select: True
+
+    - name: "detrend"
+      skip_on_sim: False # Filtering
+      process:
+        method: "median"
+
+    - name: "estimate_hwpss"
+      skip_on_sim: True # Estimated on data
+      calc:
+        hwpss_stats_name: "hwpss_stats"
+      save: True
+
+    - name: "subtract_hwpss"
+      skip_on_sim: False # Deproject hwpss
+      process:
+        subtract_name: "signal"
+        sim: True # but we have to turn on this flag to run the calc method on sim.
+
+    - name: "trends"
+      skip_on_sim: False # Keep selection steps
+      calc:
+        max_trend: 2.5
+        t_piece: 10
+      save: True
+      select:
+        kind: "any"
+
+    - name: "jumps"
+      skip_on_sim: False # Keep selection steps
+      calc:
+        function: "slow_jumps"
+        jump_configs:
+          win_size: 800
+          thresh: 20.0
+      save:
+        jumps_name: "jumps_slow"
+      select:
+        max_n_jumps: 5
+
+    - name: "fix_jumps"
+      skip_on_sim: True  # Don't want to fix jump in sims
+      process:
+        jumps_aman: "jumps_slow"
+
+    - name: "glitchfill"
+      skip_on_sim: False  # Not skipped but will have no effect on sims
+      flag_aman: "jumps_slow"
+      flag: "jump_flag"
+      process:
+        nbuf: 10
+        use_pca: False
+        modes: 1
+        wrap: "signal"
+
+    - name: "jumps"
+      skip_on_sim: False # Keep selection steps
+      calc:
+        function: "twopi_jumps"
+        jump_configs:
+          win_size: 30
+          nsigma: 10.0
+      save:
+        jumps_name: "jumps_2pi"
+      select:
+        max_n_jumps: 20
+
+    - name: "fix_jumps"
+      skip_on_sim: True  # Don't fix jumps in sims 
+      process:
+        jumps_aman: "jumps_2pi"
+        nbuf: 10
+        use_pca: False
+        modes: 1
+
+    - name: "glitchfill"
+      skip_on_sim: False  # This should do nothing
+      flag_aman: "jumps_2pi"
+      flag: "jump_flag"
+      process:
+        nbuf: 10
+        use_pca: False
+        modes: 1
+        wrap: "signal"
+
+    - name: "glitches"
+      skip_on_sim: False # Read and select using info from DB
+      calc:
+        t_glitch: 0.007
+        buffer: 100
+        hp_fc: 6.0
+        n_sig: 10
+      save: True
+      select:
+        max_n_glitch: 50000
+        sig_glitch: 10
+
+    - name: "glitchfill"
+      skip_on_sim: False  # Let's glitchfill the sims as well
+      process:
+        nbuf: 10
+        use_pca: False
+        modes: 1
+        wrap: "signal"
+
+    - name: "detrend"
+      skip_on_sim: False  # Also apply detrending
+      process:
+        method: "median"
+
+    - name : "ptp_flags"
+      skip_on_sim: False # Flags selection should be kept
+      calc:
+        signal_name: "signal"
+        kurtosis_threshold: 5
+      save: True
+      select: True
+
+    - name: "calibrate"
+      skip_on_sim: True  # No calibration in sims
+      process:
+        kind: "array"
+        cal_array: "det_cal.phase_to_pW"
+      
+    - name: "psd"
+      skip_on_sim: True # already in DB anyway
+      signal: "signal"
+      wrap: "Pxx_raw"
+      calc:
+        max_samples: 524288 #2**19
+        merge: False
+        nperseg: 65536 #2**16
+        noverlap: 0
+      save: True
+    
+    - name: "noise"
+      skip_on_sim: True # already in DB anyway
+      psd: "Pxx_raw"
+      fit: True
+      calc:
+        fwhite: [5, 20]
+        lowf: 0.1
+        f_max: 50
+      save:
+        wrap_name: "noise_signal_fit"
+    
+    - name: "noise"
+      skip_on_sim: False # Will select based on noise fit
+      psd: "Pxx_raw"
+      fit: False
+      calc:
+        low_f: 5 
+        high_f: 20 
+      save:
+        wrap_name: "white_noise_nofit"
+      select:
+        min_noise: 18e-6
+        max_noise: 80e-6
+
+    - name: "pca_relcal"
+      skip_on_sim: True  # This would multiply the sim TODs with the wrong factor.
+      signal: "lpf_sig"
+      calc:
+        pca:
+          xfac: 2
+          yfac: 1.5
+          calc_good_medianw: True
+        lpf:
+          type: "sine2"
+          cutoff: 1
+          trans_width: 0.1
+        trim_samps: 2000
+      save: True
+
+    - name: "calibrate"
+      skip_on_sim: True  # This would multiply the sim TODs with the wrong factor.
+      process:
+        kind: "array"
+        proc_aman_cal: True
+        cal_array: "lpf_sig_run1.relcal"
+
+    - name: "fourier_filter"
+      skip_on_sim: True  # To check. Keping this gave a huge bias in early tests.
+      process:
+        filt_function: "iir_filter"
+        filter_params:
+          invert: True
+
+    - name: "fourier_filter"
+      skip_on_sim: True  # To check. Keping this gave a huge bias in early tests.
+      process:
+        filt_function: "timeconst_filter"
+        filter_params:
+          timeconst: "det_cal.tau_eff"
+          invert: True
+
+    - name: "apodize"
+      skip_on_sim: False # We want to apodize before demodulation
+      process:
+        apodize_samps: 2000
+    
+    - name: "demodulate"
+      process:
+        trim_samps: 6000
+        demod_cfgs: {}
+
+    - name : "rotate_qu"
+      skip_on_sim: False  # Should rotate QU
+      process:
+        sign: 1 
+        offset: 0 
+        update_focal_plane: False
+    
+    - name: "psd"
+      skip_on_sim: True # Does nothing
+      signal: "demodQ"
+      wrap: "psdQ"
+      calc:
+        max_samples: 524288 #2**19
+        merge: False
+        nperseg: 65536 #2**16
+        noverlap: 0
+      save: True
+
+    - name: "psd"
+      skip_on_sim: True # Does nothing
+      signal: "demodU"
+      wrap: "psdU"
+      calc:
+        max_samples: 524288 #2**19
+        merge: False
+        nperseg: 65536 #2**16
+        noverlap: 0
+      save: True
+      
+    - name: "noise"
+      skip_on_sim: True # Does nothing
+      psd: "psdQ"
+      fit: True
+      calc:
+        fwhite: [1, 2]
+        f_max: 2
+        lowf: 0.1
+        merge_name: 'noise_fit_statsQ'
+      save:
+        wrap_name: "noiseQ_fit"
+
+    - name: "noise"
+      skip_on_sim: True # Does nothing
+      psd: "psdQ"
+      fit: False
+      calc:
+        low_f: 1
+        high_f: 2
+      save:
+        wrap_name: "noiseQ_nofit"
+      
+    - name: "noise"
+      skip_on_sim: True # Does nothing
+      psd: "psdU"
+      fit: True
+      calc:
+        fwhite: [1, 2]
+        f_max: 2
+        lowf: 0.1
+        merge_name: 'noise_fit_statsT'
+      save:
+        wrap_name: "noiseU_fit"
+
+    - name: "noise"
+      skip_on_sim: True # Does nothing
+      psd: "psdU"
+      fit: False
+      calc:
+        low_f: 1
+        high_f: 2
+      save:
+        wrap_name: "noiseU_nofit"

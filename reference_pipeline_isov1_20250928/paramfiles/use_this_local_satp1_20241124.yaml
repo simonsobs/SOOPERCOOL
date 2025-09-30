@@ -1,0 +1,51 @@
+tags:
+  basedir:  /cephfs/soukdata/data/tracked/metadata/satp1
+  manifestdir: /cephfs/soukdata/data/tracked/metadata/satp1/manifests
+
+imports:
+  - sotodlib.io.load_book
+  - sotodlib.io.metadata
+
+obsfiledb: '{basedir}/satp1_obsfiledb_local.sqlite'
+obsdb: '{basedir}/satp1_obsdb_240911m_local.sqlite'
+
+obs_loader_type: 'obs-book'
+obs_colon_tags: [wafer.bandpass, wafer_slot]
+
+metadata:
+  - db: '{manifestdir}/smurf_detsets/v0/smurf_detset_info_local.sqlite'
+    label: smurf
+    det_info: true
+    on_missing: fail
+  - db: '{manifestdir}/det_match/satp1_det_match_240220m/assignment_local.sqlite'
+    label: assignment
+    det_info: true
+    on_missing: fail
+  - db: '{manifestdir}/wafer_info/satp1_wafer_info_240313r1/wafer_info_local.sqlite'
+    label: wafer_info
+    det_info: true
+    on_missing: fail
+  - db: '{manifestdir}/det_cal/satp1_det_cal_240312m/det_cal_local.sqlite'
+    label: det_cal
+    unpack: det_cal
+    # on_missing: fail  ## work-around for variable mask
+    on_missing: trim
+  - db: '{manifestdir}/pointing_model/satp1_pointing_model_241004r2/db_local.sqlite'
+    label: pointing_model
+    unpack: pointing_model
+  - db: '{manifestdir}/focal_plane/satp1_focal_plane_240925r1/db_local.sqlite'
+    label: focal_plane
+    unpack: focal_plane
+    on_missing: fail
+  - db: '{manifestdir}/hwp_angle_model/satp1_hwp_angle_model_240807r1/hwp_angle_model_local.sqlite'
+    label: hwp_model
+    unpack:
+    - 'hwp_angle_model'
+  - db: '{manifestdir}/hwp_angles/satp1_hwp_angles_240430m/hwp_angle_local.sqlite'
+    label: hwp_solution
+    unpack:
+    - 'hwp_solution'
+  - db: '{manifestdir}/abscal/satp1_abscal_241024/db_local.sqlite'
+    label: abscal
+    unpack:
+    - abscal

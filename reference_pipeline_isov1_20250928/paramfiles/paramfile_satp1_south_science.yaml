@@ -1,0 +1,84 @@
+output_directory: &out_dir /cephfs/soukdata/user_scratch/kwolz/end_to_end_iso/pspectra/satp1_20250108/science
+signflip_dir: &sf_dir /scratch/gpfs/SIMONSOBS/sat-iso/noise/satp1/signflip/south/
+inputs_dir: &inputs_dir /cephfs/soukdata/user_scratch/jkania/end_to_end_iso/transfer_function/soopercool_inputs
+
+map_sets:
+  SATp1_f090_south_science:
+    map_dir: /cephfs/soukdata/user_scratch/jkania/end_to_end_iso/mapmaking/satp1_20250108/bundles/south
+    beam_dir: *inputs_dir
+    map_template: "satp1_f090_full_bundle{id_bundle}_{map|hits}.fits"
+    beam_file: "beam_unity.dat"
+    n_bundles: 4          # Number of bundles
+    freq_tag: 90          # Freq. tag (e.g. useful to coadd freqs)
+    exp_tag: "SATp1"      # Experiment tag (useful to get noise-bias free cross-split spectra)
+    filtering_tag: "SATp1_f090_south_science"
+
+####################
+# Masking metadata #
+####################
+masks:
+  # Specify coordinates if using a rectangular mask
+  box_mask:
+  # Set to True if mask is calculated from the weights,
+  # otherwise set to False to use the hits
+  use_weights: True
+  analysis_mask: !path [*out_dir, masks/analysis_mask.fits]
+  # When specifying this file, the mapset/bundle-specific hits files will
+  # be ignored and instead a global hits file will be used (testing puroposes)
+  global_hits:
+  # Path to products (binary)
+  galactic_mask: !path [*inputs_dir, planck_gal_mask_proj/planck_galmask_070_CAR_5arcmin.fits]
+  point_source_catalog: null
+  point_source_mask: null
+  external_mask: null
+  # Apodization details
+  apod_radius: 10.0
+  smoothing_radius: 1.0
+  apod_radius_point_source: 1.0
+  apod_type: "C1"
+
+####################################
+# Metadata related to the analysis #
+####################################
+## General parameters
+general_pars:
+  pix_type: car
+  car_template: /shared_home/kwolz/bbdev/SOOPERCOOL/reference_pipeline_isov1_20250928/data/band_car_fejer1_5arcmin.fits
+  nside: 512
+  lmin: 2
+  lmax: 900
+  binning_file: /cephfs/soukdata/user_scratch/kwolz/end_to_end_iso/pspectra/satp1_20250108/science/binning/binning_car_lmax2160_deltal15.npz
+  pure_B: False
+  # Where the beam window is lower than beam_floor, set it to beam_floor
+  beam_floor: 1.e-2
+
+covariance:
+  cov_num_sims: 100
+
+transfer_settings:
+  transfer_directory: !path [*out_dir, transfer_functions]
+  # For estimation
+  ## Number of sims for tf estimation and validation
+  tf_est_num_sims: 2
+  sim_id_start: 0
+  ## Parameters of the PL sims used for TF estimation
+  power_law_pars_tf_est:
+    amp: 1.0
+    delta_ell: 15
+    power_law_index: 2.
+  ## Optional beams applied on PL sims
+  # If true, beams will be applied only on the validation simulations. By default (false)
+  # beam are applied to both the estimation and validation sims,
+  # to account for potential effect of the beam on the TF (e.g. commutativity)
+  do_not_beam_est_sims: True
+  beams_list: []
+
+  ## Path to the sims for TF estimation
+  unfiltered_map_dir:
+    SATp1_f090_south_science: /cephfs/soukdata/user_scratch/kwolz/end_to_end_iso/tf_sims
+  unfiltered_map_template:
+    SATp1_f090_south_science: "{pure_type}_5.0arcmin_fwhm30.0_sim{id_sim:04d}_CAR.fits"
+  filtered_map_dir:
+    SATp1_f090_south_science: /cephfs/soukdata/user_scratch/kwolz/end_to_end_iso/tf_sims/filtered/satp1/south/f090/coadded_sims
+  filtered_map_template:
+    SATp1_f090_south_science: "{pure_type}_1.0arcmin_fwhm30.0_sim{id_sim:04d}_CAR_bundle0_f090_science_filtered.fits"

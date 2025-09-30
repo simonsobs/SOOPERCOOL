@@ -1,0 +1,44 @@
+## Required shared arguments ##
+bundle_db: /cephfs/soukdata/user_scratch/jkania/end_to_end_iso/mapmaking/satp1_20250108/bundles_{patch}_seed17_20250304.db
+atomic_db: /cephfs/soukdata/user_scratch/jkania/end_to_end_iso/mapmaking/satp1_20250108/atomic_db.sqlite
+output_dir: &output_dir /cephfs/soukdata/user_scratch/kwolz/end_to_end_iso/tf_sims/filtered/satp1/{patch}/{freq_channel}
+sim_dir: /cephfs/soukdata/user_scratch/jkania/end_to_end_iso/tf_sims
+atomic_sim_dir: !path [*output_dir, atomic_sims, "{sim_id:04d}"]
+sim_string_format: "{sim_type}_1.0arcmin_fwhm30.0_sim{sim_id:04d}_CAR.fits"
+
+freq_channels: [f090]
+sim_ids: 0,1
+patches: [south]
+sim_types: [pureT, pureE, pureB]
+# (Optional for coadd_filtered_sims)
+intra_obs_splits: [scan_left, scan_right]
+
+## Optional shared arguments ##
+pix_type: car
+car_map_template: /shared_home/kwolz/bbdev/SOOPERCOOL/reference_pipeline_isov1_20250928/data/band_car_fejer1_5arcmin.fits
+bundle_id: 0
+query_restrict: "median_weight_qu < 2e10"
+
+## Required arguments for filter_sims_sotodlib ##
+preprocess_config_init: /shared_home/kwolz/bbdev/SOOPERCOOL/reference_pipeline_isov1_20250928/paramfiles/transfer_preproc_config_satp1_20250108_sat_iso_init.yaml
+preprocess_config_proc: /shared_home/kwolz/bbdev/SOOPERCOOL/reference_pipeline_isov1_20250928/paramfiles/transfer_preproc_config_satp1_20250108_sat_iso_proc.yaml
+
+## Optional arguments for filter_sims_sotodlib ##
+fp_thin: 8
+
+
+## Required arguments for coadd_filtered_sims ##
+atomic_sim_dir: !path [*output_dir, atomic_sims, "{sim_id:04d}"]
+
+
+## Optional arguments for coadd_filtered_sims ##
+intra_obs_pair: [scan_left, scan_right]
+inter_obs_splits: [low_pwv, high_pwv, low_dpwv, high_dpwv, high_sun_distance,
+                   low_sun_distance, high_ambient_temperature,
+                   low_ambient_temperature, rising_azimuth, setting_azimuth,
+                   0_roll_angle, -45_roll_angle, +45_roll_angle,
+                   pos_f_hwp, neg_f_hwp,
+                   #low_moon_distance, high_moon_distance
+                   ]
+nbatch_atomics: 1
+remove_atomics: False

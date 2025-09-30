@@ -1,0 +1,247 @@
+context_file: /shared_home/kwolz/bbdev/SOOPERCOOL/reference_pipeline_isov1_20250928/paramfiles/use_this_local_satp1_20241124.yaml
+plot_dir: /cephfs/soukdata/user_scratch/jkania/end_to_end_iso/preprocessing/satp1_20250108_proc/preprocess_plots
+
+subobs:
+  use: ['wafer_slot', 'wafer.bandpass']
+  label: wafer_slot
+  
+archive:
+  index: /cephfs/soukdata/user_scratch/jkania/end_to_end_iso/preprocessing/satp1_20250108_proc/process_archive.sqlite
+  policy:
+    type: 'simple'
+    filename: /cephfs/soukdata/user_scratch/jkania/end_to_end_iso/preprocessing/satp1_20250108_proc/preprocess_archive.h5
+
+process_pipe:
+    ### updated
+    #- name : 'subtract_qu_common_mode'
+    #  signal_name_Q: 'demodQ'
+    #  signal_name_U: 'demodU'
+    #  process:
+    #    subtract: False
+    #  calc: True
+    #  save: True
+
+    - name: "estimate_t2p"
+      skip_on_sim: True # Does nothing
+      calc: {}
+      save: True
+
+    - name: "subtract_t2p"
+      skip_on_sim: True  # Template deprojection == effective filtering.
+      process: {}        # This is already included in the code, reading the template from data
+
+    - name: "inv_var_flags"
+      skip_on_sim: False # Want to select
+      calc:
+        signal_name: 'demodQ'
+        nsigma: 2
+      save: True
+      select: True
+
+    - name : "tod_stats"
+      skip_on_sim: True # Does nothing
+      signal: "dsT"
+      wrap: "tod_stats_T"
+      calc:
+        stat_names: ["std", "ptp"]
+        split_subscans: True
+      save: True
+
+    - name : "tod_stats"
+      skip_on_sim: True # Does nothing
+      signal: "demodQ"
+      wrap: "tod_stats_Q"
+      calc:
+        stat_names: ["median", "std", "skew", "kurtosis", "ptp"]
+        split_subscans: True
+      save: True
+
+    - name : "tod_stats"
+      skip_on_sim: True # Does nothing
+      signal: "demodU"
+      wrap: "tod_stats_U"
+      calc:
+        stat_names: ["median", "std", "skew", "kurtosis", "ptp"]
+        split_subscans: True
+      save: True
+
+    ### updated
+    - name : "noisy_subscan_flags"
+      skip_on_sim: False  # Select.
+      stats_name: tod_stats
+      calc:
+        subscan_stats: ["demodQ", "demodU", "dsT"]
+        nstd_lim: 3.0
+        ptp_lim: 0.8
+        kurt_lim: 0.5
+        skew_lim: 0.5
+        noisy_detector_lim: 0.5
+        merge: False
+      save: True
+      select: True
+
+    - name: "sub_polyf"
+      skip_on_sim: False # Filter
+      process:
+        degree: 0
+        method: "polyfit"
+        in_place: True
+
+    - name: "union_flags"
+      skip_on_sim: False # Flags (to keep)
+      process:
+        flag_labels: ['noisy_subscan_flags.valid_subscans']
+        total_flags_label: 'valid_subscans'
+
+    ### updated
+    - name: "azss"
+      skip_on_sim: False  # We keep this
+      azss_stats_name: 'azss_statsT'
+      azss_model_name: 'azss_modelT'
+      proc_aman_turnaround_info: 'turnaround_flags'
+      calc:
+        signal: 'dsT'
+        frange: [-3.141592, 7.85398]
+        bins: 126 #1262
+        left_right: True
+        apodize_flags: True
+        apodize_edges: True
+        apodize_edges_samps: 20000
+        apodize_flags_samps: 200
+        flags: ['valid_subscans'] #,'turnarounds']
+      save: True
+      process:
+        subtract: True
+        sim: True # but we have to turn on this flag to run the calc method on sim.
+
+    - name: "azss"
+      skip_on_sim: False  # Same as above
+      azss_stats_name: 'azss_statsQ'
+      azss_model_name: 'azss_modelQ'
+      proc_aman_turnaround_info: 'turnaround_flags'
+      calc:
+        signal: 'demodQ'
+        frange: [-3.141592, 7.85398]
+        bins: 126 #1262
+        left_right: True
+        apodize_flags: True
+        apodize_edges: True
+        apodize_edges_samps: 20000
+        apodize_flags_samps: 200
+        flags: ['valid_subscans'] #,'turnarounds']
+      save: True
+      process:
+        subtract: True
+        sim: True
+
+    - name: "azss"
+      skip_on_sim: False  # Same as above
+      azss_stats_name: 'azss_statsU'
+      azss_model_name: 'azss_modelU'
+      proc_aman_turnaround_info: 'turnaround_flags'
+      calc:
+        signal: 'demodU'
+        frange: [-3.141592, 7.85398]
+        bins: 126 #1262
+        left_right: True
+        apodize_flags: True
+        apodize_edges: True
+        apodize_edges_samps: 20000
+        apodize_flags_samps: 200
+        flags: ['valid_subscans'] #,'turnarounds']
+      save: True
+      process:
+        subtract: True
+        sim: True
+    
+    - name: "union_flags"
+      skip_on_sim: False # Merge all flags
+      process:
+        flag_labels: ['jumps_2pi.jump_flag', 'glitches.glitch_flags', 'turnaround_flags.turnarounds', 'jumps_slow.jump_flag', 'noisy_subscan_flags.valid_subscans']
+        total_flags_label: 'exclude'
+
+    - name: "sub_polyf"
+      skip_on_sim: False # Filter to include
+      process:
+        signal_name: "dsT"
+        degree: 9
+        in_place: True
+        mask: "exclude"
+
+    - name: "sub_polyf"
+      skip_on_sim: False # Filter to include
+      process:
+        signal_name: "demodQ"
+        degree: 1
+        in_place: True
+        mask: "exclude"
+
+    - name: "sub_polyf"
+      skip_on_sim: False # Filter to include
+      process:
+        signal_name: "demodU"
+        degree: 1
+        in_place: True
+        mask: "exclude"
+
+    - name: "rotate_qu"
+      skip_on_sim: False  # We rotate first, we do it back.
+      process:
+        sign: -1
+        offset: 0
+        update_focal_plane: False
+
+    - name: "calibrate"
+      skip_on_sim: True # no cal in sims 
+      signal: "dsT"
+      process:
+        kind: "array"
+        cal_array: "abscal.abscal_cmb"
+
+    - name: "calibrate"
+      skip_on_sim: True # no cal in sims 
+      signal: "demodQ"
+      process:
+        kind: "array"
+        cal_array: "abscal.abscal_cmb"
+
+    - name: "calibrate"
+      skip_on_sim: True # no cal in sims 
+      signal: "demodU"
+      process:
+        kind: "array"
+        cal_array: "abscal.abscal_cmb"
+
+    - name : "source_flags"
+      skip_on_sim: False # We keep selection
+      calc:
+        mask: {'shape': 'circle',
+               'xyr': [0, 0, 1.]}
+        center_on: ['moon'] # list of str
+        res: 20 # arcmin
+        max_pix: 4000000 # max number of allowed pixels in map
+        distance: 0 # max distance of footprint from source in degrees
+      save: True
+      select: True # optional
+
+    - name: "union_flags"
+      skip_on_sim: False # Merge all flags
+      process:
+        flag_labels: ['jumps_2pi.jump_flag', 'glitches.glitch_flags', 'turnaround_flags.turnarounds', 'jumps_slow.jump_flag', 'source_flags.moon', 'noisy_subscan_flags.valid_subscans']
+        total_flags_label: 'glitch_flags'
+
+    - name: "split_flags"
+      skip_on_sim: False # Does nothing
+      calc:
+        right_focal_plane: 0
+        top_focal_plane: 0
+        central_pixels: 0.20023039
+        high_gain: 0.115
+        high_noise: 3.5e-5
+        high_tau: 1.5e-3
+        det_A: A
+        pol_angle: 35
+        det_top: B
+        high_leakage: 1.0e-3
+        high_2f: 1.5e-3
+      save: True
