@@ -2,6 +2,7 @@ from soopercool import BBmeta
 from itertools import product
 import numpy as np
 import argparse
+import os
 import pymaster as nmt
 
 
@@ -127,26 +128,51 @@ def main(args):
             clb_th = None
             if fiducial_cmb:
                 cmb_cl = hp.read_cl(fiducial_cmb)[:, :lmax_bins+1]
+                napp = nmt_bins.lmax + 1 - cmb_cl.shape[1]
+                if napp > 0:
+                    cmb_cl = np.concatenate(
+                        [cmb_cl, np.zeros((cmb_cl.shape[0], napp))], axis=1
+                    )
                 cmb_clb = nmt_bins.bin_cell(cmb_cl)[:, mask]
                 clb_th = cmb_clb
             if fiducial_dust:
+                if not os.path.isfile(fiducial_dust.format(nu1=nu1, nu2=nu2)):
+                    nu1, nu2 = nu2, nu1
                 dust_cl = hp.read_cl(
                     fiducial_dust.format(nu1=nu1, nu2=nu2)
                 )[:, :lmax_bins+1]
+                napp = nmt_bins.lmax + 1 - dust_cl.shape[1]
+                if napp > 0:
+                    dust_cl = np.concatenate(
+                        [dust_cl, np.zeros((dust_cl.shape[0], napp))], axis=1
+                    )
                 dust_clb = nmt_bins.bin_cell(dust_cl)[:, mask]
-                if clb_th:
+                if clb_th is not None:
                     clb_th += dust_clb
                 else:
                     clb_th = dust_clb
             if fiducial_synch:
+                if not os.path.isfile(fiducial_dust.format(nu1=nu1, nu2=nu2)):
+                    nu1, nu2 = nu2, nu1
                 synch_cl = hp.read_cl(
                     fiducial_synch.format(nu1=nu1, nu2=nu2)
                 )[:, :lmax_bins+1]
+                napp = nmt_bins.lmax + 1 - synch_cl.shape[1]
+                if napp > 0:
+                    synch_cl = np.concatenate(
+                        [synch_cl, np.zeros((synch_cl.shape[0], napp))], axis=1
+                    )
                 synch_clb = nmt_bins.bin_cell(synch_cl)[:, mask]
-                if clb_th:
+                if clb_th is not None:
                     clb_th += synch_clb
                 else:
                     clb_th = synch_clb
+
+            beam1, beam2 = (
+                nmt_bins.bin_cell(meta.read_beam(ms)[1][:lmax+1])[mask]
+                for ms in [map_set1, map_set2]
+            )
+            clb_th *= (beam1 * beam2)[None, :lmax_bins+1]
 
             for fp in field_pairs:
 
