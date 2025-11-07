@@ -170,7 +170,6 @@ def main(args):
                     pix_type=meta.pix_type,
                     lims=[[-500, 500], [-20, 20], [-20, 20]]
                     )
-                print(f"Pol map variance: {np.std(coadded_map[1:]):.2E}")
         if verbose and do_plots:
             mpi.print_rnk0(f" PLOTS: {plots_dir}", rank)
 

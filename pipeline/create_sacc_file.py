@@ -5,6 +5,8 @@ import sacc
 from itertools import product
 import numpy as np
 import pymaster as nmt
+import copy
+import os
 
 
 def multi_eye(size, k_list):
@@ -42,7 +44,13 @@ def main(args):
     sacc_dir = f"{out_dir}/saccs"
     BBmeta.make_dir(sacc_dir)
 
-    cov_dir = f"{out_dir}/covariances"
+    cov_dir = {}
+    if os.path.isdir(f"{out_dir}/mc_covariances/coadd"):
+        for typ in ["signal", "noise", "coadd"]:
+            cov_dir[typ] = f"{out_dir}/mc_covariances/{typ}"
+    else:
+        cov_dir["coadd"] = f"{out_dir}/mc_covariances/coadd"
+    covtypes = list(cov_dir.keys())
 
     binning = np.load(meta.binning_file)
     nmt_binning = nmt.NmtBin.from_edges(binning["bin_low"],
@@ -64,7 +72,8 @@ def main(args):
         cl_dir = f"{out_dir}/cells"
         Nsims = 1
     elif args.sims:
-        cl_dir = f"{out_dir}/cells_sims"
+        if os.path.isdir(f"{out_dir}/cells_sims/coadd"):
+            cl_dir = f"{out_dir}/cells_sims/coadd"
         Nsims = meta.covariance["cov_num_sims"]
 
     data_types = {"T": "0", "E": "e", "B": "b"}
@@ -77,37 +86,40 @@ def main(args):
 
             if i > j:
                 continue
-            cov_dict = np.load(
-                f"{cov_dir}/mc_cov_{ms1}_x_{ms2}_{ms3}_x_{ms4}.npz"
-            )
+            for ct in covtypes:
+                cov_dict = np.load(
+                    f"{cov_dir[ct]}/mc_cov_{ms1}_x_{ms2}_{ms3}_x_{ms4}.npz"
+                )
 
-            cov_size = len(field_pairs)*len(lb)
-            cov = np.zeros((cov_size, cov_size))
-            for ifp1, fp1 in enumerate(field_pairs):
-                for ifp2, fp2 in enumerate(field_pairs):
-                    cov[ifp1*len(lb):(ifp1+1)*len(lb),
-                        ifp2*len(lb):(ifp2+1)*len(lb)] = cov_dict[fp1+fp2]
+                cov_size = len(field_pairs)*len(lb)
+                cov = np.zeros((cov_size, cov_size))
+                for ifp1, fp1 in enumerate(field_pairs):
+                    for ifp2, fp2 in enumerate(field_pairs):
+                        cov[ifp1*len(lb):(ifp1+1)*len(lb),
+                            ifp2*len(lb):(ifp2+1)*len(lb)] = cov_dict[fp1+fp2]
 
-            covs[ms1, ms2, ms3, ms4] = thin_covariance(
-                cov, len(lb), len(field_pairs), order=0
-            )
+                covs[ct, ms1, ms2, ms3, ms4] = thin_covariance(
+                    cov, len(lb), len(field_pairs), order=0
+                )
 
     full_cov_size = len(ps_names)*len(lb)*len(field_pairs)
-    full_cov = np.zeros((full_cov_size, full_cov_size))
+    full_cov = {ct: np.zeros((full_cov_size, full_cov_size))
+                for ct in covtypes}
 
-    for i, (ms1, ms2) in enumerate(ps_names):
-        for j, (ms3, ms4) in enumerate(ps_names):
-            if i > j:
-                continue
+    for ct in covtypes:
+        for i, (ms1, ms2) in enumerate(ps_names):
+            for j, (ms3, ms4) in enumerate(ps_names):
+                if i > j:
+                    continue
 
-            full_cov[
-                i*len(field_pairs)*len(lb):(i+1)*len(field_pairs)*len(lb),
-                j*len(field_pairs)*len(lb):(j+1)*len(field_pairs)*len(lb)
-            ] = covs[ms1, ms2, ms3, ms4]
+                full_cov[ct][
+                    i*len(field_pairs)*len(lb):(i+1)*len(field_pairs)*len(lb),
+                    j*len(field_pairs)*len(lb):(j+1)*len(field_pairs)*len(lb)
+                ] = covs[ct, ms1, ms2, ms3, ms4]
 
-    # Symmetrize
-    full_cov = np.triu(full_cov)
-    full_cov += full_cov.T - np.diag(full_cov.diagonal())
+        # Symmetrize
+        full_cov[ct] = np.triu(full_cov[ct])
+        full_cov[ct] += full_cov[ct].T - np.diag(full_cov[ct].diagonal())
 
     use_mpi4py = args.sims
     mpi.init(use_mpi4py)
@@ -130,16 +142,15 @@ def main(args):
                 ["cmb_temperature", "cmb_polarization"]
             ):
 
-                s.add_tracer(**{
-                    "tracer_type": "NuMap",
-                    "name": f"{ms}",
-                    "quantity": qty,
-                    "spin": spin,
-                    "nu": [f-1., f, f+1],  # Delta bandpasses. TODO: generalize
-                    "ell": lb,
-                    "beam": np.ones_like(lb),  # Unit beam. TODO: generalize
-                    "bandpass": [0., 1., 0.]  # Deltas. TODO: generalize
-                })
+                s.add_tracer(
+                    "NuMap", f"{ms}", **{
+                        "quantity": qty,
+                        "spin": spin,
+                        "nu": [f-1., f, f+1],  # Deltas. TODO: generalize
+                        "ell": lb,
+                        "beam": np.ones_like(lb),  # Unit beam. Expected.
+                        "bandpass": [0., 1., 0.]}  # Deltas. TODO: generalize
+                )
 
         for i, (ms1, ms2) in enumerate(ps_names):
 
@@ -158,12 +169,23 @@ def main(args):
                     "window": s_wins
                 })
 
-        s.add_covariance(full_cov)
-
-        s.save_fits(
-            f"{sacc_dir}/cl_and_cov_sacc{sim_label}.fits",
-            overwrite=True
-        )
+        if id_sim == 0:
+            cov_label = {"coadd": "", "signal": "signal_only_",
+                         "noise": "noise_only_"}
+            for ct in covtypes:
+                sc = copy.deepcopy(s)
+                sc.add_covariance(full_cov[ct])
+                fname = f"{sacc_dir}/cl_and_{cov_label[ct]}mc_cov_sacc{sim_label}.fits"  # noqa
+                sc.save_fits(
+                    fname,
+                    overwrite=True
+                )
+        else:
+            fname = f"{sacc_dir}/cl_sacc{sim_label}.fits"
+            s.save_fits(
+                fname,
+                overwrite=True
+            )
 
 
 if __name__ == "__main__":

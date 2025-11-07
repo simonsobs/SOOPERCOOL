@@ -16,16 +16,19 @@ def load_bpwins(coupling_file):
     return bp_win["bp_win"]
 
 
-def binned_theory_from_unbinned(clth, bpw_mat, lb, lmax):
+def binned_theory_from_unbinned(clth, bpw_mat, lb):
     """
     """
     modes = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
     clth_vec = np.concatenate(
         [clth[mode] for mode in modes]
     ).reshape(len(modes), -1)
-    msk = np.arange(bpw_mat.shape[-1]) <= lmax
-    bpw_mat_crop = bpw_mat[:, :, :, msk]
-    clth_binned = np.einsum("ijkl,kl->ij", bpw_mat_crop, clth_vec)
+    _, n_bins, _, nl = bpw_mat.shape
+    nl_th = clth["EE"].shape[-1]
+    nl = min(nl, nl_th)
+    nb = len(lb)
+    
+    clth_binned = np.einsum("ijkl,kl->ij", bpw_mat[:, :nb, :, :nl], clth_vec)
     cl_out = {}
     for i, m in enumerate(modes):
         cl_out[m] = clth_binned[i]
@@ -162,16 +165,21 @@ def main(args):
 
     transfer_dir = meta.transfer_settings["transfer_directory"]
     for ftag1, ftag2 in meta.get_independent_filtering_pairs():
+        tf_dir = f"{transfer_dir}/transfer_function_{ftag1}_x_{ftag2}.npz"
+        if not os.path.isfile(tf_dir):
+            tf_dir = f"{transfer_dir}/transfer_function_{ftag2}_x_{ftag1}.npz"
         idx = multipole_min_from_tf(
-            f"{transfer_dir}/transfer_function_{ftag1}_x_{ftag2}.npz",
+            tf_dir,
             field_pairs=field_pairs,
             snr_cut=3
         )
         idx_bad_tf[ftag1, ftag2] = idx
 
     for ms1, ms2 in ps_names:
-        bpw_file = f"couplings_{ms1}_{ms2}.npz"
-        bpw_mats[ms1, ms2] = load_bpwins(f"{couplings_dir}/{bpw_file}")
+        bpw_file = f"{couplings_dir}/couplings_{ms1}_{ms2}.npz"
+        if not os.path.isfile(bpw_file):
+            bpw_file = f"{couplings_dir}/couplings_{ms2}_{ms1}.npz"
+        bpw_mats[ms1, ms2] = load_bpwins(bpw_file)
 
     plot_sims = {
         (ms1, ms2, fp): {
@@ -200,10 +208,14 @@ def main(args):
         for i, fp in enumerate(["TT", "EE", "BB", "TE"]):
             clth[fp] = hp.read_cl(fiducial_cmb)[i, :lmax+1]
             if fiducial_dust is not None:
+                if not os.path.isfile(fiducial_dust.format(nu1=nu1, nu2=nu2)):
+                    nu1, nu2 = nu2, nu1
                 clth[fp] += hp.read_cl(
                     fiducial_dust.format(nu1=nu1, nu2=nu2)
                 )[i, :lmax+1]
             if fiducial_synch is not None:
+                if not os.path.isfile(fiducial_synch.format(nu1=nu1, nu2=nu2)):
+                    nu1, nu2 = nu2, nu1
                 clth[fp] += hp.read_cl(
                     fiducial_synch.format(nu1=nu1, nu2=nu2)
                 )[i, :lmax+1]
@@ -221,16 +233,14 @@ def main(args):
                 cl_th[fp] = clth[fp[::-1]]
 
         clth_binned = binned_theory_from_unbinned(cl_th, bpw_mats[(ms1, ms2)],
-                                                  lb, lmax)
+                                                  lb[lb <= meta.lmax])
 
         ftag1 = meta.filtering_tag_from_map_set(ms1)
         ftag2 = meta.filtering_tag_from_map_set(ms2)
 
         for fp in field_pairs:
-            mask_th = (clth["l"] <= meta.lmax)
-            x_th, y_th = clth["l"][mask_th], cl_th[fp][mask_th]
-            mask = lb <= meta.lmax
-            th_binned = clth_binned[fp][mask]
+            x_th, y_th = clth["l"], cl_th[fp]
+            th_binned = clth_binned[fp]
 
             plot_sims[ms1, ms2, fp]["x_th"] = x_th
             plot_sims[ms1, ms2, fp]["y_th"] = y_th
@@ -244,7 +254,7 @@ def main(args):
         } for ms1, ms2 in ps_names
         for fp in field_pairs
     }
-    fname_data = f"{sacc_dir}/cl_and_cov_sacc.fits"
+    fname_data = f"{sacc_dir}/cl_and_mc_cov_sacc.fits"
 
     if not os.path.isfile(fname_data):
         print("No data sacc to print. Skipping...")
@@ -274,10 +284,12 @@ def main(args):
     # Load simulations
     for id_sim in range(Nsims):
         if verbose:
-            print(f"# {id_sim} | {ms1} x {ms2}")
-        s = sacc.Sacc.load_fits(
-            f"{sacc_dir}/cl_and_cov_sacc_{id_sim:04d}.fits"
-        )
+            print(f"# {id_sim+1} | {ms1} x {ms2}")
+        if id_sim == 0:
+            sacc_file = f"{sacc_dir}/cl_and_mc_cov_sacc_{id_sim:04d}.fits"
+        else:
+            sacc_file = f"{sacc_dir}/cl_sacc_{id_sim:04d}.fits"
+        s = sacc.Sacc.load_fits(sacc_file)
 
         for ms1, ms2 in ps_names:
             ftag1 = meta.filtering_tag_from_map_set(ms1)
@@ -286,12 +298,20 @@ def main(args):
             for fp in field_pairs:
                 f1, f2 = fp
 
-                ell, cl, cov = s.get_ell_cl(
-                    f"cl_{types[f1]}{types[f2]}",
-                    ms1,
-                    ms2,
-                    return_cov=True
-                )
+                if id_sim == 0:
+                    ell, cl, cov = s.get_ell_cl(
+                        f"cl_{types[f1]}{types[f2]}",
+                        ms1,
+                        ms2,
+                        return_cov=True
+                    )
+                else:
+                    ell, cl = s.get_ell_cl(
+                        f"cl_{types[f1]}{types[f2]}",
+                        ms1,
+                        ms2,
+                        return_cov=False
+                    )
                 mask = ell <= meta.lmax
                 x, y, err = ell, cl, np.sqrt(cov.diagonal())
                 x, y, err = x[mask], y[mask], err[mask]
