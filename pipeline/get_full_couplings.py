@@ -2,6 +2,7 @@ import argparse
 from soopercool import BBmeta
 import numpy as np
 from soopercool import coupling_utils as cu
+import os
 
 
 def main(args):
@@ -23,7 +24,10 @@ def main(args):
 
     tf_dict = {}
     for ftag1, ftag2 in filtering_pairs:
-        tf = np.load(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
+        tf_file = f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz"
+        if not os.path.isfile(tf_file):
+            tf_file = f"{tf_dir}/transfer_function_{ftag2}_x_{ftag1}.npz"
+        tf = np.load(tf_file)
         tf_dict[ftag1, ftag2] = tf["full_tf"]
 
     mcms_dict = cu.load_mcms(couplings_dir,
