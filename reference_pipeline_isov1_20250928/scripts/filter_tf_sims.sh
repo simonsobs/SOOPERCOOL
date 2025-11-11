@@ -29,8 +29,8 @@ bb_awg_scripts_dir=/shared_home/kwolz/bbdev/bb-awg-scripts
 
 srun -n 112 -c 4 --cpu_bind=cores \
 python -u ${bb_awg_scripts_dir}/pipeline/filtering/filter_sims_sotodlib.py \
-    --config_file $filtering_config > "${log}_filter" 2>&1
+    --config_file $filtering_config --sim_ids 0,1 > "${log}_filter" 2>&1
 
 srun -n 32 -c 14 --cpu-bind=cores \
 python -u ${bb_awg_scripts_dir}/pipeline/filtering/coadd_filtered_sims.py \
-    --config_file $filtering_config > "${log}_coadd" 2>&1
+    --config_file $filtering_config -sim_ids 0,1 > "${log}_coadd" 2>&1filter

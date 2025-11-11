@@ -22,7 +22,7 @@ module load soconda/20241017_3.10
 # Code references. The software packages needed to run this script are:
 # * sotodlib (https://github.com/simonsobs/sotodlib/tree/master/sotodlib)
 # * bb-awg-scripts (https://github.com/simonsobs/bb-awg-scripts/tree/main)
-# * soopercool (https://github.com/simonsobs/SOOPERCOOL/tree/f2f-tutorial)
+# * soopercool (https://github.com/simonsobs/SOOPERCOOL/tree/reference_pipeline_isov1_20250928)
 
 # Install the above packages (on soconda, everything should be readily
 # installable via `git clone [url]; cd [package];  pip install . --user`.
