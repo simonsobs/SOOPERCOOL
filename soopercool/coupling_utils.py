@@ -148,7 +148,7 @@ def average_pcls_matrices(pcls_mat_dict, filtering_pairs,
     return pcls_mat_mean
 
 
-def compute_couplings(mcm, nmt_binning, transfer=None):
+def compute_couplings(mcm, nmt_binning, transfer=None, compute_Dl=False):
     """
     """
 
@@ -160,9 +160,24 @@ def compute_couplings(mcm, nmt_binning, transfer=None):
     else:
         tmcm = mcm
 
+    ells_per_bin = [
+        nmt_binning.get_ell_list(i)
+        for i in range(n_bins)
+    ]
+    if compute_Dl:
+        cl2dl_per_bin = []
+        for i in range(n_bins):
+            cl2dl_per_bin.append(
+                ells_per_bin[i] * (ells_per_bin[i] + 1) / 2 / np.pi
+            )
+            # Regularize to avoid division by zero for l=0
+            cl2dl_per_bin[i][cl2dl_per_bin[i] == 0] = np.inf
+    else:
+        cl2dl_per_bin = [np.ones_like(ells_per_bin[i]) for i in range(n_bins)]
+
     btmcm = np.transpose(
         np.array([
-            np.sum(tmcm[:, :, :, nmt_binning.get_ell_list(i)],
+            np.sum(tmcm[:, :, :, ells_per_bin[i]] / cl2dl_per_bin[i][None, None, None, :],
                    axis=-1)
             for i in range(n_bins)
         ]), axes=[1, 2, 3, 0]
@@ -181,7 +196,8 @@ def compute_couplings(mcm, nmt_binning, transfer=None):
 def get_couplings_dict(mcm_dict, nmt_binning,
                        transfer_dict=None,
                        ps_names_and_ftags=None,
-                       filtering_pairs=None):
+                       filtering_pairs=None,
+                       compute_Dl=False):
     """
     """
     couplings = {}
@@ -198,7 +214,8 @@ def get_couplings_dict(mcm_dict, nmt_binning,
                 transfer = None
 
             bpw_win, inv_coupling = compute_couplings(
-                mcm, nmt_binning, transfer
+                mcm, nmt_binning, transfer,
+                compute_Dl=compute_Dl
             )
             couplings[ms1, ms2]["bp_win"] = bpw_win
             couplings[ms1, ms2]["inv_coupling"] = inv_coupling
@@ -213,7 +230,8 @@ def get_couplings_dict(mcm_dict, nmt_binning,
                 transfer = None
 
             bpw_win, inv_coupling = compute_couplings(
-                mcm, nmt_binning, transfer
+                mcm, nmt_binning, transfer,
+                compute_Dl=compute_Dl
             )
             couplings[ftag1, ftag2]["bp_win"] = bpw_win
             couplings[ftag1, ftag2]["inv_coupling"] = inv_coupling

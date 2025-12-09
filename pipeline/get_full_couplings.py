@@ -15,7 +15,8 @@ def main(args):
 
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+                                     binning["bin_high"] + 1,
+                                     is_Dell=meta.compute_Dl)
 
     tf_settings = meta.transfer_settings
 
@@ -42,12 +43,14 @@ def main(args):
     couplings_filtered = cu.get_couplings_dict(
         mcms_dict, nmt_bins,
         transfer_dict=tf_dict,
-        ps_names_and_ftags=ps_names_and_ftags
+        ps_names_and_ftags=ps_names_and_ftags,
+        compute_Dl=meta.compute_Dl
     )
     couplings_unfiltered = cu.get_couplings_dict(
         mcms_dict, nmt_bins,
         transfer_dict=None,
-        ps_names_and_ftags=ps_names_and_ftags
+        ps_names_and_ftags=ps_names_and_ftags,
+        compute_Dl=meta.compute_Dl
     )
 
     for ms1, ms2 in ps_names:
