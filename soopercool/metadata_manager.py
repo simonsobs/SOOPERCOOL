@@ -89,6 +89,10 @@ class BBmeta(object):
         """
         for key, value in self.general_pars.items():
             setattr(self, key, value)
+        # Set a default value for compute_Dl
+        # to make it backward compatible
+        if not hasattr(self, "compute_Dl"):
+            self.compute_Dl = False
 
     def _get_map_sets_list(self):
         """
