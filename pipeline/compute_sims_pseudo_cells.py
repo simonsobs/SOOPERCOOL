@@ -29,10 +29,7 @@ def main(args):
                        pix_type=meta.pix_type,
                        car_template=meta.car_template)
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1,
-                                     is_Dell=meta.compute_Dl)
+    nmt_bins = meta.read_nmt_binning()
     n_bins = nmt_bins.get_n_bands()
     ps_pairs = meta.get_ps_names_list(type="all", coadd=False)
 
@@ -115,8 +112,9 @@ def main(args):
                     flat_template = enmap.zeros((3, shape[0], shape[1]), wcs)
                     mask = enmap.insert(flat_template.copy()[0], mask)
                     m = enmap.insert(flat_template.copy(), m)
-            field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs)
+            field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs, lmax=meta.lmax)
             field_spin2 = nmt.NmtField(mask, m[1:], wcs=wcs,
+                                       lmax=meta.lmax,
                                        purify_b=meta.pure_B)
 
             fields[map_set, id_bundle] = {

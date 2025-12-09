@@ -1,7 +1,6 @@
 import argparse
 from soopercool import BBmeta
 import numpy as np
-import pymaster as nmt
 from soopercool import coupling_utils as cu
 
 
@@ -13,10 +12,7 @@ def main(args):
     out_dir = meta.output_directory
     couplings_dir = f"{out_dir}/couplings"
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1,
-                                     is_Dell=meta.compute_Dl)
+    nmt_bins = meta.read_nmt_binning()
 
     tf_settings = meta.transfer_settings
 

@@ -26,10 +26,7 @@ def main(args):
 
     nspec = 7
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1,
-                                     is_Dell=meta.compute_Dl)
+    nmt_bins = meta.read_nmt_binning()
     n_bins = nmt_bins.get_n_bands()
 
     mask_file = meta.masks["analysis_mask"]
@@ -41,9 +38,12 @@ def main(args):
     else:
         raise FileNotFoundError("The analysis mask must be specified.")
 
-    if nmt_bins.lmax < lmax:  # In case bins are lower than mask's lmax
-        lmax = nmt_bins.lmax
-    nl = lmax + 1
+    if meta.lmax > lmax:
+        raise ValueError(
+            f"Specified lmax {meta.lmax} is larger than "
+            f"the maximum lmax from map resolution {lmax}"
+        )
+    nl = meta.lmax + 1
 
     binner = np.array([nmt_bins.bin_cell(np.array([cl]))[0]
                        for cl in np.eye(nl)]).T
@@ -61,14 +61,14 @@ def main(args):
         None,
         wcs=wcs,
         spin=0,
-        lmax=lmax
+        lmax=meta.lmax
     )
     field_spin2 = nmt.NmtField(
         mask,
         None,
         wcs=wcs,
         spin=2,
-        lmax=lmax,
+        lmax=meta.lmax,
         purify_b=meta.pure_B
     )
 
@@ -89,7 +89,7 @@ def main(args):
 
         _, bl = su.read_beam_from_file(
             f"{beam_dir}/{beam_file}",
-            lmax=lmax
+            lmax=meta.lmax
         )
         beams[map_set] = bl
 

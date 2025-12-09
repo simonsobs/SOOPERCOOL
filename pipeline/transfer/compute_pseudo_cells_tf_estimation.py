@@ -26,10 +26,11 @@ def main(args):
     pcls_tf_est_dir = f"{out_dir}/cells_tf_est"
     BBmeta.make_dir(pcls_tf_est_dir)
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1,
-                                     is_Dell=meta.compute_Dl)
+    # binning = np.load(meta.binning_file)
+    # nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
+    #                                  binning["bin_high"] + 1,
+    #                                  is_Dell=meta.compute_Dl)
+    nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
 
     mask_file = meta.masks["analysis_mask"]
@@ -163,13 +164,16 @@ def main(args):
                     _, wcs = enmap.read_map_geometry(meta.car_template)
 
                 field = {
-                    "spin0": nmt.NmtField(mask, map[:1], wcs=wcs),
-                    "spin2": nmt.NmtField(mask, map[1:],
+                    "spin0": nmt.NmtField(mask, map[:1], lmax=meta.lmax,
+                                          wcs=wcs),
+                    "spin2": nmt.NmtField(mask, map[1:], lmax=meta.lmax,
                                           purify_b=purify_b, wcs=wcs)
                 }
                 field_filtered = {
-                    "spin0": nmt.NmtField(mask, map_filtered[:1], wcs=wcs),
+                    "spin0": nmt.NmtField(mask, map_filtered[:1],
+                                          lmax=meta.lmax, wcs=wcs),
                     "spin2": nmt.NmtField(mask, map_filtered[1:],
+                                          lmax=meta.lmax,
                                           purify_b=purify_b, wcs=wcs)
                 }
 
