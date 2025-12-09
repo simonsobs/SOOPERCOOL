@@ -46,7 +46,8 @@ def main(args):
 
     binning = np.load(meta.binning_file)
     nmt_binning = nmt.NmtBin.from_edges(binning["bin_low"],
-                                        binning["bin_high"] + 1)
+                                        binning["bin_high"] + 1,
+                                        is_Dell=meta.compute_Dl)
     ls = np.arange(nmt_binning.lmax+1)
     lb = nmt_binning.get_effective_ells()
     n_bins = len(lb)

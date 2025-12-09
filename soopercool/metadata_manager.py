@@ -223,7 +223,8 @@ class BBmeta(object):
         import pymaster as nmt
         binning = np.load(self.binning_file)
         return nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+                                     binning["bin_high"] + 1,
+                                     is_Dell=self.compute_Dl)
 
     def get_n_bandpowers(self):
         """

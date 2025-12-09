@@ -23,7 +23,8 @@ def main(args):
 
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+                                     binning["bin_high"] + 1,
+                                     is_Dell=meta.compute_Dl)
     lmax_bins = nmt_bins.get_ell_max(nmt_bins.get_n_bands() - 1)
     lb = nmt_bins.get_effective_ells()
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]

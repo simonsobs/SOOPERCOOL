@@ -28,7 +28,8 @@ def main(args):
 
     binning = np.load(meta.binning_file)
     nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+                                     binning["bin_high"] + 1,
+                                     is_Dell=meta.compute_Dl)
     n_bins = nmt_bins.get_n_bands()
 
     cov_settings = meta.covariance
