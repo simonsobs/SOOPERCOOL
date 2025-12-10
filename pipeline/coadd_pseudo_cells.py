@@ -21,10 +21,6 @@ def main(args):
     plot_dir = f"{out_dir}/plots/cells"
     BBmeta.make_dir(plot_dir)
 
-    # binning = np.load(meta.binning_file)
-    # nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-    #                                  binning["bin_high"] + 1,
-    #                                  is_Dell=meta.compute_Dl)
     nmt_bins = meta.read_nmt_binning()
     lmax_bins = nmt_bins.get_ell_max(nmt_bins.get_n_bands() - 1)
     lb = nmt_bins.get_effective_ells()

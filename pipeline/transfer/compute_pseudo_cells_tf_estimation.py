@@ -26,10 +26,6 @@ def main(args):
     pcls_tf_est_dir = f"{out_dir}/cells_tf_est"
     BBmeta.make_dir(pcls_tf_est_dir)
 
-    # binning = np.load(meta.binning_file)
-    # nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-    #                                  binning["bin_high"] + 1,
-    #                                  is_Dell=meta.compute_Dl)
     nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
 

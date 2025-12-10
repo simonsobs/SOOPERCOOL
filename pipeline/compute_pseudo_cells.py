@@ -20,11 +20,6 @@ def main(args):
     mask = mu.read_map(meta.masks["analysis_mask"],
                        pix_type=meta.pix_type,
                        car_template=meta.car_template)
-
-    # binning = np.load(meta.binning_file)
-    # nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-    #                                  binning["bin_high"] + 1,
-    #                                  is_Dell=meta.compute_Dl)
     nmt_bins = meta.read_nmt_binning()
 
     if do_plots:

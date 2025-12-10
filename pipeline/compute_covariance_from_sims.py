@@ -3,7 +3,6 @@ from soopercool import BBmeta
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import pymaster as nmt
 
 
 def main(args):
@@ -26,10 +25,7 @@ def main(args):
 
     cl_dir = f"{out_dir}/cells_sims"
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1,
-                                     is_Dell=meta.compute_Dl)
+    nmt_bins = meta.read_nmt_binning()
     n_bins = nmt_bins.get_n_bands()
 
     cov_settings = meta.covariance
