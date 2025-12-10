@@ -20,6 +20,16 @@ def main(args):
     mask = mu.read_map(meta.masks["analysis_mask"],
                        pix_type=meta.pix_type,
                        car_template=meta.car_template)
+
+    lmax = mu.lmax_from_map(
+        meta.masks["analysis_mask"],
+        pix_type=meta.pix_type
+    )
+    if meta.lmax > lmax:
+        raise ValueError(
+            f"Specified lmax {meta.lmax} is larger than "
+            f"the maximum lmax from map resolution {lmax}"
+        )
     nmt_bins = meta.read_nmt_binning()
 
     if do_plots:

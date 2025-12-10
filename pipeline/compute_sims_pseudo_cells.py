@@ -29,6 +29,16 @@ def main(args):
                        pix_type=meta.pix_type,
                        car_template=meta.car_template)
 
+    lmax = mu.lmax_from_map(
+        meta.masks["analysis_mask"],
+        pix_type=meta.pix_type
+    )
+    if meta.lmax > lmax:
+        raise ValueError(
+            f"Specified lmax {meta.lmax} is larger than "
+            f"the maximum lmax from map resolution {lmax}"
+        )
+
     nmt_bins = meta.read_nmt_binning()
     n_bins = nmt_bins.get_n_bands()
     ps_pairs = meta.get_ps_names_list(type="all", coadd=False)

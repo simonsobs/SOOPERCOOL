@@ -44,6 +44,16 @@ def main(args):
                        pix_type=meta.pix_type,
                        car_template=meta.car_template)
 
+    lmax = mu.lmax_from_map(
+        meta.masks["analysis_mask"],
+        pix_type=meta.pix_type
+    )
+    if meta.lmax > lmax:
+        raise ValueError(
+            f"Specified lmax {meta.lmax} is larger than "
+            f"the maximum lmax from map resolution {lmax}"
+        )
+
     tf_settings = meta.transfer_settings
     sim_id_start = 0 if "sim_id_start" not in tf_settings else tf_settings["sim_id_start"]  # noqa
     sim_ids = range(sim_id_start, tf_settings["tf_val_num_sims"]+sim_id_start)
