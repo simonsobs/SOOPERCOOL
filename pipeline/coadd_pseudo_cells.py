@@ -2,7 +2,6 @@ from soopercool import BBmeta
 from itertools import product
 import numpy as np
 import argparse
-import pymaster as nmt
 
 
 def main(args):
@@ -22,9 +21,7 @@ def main(args):
     plot_dir = f"{out_dir}/plots/cells"
     BBmeta.make_dir(plot_dir)
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    nmt_bins = meta.read_nmt_binning()
     lmax_bins = nmt_bins.get_ell_max(nmt_bins.get_n_bands() - 1)
     lb = nmt_bins.get_effective_ells()
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]

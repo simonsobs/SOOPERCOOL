@@ -21,9 +21,16 @@ def main(args):
                        pix_type=meta.pix_type,
                        car_template=meta.car_template)
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    lmax = mu.lmax_from_map(
+        meta.masks["analysis_mask"],
+        pix_type=meta.pix_type
+    )
+    if meta.lmax > lmax:
+        raise ValueError(
+            f"Specified lmax {meta.lmax} is larger than "
+            f"the maximum lmax from map resolution {lmax}"
+        )
+    nmt_bins = meta.read_nmt_binning()
 
     if do_plots:
         import healpy as hp
@@ -90,8 +97,9 @@ def main(args):
             mask = enmap.insert(flat_template.copy()[0], mask)
             m = enmap.insert(flat_template.copy(), m)
 
-        field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs)
-        field_spin2 = nmt.NmtField(mask, m[1:], wcs=wcs, purify_b=meta.pure_B)
+        field_spin0 = nmt.NmtField(mask, m[:1], lmax=meta.lmax, wcs=wcs)
+        field_spin2 = nmt.NmtField(mask, m[1:], lmax=meta.lmax, wcs=wcs,
+                                   purify_b=meta.pure_B)
 
         fields[map_set, id_bundle] = {
             "spin0": field_spin0,

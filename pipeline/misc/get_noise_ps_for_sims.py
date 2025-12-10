@@ -1,6 +1,5 @@
 import argparse
 from soopercool import BBmeta
-import pymaster as nmt
 import numpy as np
 from itertools import product
 from scipy.interpolate import interp1d
@@ -53,9 +52,7 @@ def main(args):
     if do_plots:
         BBmeta.make_dir(plot_dir)
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
 
     lmax = mu.lmax_from_map(meta.masks["analysis_mask"],

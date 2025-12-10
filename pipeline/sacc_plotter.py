@@ -5,7 +5,6 @@ from itertools import product
 import sacc
 import numpy as np
 import healpy as hp
-import pymaster as nmt
 import os
 
 
@@ -138,9 +137,7 @@ def main(args):
     plot_dir = f"{out_dir}/plots/sacc_spectra"
     BBmeta.make_dir(plot_dir)
 
-    binning = np.load(meta.binning_file)
-    nmt_binning = nmt.NmtBin.from_edges(binning["bin_low"],
-                                        binning["bin_high"] + 1)
+    nmt_binning = meta.read_nmt_binning()
     lb = nmt_binning.get_effective_ells()
     lmax = meta.lmax
 
