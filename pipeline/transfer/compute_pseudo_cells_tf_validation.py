@@ -113,7 +113,7 @@ def main(args):
                 field_spin0 = nmt.NmtField(mask_restrict, m[:1], wcs=wcs,
                                            lmax=meta.lmax)
                 field_spin2 = nmt.NmtField(mask_restrict, m[1:], wcs=wcs,
-                                           lmax=meta.lmax(),
+                                           lmax=meta.lmax,
                                            purify_b=meta.pure_B)
                 fields[f_tag][map_set] = {
                     "spin0": field_spin0,
