@@ -244,7 +244,7 @@ class BBmeta(object):
                 bin_high[:-1],
                 np.array([self.lmax])
             ))
-        
+
         return nmt.NmtBin.from_edges(
             bin_low,
             bin_high + 1,

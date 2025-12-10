@@ -177,8 +177,11 @@ def compute_couplings(mcm, nmt_binning, transfer=None, compute_Dl=False):
 
     btmcm = np.transpose(
         np.array([
-            np.sum(tmcm[:, :, :, ells_per_bin[i]] / cl2dl_per_bin[i][None, None, None, :],
-                   axis=-1)
+            np.sum(
+                tmcm[:, :, :, ells_per_bin[i]] /
+                cl2dl_per_bin[i][None, None, None, :],
+                axis=-1
+            )
             for i in range(n_bins)
         ]), axes=[1, 2, 3, 0]
     )
