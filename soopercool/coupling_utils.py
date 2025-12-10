@@ -150,6 +150,29 @@ def average_pcls_matrices(pcls_mat_dict, filtering_pairs,
 
 def compute_couplings(mcm, nmt_binning, transfer=None, compute_Dl=False):
     """
+    Compute couplings from pre-computed mode-coupling
+    matrices `mcm` and optional transfer functions.
+
+    Parameters
+    ----------
+    mcm : ndarray
+        Mode-coupling matrix of shape (size, n_bins, size, nl), where
+        `size` is the number of field combinations (e.g., 9 for TEBxTEB),
+        `n_bins` is the number of bandpower bins, and `nl` is the maximum multipole.
+    nmt_binning : NmtBin object
+        Namaster binning scheme used to define the bandpowers.
+    transfer : ndarray, optional
+        Transfer function of shape (size, n_bins, n_bins) to apply to the MCM.
+    compute_Dl : bool, optional
+        If True, applies the Dl conversion when computing the binned MCM.
+        The code will then output power spectra in Dl units.
+
+    Returns
+    -------
+    bpw_windows : ndarray
+        Binned power window functions of shape (size, n_bins, size, nl).
+    inv_coupling : ndarray
+        Inverse binned mode-coupling matrix of shape (size, n_bins, size, n_bins).
     """
 
     size, n_bins, _, nl = mcm.shape
@@ -202,6 +225,30 @@ def get_couplings_dict(mcm_dict, nmt_binning,
                        filtering_pairs=None,
                        compute_Dl=False):
     """
+    Compute couplings from pre-computed mode-coupling
+    matrices `mcm_dict` and optional transfer functions.
+    This loops over either ps_names_and_ftags or filtering_pairs
+    to compute the couplings for each pair.
+
+    Parameters
+    ----------
+    mcm_dict : dict
+        Dictionary of mode-coupling matrices of shape
+        (size, n_bins, size, nl), where `size` is the number of field combinations
+        (e.g., 9 for TEBxTEB), `n_bins` is the number of bandpower bins,
+        and `nl` is the maximum multipole.
+    nmt_binning : NmtBin object
+        Namaster binning scheme used to define the bandpowers.
+    transfer_dict : dict, optional
+        Dictionary of transfer functions of shape (size, n_bins, n_bins) to apply to the MCM.
+    ps_names_and_ftags : dict, optional
+        Dictionary with keys as (map_set1, map_set2) and values as (ftag1, ftag2).
+        If provided, couplings will be computed for these pairs.
+    filtering_pairs : list of tuples, optional
+        List of (ftag1, ftag2) tuples. If provided, couplings will be computed for these pairs.
+    compute_Dl : bool, optional
+        If True, applies the Dl conversion when computing the binned MCM.
+        The code will then output power spectra in Dl units.
     """
     couplings = {}
 
