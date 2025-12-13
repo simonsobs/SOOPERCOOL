@@ -162,8 +162,12 @@ def main(args):
             cells_dict_std = {
                 type: {
                     (clt, m1, m2): {
-                        fp: np.std(cells_dict_sims[type][(clt, m1, m2)][fp],
-                                   axis=0)
+                        fp: np.std(
+                                np.array(
+                                    cells_dict_sims[type][(clt, m1, m2)][fp],
+                                    dtype=float
+                                ), axis=0
+                            )
                         for fp in field_pairs
                     } for clt, (m1, m2) in product(cltypes, cross_map_set_list)
                 } for type in types
@@ -172,9 +176,12 @@ def main(args):
                 type: {
                     (clt, m1, m2): {
                         fp: np.mean(
-                            cells_dict_sims[type][(clt, m1, m2)][fp],
-                            axis=0
-                        ) for fp in field_pairs
+                                np.array(
+                                    cells_dict_sims[type][(clt, m1, m2)][fp],
+                                    dtype=float
+                                ), axis=0
+                            )
+                        for fp in field_pairs
                     } for clt, (m1, m2) in product(cltypes, cross_map_set_list)
                 } for type in types
             }
@@ -264,16 +271,16 @@ def main(args):
                     )
                     sub.set_ylim(-5, 5)
                     main.set_xlim(0, meta.lmax)
-                    for typ in types:
-                        main.errorbar(
-                            lb,
-                            conv*cells_dict_mean[typ][("coadd", map_set1,
+                for typ in types:
+                    main.errorbar(
+                        lb,
+                        conv*cells_dict_mean[typ][("coadd", map_set1,
+                                                   map_set2)][fp],
+                        yerr=conv*cells_dict_std[typ][("coadd", map_set1,
                                                        map_set2)][fp],
-                            yerr=conv*cells_dict_std[typ][("coadd", map_set1,
-                                                           map_set2)][fp],
-                            label=typ, marker=mst[typ], lw=0.7,
-                            c=colors[typ]
-                        )
+                        label=typ, marker=mst[typ], lw=0.7,
+                        c=colors[typ]
+                    )
                 else:
                     f, main = plt.subplots(1, 1, figsize=(10, 8))
                     main.set_xlabel(r"$\ell$", fontsize=15)
@@ -312,7 +319,7 @@ def main(args):
                     f"{plot_dir}/pcls_{map_set1}_{map_set2}_{fp}.png",
                     bbox_inches="tight"
                 )
-                plt.close()
+                plt.close('all')
                 if args.verbose:
                     print(" PLOT "
                           f"{plot_dir}/pcls_{map_set1}_{map_set2}_{fp}.png")
