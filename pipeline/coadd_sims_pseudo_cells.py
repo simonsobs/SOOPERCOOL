@@ -3,6 +3,7 @@ from soopercool import mpi_utils as mpi
 from itertools import product
 import numpy as np
 import argparse
+import os
 
 
 def main(args):
@@ -18,10 +19,14 @@ def main(args):
     verbose = args.verbose
 
     out_dir = meta.output_directory
-    cells_dir = f"{out_dir}/cells_sims"
+    cells_dir = {}
+    map_types = ["signal", "noise", "coadd"]
+    for typ in map_types:
+        cells_dir[typ] = f"{out_dir}/cells_sims/{typ}"
 
     nmt_bins = meta.read_nmt_binning()
-    lmax_bins = nmt_bins.get_ell_max(nmt_bins.get_n_bands() - 1)
+    lmax = nmt_bins.lmax
+
     lb = nmt_bins.get_effective_ells()
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
     nsims = meta.covariance["cov_num_sims"]
@@ -53,22 +58,24 @@ def main(args):
     # Load bundle C_ells
     cells_dict_sims = {
         type: {
-            (ms1, ms2): {
+            (clt, ms1, ms2): {
                 fp: [] for fp in field_pairs
-            } for ms1, ms2 in cross_map_set_list
+            } for clt, (ms1, ms2) in product(map_types, cross_map_set_list)
         } for type in ["cross", "auto", "noise"]
     }
 
     # MPI parallelization
     rank, size, comm = mpi.init(True)
-    mpi_shared_list = [id_sim for id_sim in range(nsims)]
+    mpi_shared_list = [(c, j)
+                       for (c, j) in product(map_types,
+                                             [i for i in range(nsims)])]
 
     # Every rank must have the same shared list
     mpi_shared_list = comm.bcast(mpi_shared_list, root=0)
     task_ids = mpi.distribute_tasks(size, rank, len(mpi_shared_list))
     local_mpi_list = [mpi_shared_list[i] for i in task_ids]
 
-    for id_sim in local_mpi_list:
+    for clt, id_sim in local_mpi_list:
 
         # Initialize temporary dictionary
         cells_coadd = {
@@ -82,13 +89,13 @@ def main(args):
         # Loop over all map set pairs
         for map_name1, map_name2 in cross_bundle_list:
             if verbose:
-                print(f"# {id_sim} | {map_name1} x {map_name2}")
+                print(f"# {id_sim} | {clt} | {map_name1} x {map_name2}")
 
             map_set1, _ = map_name1.split("__")
             map_set2, _ = map_name2.split("__")
 
             cells_dict = np.load(
-                f"{cells_dir}/decoupled_pcls_{map_name1}_x_{map_name2}_{id_sim:04d}.npz"  # noqa
+                f"{cells_dir[clt]}/decoupled_pcls_{map_name1}_x_{map_name2}_{id_sim:04d}.npz"  # noqa
             )
 
             if (map_name1, map_name2) in ps_names["cross"]:
@@ -98,7 +105,9 @@ def main(args):
 
             for field_pair in field_pairs:
 
-                cells_coadd[type][map_set1, map_set2][field_pair] += [cells_dict[field_pair]] # noqa
+                cells_coadd[type][map_set1, map_set2][field_pair] += [
+                    cells_dict[field_pair]
+                ]
 
         # Average the cross-bundle power spectra
         cells_coadd["noise"] = {}
@@ -106,14 +115,14 @@ def main(args):
             cells_coadd["noise"][(map_set1, map_set2)] = {}
             for field_pair in field_pairs:
                 for type in ["cross", "auto"]:
-                    cells_coadd[type][map_set1, map_set2][field_pair] = \
+                    cells_coadd[type][map_set1, map_set2][field_pair] =\
                         np.mean(
                             cells_coadd[type][map_set1, map_set2][field_pair],
                             axis=0
                         )
 
-                cells_coadd["noise"][(map_set1, map_set2)][field_pair] = \
-                    cells_coadd["auto"][map_set1, map_set2][field_pair] - \
+                cells_coadd["noise"][map_set1, map_set2][field_pair] = \
+                    cells_coadd["auto"][map_set1, map_set2][field_pair] -\
                     cells_coadd["cross"][map_set1, map_set2][field_pair]
 
             for type in ["cross", "auto", "noise"]:
@@ -122,9 +131,11 @@ def main(args):
                     for fp in field_pairs
                 }
                 for fp in field_pairs:
-                    cells_dict_sims[type][map_set1, map_set2][fp] += [np.array(cells_to_save[fp]).squeeze()]  # noqa
+                    cells_dict_sims[type][clt, map_set1, map_set2][fp] += [
+                        np.array(cells_to_save[fp]).squeeze()
+                    ]
                 np.savez(
-                    f"{cells_dir}/decoupled_{type}_pcls_{map_set1}_x_{map_set2}_{id_sim:04d}.npz",  # noqa
+                    f"{cells_dir[clt]}/decoupled_{type}_pcls_{map_set1}_x_{map_set2}_{id_sim:04d}.npz",  # noqa
                     lb=lb,
                     **cells_to_save
                 )
@@ -137,22 +148,41 @@ def main(args):
             if size > 1:
                 for i in range(1, size):
                     cells_dict = comm.recv(source=i, tag=11)
-                    for type, (m1, m2), fp in product(types, cross_map_set_list, field_pairs):  # noqa
-                        cells_dict_sims[type][(m1, m2)][fp] += [np.array(cells_dict[type][(m1, m2)][fp]).squeeze()]  # noqa
+                    for clt, type, (m1, m2), fp in product(map_types,
+                                                           types,
+                                                           cross_map_set_list,
+                                                           field_pairs):
+                        cells_dict_sims[type][clt, m1, m2][fp] += [
+                            np.array(
+                                cells_dict[type][clt, m1, m2][fp]
+                            ).squeeze()
+                        ]
             cells_dict_std = {
                 type: {
-                    (m1, m2): {
-                        fp: np.std(cells_dict_sims[type][(m1, m2)][fp], axis=0)
+                    (clt, m1, m2): {
+                        fp: np.std(
+                                np.array(
+                                    cells_dict_sims[type][(clt, m1, m2)][fp],
+                                    dtype=float
+                                ), axis=0
+                            )
                         for fp in field_pairs
-                    } for m1, m2 in cross_map_set_list
+                    } for clt, (m1, m2) in product(map_types,
+                                                   cross_map_set_list)
                 } for type in types
             }
             cells_dict_mean = {
                 type: {
-                    (m1, m2): {
-                        fp: np.mean(cells_dict_sims[type][(m1, m2)][fp], axis=0)  # noqa
+                    (clt, m1, m2): {
+                        fp: np.mean(
+                                np.array(
+                                    cells_dict_sims[type][(clt, m1, m2)][fp],
+                                    dtype=float
+                                ), axis=0
+                            )
                         for fp in field_pairs
-                    } for m1, m2 in cross_map_set_list
+                    } for clt, (m1, m2) in product(map_types,
+                                                   cross_map_set_list)
                 } for type in types
             }
         else:
@@ -167,76 +197,106 @@ def main(args):
 
             clb_th = None
             if fiducial_cmb:
-                cmb_cl = hp.read_cl(fiducial_cmb)[:, :lmax_bins+1]
+                cmb_cl = hp.read_cl(fiducial_cmb)[:, :lmax+1]
+                napp = nmt_bins.lmax + 1 - cmb_cl.shape[1]
+                if napp > 0:
+                    cmb_cl = np.concatenate(
+                        [cmb_cl, np.zeros((cmb_cl.shape[0], napp))], axis=1
+                    )
                 cmb_clb = nmt_bins.bin_cell(cmb_cl)[:, mask]
                 clb_th = cmb_clb
             if fiducial_dust:
+                if not os.path.isfile(fiducial_dust.format(nu1=nu1, nu2=nu2)):
+                    nu1, nu2 = nu2, nu1
                 dust_cl = hp.read_cl(
                     fiducial_dust.format(nu1=nu1, nu2=nu2)
-                )[:, :lmax_bins+1]
+                )[:, :lmax+1]
+                napp = nmt_bins.lmax + 1 - dust_cl.shape[1]
+                if napp > 0:
+                    dust_cl = np.concatenate(
+                        [dust_cl, np.zeros((dust_cl.shape[0], napp))], axis=1
+                    )
                 dust_clb = nmt_bins.bin_cell(dust_cl)[:, mask]
-                if clb_th:
+                if clb_th is not None:
                     clb_th += dust_clb
                 else:
                     clb_th = dust_clb
             if fiducial_synch:
+                if not os.path.isfile(fiducial_dust.format(nu1=nu1, nu2=nu2)):
+                    nu1, nu2 = nu2, nu1
                 synch_cl = hp.read_cl(
                     fiducial_synch.format(nu1=nu1, nu2=nu2)
-                )[:, :lmax_bins+1]
+                )[:, :lmax+1]
+                napp = nmt_bins.lmax + 1 - synch_cl.shape[1]
+                if napp > 0:
+                    synch_cl = np.concatenate(
+                        [synch_cl, np.zeros((synch_cl.shape[0], napp))], axis=1
+                    )
                 synch_clb = nmt_bins.bin_cell(synch_cl)[:, mask]
-                if clb_th:
+                if clb_th is not None:
                     clb_th += synch_clb
                 else:
                     clb_th = synch_clb
+            beam1, beam2 = (
+                nmt_bins.bin_cell(meta.read_beam(ms)[1][:lmax+1])[mask]
+                for ms in [map_set1, map_set2]
+            )
 
             for fp in field_pairs:
-                ifp = None if fp not in field_pairs_theory else field_pairs_theory[fp]  # noqa
-                f, main = plt.subplots(1, 1, figsize=(10, 8))
-
-                if clb_th is not None and ifp is not None:
+                if fp in field_pairs_theory and clb_th is not None:
+                    ifp = field_pairs_theory[fp]
                     f, (main, sub) = plt.subplots(
                         2, 1, gridspec_kw={'height_ratios': [3, 1]},
                         figsize=(10, 9), sharex=True
                     )
+                    y = clb_th[ifp] * beam1 * beam2
+                    res = cells_dict_mean["cross"][("coadd",
+                                                    map_set1,
+                                                    map_set2)][fp][mask] - y
+                    res /= cells_dict_std["cross"][("coadd",
+                                                    map_set1,
+                                                    map_set2)][fp][mask]
+                    res *= np.sqrt(nsims)
                     sub.set_xlabel(r"$\ell$", fontsize=15)
                     sub.set_ylabel("residual", fontsize=12)
-                    sub.set_ylim(-5, 5)
                     sub.axhspan(-3, 3, facecolor="grey", alpha=0.2)
                     sub.axhspan(-2, 2, facecolor="grey", alpha=0.2)
                     sub.axhline(0, color="k", linestyle="--")
-                    sub.plot(
-                        lb[mask],
-                        ((cells_dict_mean["cross"][(map_set1, map_set2)][fp][mask] - clb_th[ifp])  # noqa
-                         / cells_dict_std[type][(map_set1, map_set2)][fp][mask]),  # noqa
-                        c=colors["cross"]
-                    )
-                    main.plot(lb[mask], clb_th[ifp], c="k", ls="--",
+                    sub.plot(lb[mask], res, c=colors["cross"])
+                    main.plot(lb[mask], y, c="k", ls="--",
                               label="Theory")
                     sub.tick_params(
                         axis='x', which="both", bottom=True, top=True,
                         labeltop=False, direction="in"
                     )
-                else:
-                    main.set_xlabel(r"$\ell$", fontsize=15)
-                main.set_xlim(0, meta.lmax)
-
-                for type in types:
+                    sub.set_ylim(-5, 5)
+                    main.set_xlim(0, meta.lmax)
+                for typ in types:
                     main.errorbar(
                         lb,
-                        conv*cells_dict_mean[type][(map_set1, map_set2)][fp],
-                        yerr=conv*cells_dict_std[type][(map_set1, map_set2)][fp],  # noqa
-                        label=type, marker=mst[type], lw=0.7,
-                        c=colors[type]
+                        conv*cells_dict_mean[typ][("coadd", map_set1,
+                                                   map_set2)][fp],
+                        yerr=conv*cells_dict_std[typ][("coadd", map_set1,
+                                                       map_set2)][fp],
+                        label=typ, marker=mst[typ], lw=0.7,
+                        c=colors[typ]
                     )
+                else:
+                    f, main = plt.subplots(1, 1, figsize=(10, 8))
+                    main.set_xlabel(r"$\ell$", fontsize=15)
+                    main.set_xlim(0, meta.lmax)
 
                 if fp == fp[::-1]:
                     main.set_yscale("log")
                     if fp == "TT":
-                        plt.ylim(1e-2, 1e9)
+                        main.set_ylim(1e-4, 1e7)
                     elif fp == "EE":
-                        plt.ylim(1e-6, 1e3)
+                        main.set_ylim(1e-8, 1e1)
                     elif fp == "BB":
-                        plt.ylim(1e-8, 1e3)
+                        main.set_ylim(1e-10, 1e1)
+                elif fp in ["TE", "ET"]:
+                    main.set_yscale("log")
+                    main.set_ylim(1e-8, 1e3)
                 else:
                     main.axhline(0, color="k", linestyle="--")
                     if fp in ["EB", "BE"]:
@@ -259,7 +319,10 @@ def main(args):
                     f"{plot_dir}/pcls_{map_set1}_{map_set2}_{fp}.png",
                     bbox_inches="tight"
                 )
-                plt.close()
+                plt.close('all')
+                if args.verbose:
+                    print(" PLOT "
+                          f"{plot_dir}/pcls_{map_set1}_{map_set2}_{fp}.png")
 
 
 if __name__ == "__main__":

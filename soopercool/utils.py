@@ -37,9 +37,10 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30):
         "TT": powers["total"][:, 0][lmin:lmax+1]*bl_sq,
         "EE": powers["total"][:, 1][lmin:lmax+1]*bl_sq,
         "TE": powers["total"][:, 3][lmin:lmax+1]*bl_sq,
+        "ET": powers["total"][:, 3][lmin:lmax+1]*bl_sq,
         "BB": powers["total"][:, 2][lmin:lmax+1]*bl_sq,
     }
-    for spec in ["EB", "TB"]:
+    for spec in ["EB", "TB", "BE", "BT"]:
         cl_th[spec] = np.zeros_like(lth)
 
     return lth, cl_th
