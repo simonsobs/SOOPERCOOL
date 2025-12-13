@@ -74,7 +74,7 @@ def main(args):
 
     for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
         cname = f"{couplings_dir}/couplings_{ms1}_{ms2}.npz"
-        if not os.path. isfile(cname):
+        if not os.path.isfile(cname):
             cname = f"{couplings_dir}/couplings_{ms2}_{ms1}.npz"
 
         inv_couplings_beamed[ms1, ms2] = np.load(cname)["inv_coupling"][:, :n_bins, :, :n_bins].reshape([n_bins*9, n_bins*9])  # noqa

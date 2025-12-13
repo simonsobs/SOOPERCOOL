@@ -22,13 +22,16 @@ def main(args):
 
     tf_dir = tf_settings["transfer_directory"]
 
-    tf_dict = {}
-    for ftag1, ftag2 in filtering_pairs:
-        tf_file = f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz"
-        if not os.path.isfile(tf_file):
-            tf_file = f"{tf_dir}/transfer_function_{ftag2}_x_{ftag1}.npz"
-        tf = np.load(tf_file)
-        tf_dict[ftag1, ftag2] = tf["full_tf"]
+    if args.unity:
+        tf_dict = None
+    else:
+        tf_dict = {}
+        for ftag1, ftag2 in filtering_pairs:
+            tf_file = f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz"
+            if not os.path.isfile(tf_file):
+                tf_file = f"{tf_dir}/transfer_function_{ftag2}_x_{ftag1}.npz"
+            tf = np.load(tf_file)
+            tf_dict[ftag1, ftag2] = tf["full_tf"]
 
     mcms_dict = cu.load_mcms(couplings_dir,
                              ps_names=ps_names, full_mcm=True)

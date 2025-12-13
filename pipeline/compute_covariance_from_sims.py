@@ -23,7 +23,8 @@ def main(args):
         for typ in ["signal", "noise", "coadd"]:
             cl_dir[typ] = f"{out_dir}/cells_sims/{typ}"
     else:
-        cl_dir["coadd"] = f"{out_dir}/cells_sims/coadd"
+        cl_dir["coadd"] = f"{out_dir}/cells_sims"
+
     cltypes = list(cl_dir.keys())
 
     if do_plots:

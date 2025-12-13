@@ -67,6 +67,8 @@ def main(args):
     elif args.sims:
         if os.path.isdir(f"{out_dir}/cells_sims/coadd"):
             cl_dir = f"{out_dir}/cells_sims/coadd"
+        else:
+            cl_dir = f"{out_dir}/cells_sims"
         Nsims = meta.covariance["cov_num_sims"]
 
     data_types = {"T": "0", "E": "e", "B": "b"}
