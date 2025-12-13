@@ -20,12 +20,10 @@ def main(args):
 
     out_dir = meta.output_directory
     cells_dir = {}
-    if os.path.isdir(f"{out_dir}/cells_sims/coadd"):
-        for typ in ["signal", "noise", "coadd"]:
-            cells_dir[typ] = f"{out_dir}/cells_sims/{typ}"
-    else:
-        cells_dir["coadd"] = f"{out_dir}/cells_sims/coadd"
-    cltypes = list(cells_dir.keys())
+    map_types = ["signal", "noise", "coadd"]
+    for typ in map_types:
+        cells_dir[typ] = f"{out_dir}/cells_sims/{typ}"
+
     nmt_bins = meta.read_nmt_binning()
     lmax = nmt_bins.lmax
 
@@ -62,14 +60,14 @@ def main(args):
         type: {
             (clt, ms1, ms2): {
                 fp: [] for fp in field_pairs
-            } for clt, (ms1, ms2) in product(cltypes, cross_map_set_list)
+            } for clt, (ms1, ms2) in product(map_types, cross_map_set_list)
         } for type in ["cross", "auto", "noise"]
     }
 
     # MPI parallelization
     rank, size, comm = mpi.init(True)
     mpi_shared_list = [(c, j)
-                       for (c, j) in product(cltypes,
+                       for (c, j) in product(map_types,
                                              [i for i in range(nsims)])]
 
     # Every rank must have the same shared list
@@ -150,7 +148,7 @@ def main(args):
             if size > 1:
                 for i in range(1, size):
                     cells_dict = comm.recv(source=i, tag=11)
-                    for clt, type, (m1, m2), fp in product(cltypes,
+                    for clt, type, (m1, m2), fp in product(map_types,
                                                            types,
                                                            cross_map_set_list,
                                                            field_pairs):
@@ -169,7 +167,8 @@ def main(args):
                                 ), axis=0
                             )
                         for fp in field_pairs
-                    } for clt, (m1, m2) in product(cltypes, cross_map_set_list)
+                    } for clt, (m1, m2) in product(map_types,
+                                                   cross_map_set_list)
                 } for type in types
             }
             cells_dict_mean = {
@@ -182,7 +181,8 @@ def main(args):
                                 ), axis=0
                             )
                         for fp in field_pairs
-                    } for clt, (m1, m2) in product(cltypes, cross_map_set_list)
+                    } for clt, (m1, m2) in product(map_types,
+                                                   cross_map_set_list)
                 } for type in types
             }
         else:
