@@ -26,7 +26,7 @@ def binned_theory_from_unbinned(clth, bpw_mat, lb):
     nl_th = clth["EE"].shape[-1]
     nl = min(nl, nl_th)
     nb = len(lb)
-    
+
     clth_binned = np.einsum("ijkl,kl->ij", bpw_mat[:, :nb, :, :nl], clth_vec)
     cl_out = {}
     for i, m in enumerate(modes):
