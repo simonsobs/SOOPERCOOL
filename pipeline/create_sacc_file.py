@@ -1,6 +1,5 @@
 import argparse
 from soopercool import BBmeta
-from soopercool import mpi_utils as mpi
 import sacc
 from itertools import product
 import numpy as np
@@ -63,13 +62,15 @@ def main(args):
 
     if args.data:
         cl_dir = f"{out_dir}/cells"
-        Nsims = 1
+        sim_ids = [0]
     elif args.sims:
         if os.path.isdir(f"{out_dir}/cells_sims/coadd"):
             cl_dir = f"{out_dir}/cells_sims/coadd"
         else:
             cl_dir = f"{out_dir}/cells_sims"
-        Nsims = meta.covariance["cov_num_sims"]
+        id_start = meta.covariance["cov_id_start"]
+        nsims = meta.covariance["cov_num_sims"]
+        sim_ids = list(range(id_start, id_start+nsims))
 
     data_types = {"T": "0", "E": "e", "B": "b"}
     map_sets = meta.map_sets_list
@@ -115,15 +116,9 @@ def main(args):
         full_cov[ct] = np.triu(full_cov[ct])
         full_cov[ct] += full_cov[ct].T - np.diag(full_cov[ct].diagonal())
 
-    use_mpi4py = args.sims
-    mpi.init(use_mpi4py)
-
-    for id_sim in mpi.taskrange(Nsims - 1):
-
-        sim_label = f"_{id_sim:04d}" if Nsims > 1 else ""
-
+    for id_sim in sim_ids:
+        sim_label = f"_{id_sim:04d}" if len(sim_ids) > 1 else ""
         s_wins = sacc.BandpowerWindow(ls, lwin)
-
         s = sacc.Sacc()
 
         for ms in map_sets:
@@ -135,7 +130,6 @@ def main(args):
                 [0, 2],
                 ["cmb_temperature", "cmb_polarization"]
             ):
-
                 s.add_tracer(
                     "NuMap", f"{ms}", **{
                         "quantity": qty,
@@ -147,12 +141,10 @@ def main(args):
                 )
 
         for i, (ms1, ms2) in enumerate(ps_names):
-
             cl_file = f"{cl_dir}/decoupled_cross_pcls_{ms1}_x_{ms2}{sim_label}.npz" # noqa
             cells = np.load(cl_file)
 
             for fp in field_pairs:
-
                 f1, f2 = fp
                 s.add_ell_cl(**{
                     "data_type": f"cl_{data_types[f1]}{data_types[f2]}",
@@ -164,7 +156,8 @@ def main(args):
                 })
 
         if id_sim == 0:
-            cov_label = {"coadd": "", "signal": "signal_only_",
+            cov_label = {"coadd": "",
+                         "signal": "signal_only_",
                          "noise": "noise_only_"}
             for ct in covtypes:
                 sc = copy.deepcopy(s)
