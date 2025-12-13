@@ -179,18 +179,17 @@ def compute_couplings(mcm, nmt_binning, transfer=None, compute_Dl=False):
         Inverse binned mode-coupling matrix
         of shape (size, n_bins, size, n_bins).
     """
-
     size, n_bins, _, nl = mcm.shape
     if transfer is not None:
-        n_bins_nmt = len(nmt_binning.get_n_bands())
-        nl_nmt = nmt_binning.lmax
+        n_bins_nmt = nmt_binning.get_n_bands()
+        nl_nmt = nmt_binning.lmax + 1
         size_tf, _, n_bins_tf = transfer.shape
         if size != size_tf:
             raise ValueError(
                 "MCM and transfer fucntion have incompatible dimensions"
             )
         n_bins = min(n_bins, n_bins_tf, n_bins_nmt)
-        nl = min(nl, nl_nmt, nmt_binning.get_ell_max(n_bins))
+        nl = min(nl, nl_nmt, nmt_binning.get_ell_max(n_bins-1)+1)
         tmcm = np.einsum('ijk,jklm->iklm',
                          transfer[:, :, :n_bins],
                          mcm[:, :n_bins, :, :nl])
@@ -282,8 +281,7 @@ def get_couplings_dict(mcm_dict, nmt_binning,
                 transfer = None
 
             bpw_win, inv_coupling = compute_couplings(
-                mcm, nmt_binning, transfer,
-                compute_Dl=compute_Dl
+                mcm, nmt_binning, transfer, compute_Dl=compute_Dl
             )
             couplings[ms1, ms2]["bp_win"] = bpw_win
             couplings[ms1, ms2]["inv_coupling"] = inv_coupling
@@ -298,8 +296,7 @@ def get_couplings_dict(mcm_dict, nmt_binning,
                 transfer = None
 
             bpw_win, inv_coupling = compute_couplings(
-                mcm, nmt_binning, transfer,
-                compute_Dl=compute_Dl
+                mcm, nmt_binning, transfer, compute_Dl=compute_Dl
             )
             couplings[ftag1, ftag2]["bp_win"] = bpw_win
             couplings[ftag1, ftag2]["inv_coupling"] = inv_coupling
