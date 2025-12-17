@@ -628,3 +628,17 @@ def read_beam_from_file(beam_file, lmax=None):
     if lmax is not None:
         return l[:lmax+1], bl[:lmax+1]
     return l, bl
+
+
+def multipole_min_from_tf(tf_file, field_pairs, snr_cut=3.):
+    """
+    """
+    tf = np.load(tf_file)
+    idx_bad_tf = {}
+    for fp in field_pairs:
+        name = f"{fp}_to_{fp}"
+        snr = tf[name] / tf[f"{name}_std"]
+        idx = np.where(snr < snr_cut)[0]
+        idx_bad_tf[fp] = idx.max() if idx.size > 0 else 0
+
+    return idx_bad_tf
