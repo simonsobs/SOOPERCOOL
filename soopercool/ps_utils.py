@@ -2,6 +2,7 @@ import soopercool.map_utils as mu
 from itertools import product
 import pymaster as nmt
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def get_validation_power_spectra(meta, id_sim, mask, nmt_binning,
@@ -218,6 +219,31 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
     return pcls_mat
 
 
+def bin_theory_cls(cls, bpwf):
+    """
+    """
+    fields_theory = {"TT": 0, "EE": 1, "BB": 2, "TE": 3}
+    fields_all = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
+    nl_th = cls["TT"].shape[0]
+
+    size, n_bins, _, nl = bpwf.shape
+    assert size == 9, "Unexpected number of fields in coupling matrix"
+    assert nl <= nl_th, f"Theory spectrum must contain ell up to {nl}."
+
+    cls_dict = {}
+    for fp in fields_all:
+        if fp in fields_theory:
+            cls_dict[fp] = cls[fp][:nl]
+        else:
+            cls_dict[fp] = np.zeros(nl)
+    cls_vec = np.array([cls_dict[fp] for fp in fields_all])
+
+    clb = np.dot(bpwf.reshape(size*n_bins, size*nl), cls_vec.reshape(size*nl))
+    clb = clb.reshape(size, n_bins)
+
+    return {fp: clb[ifp] for ifp, fp in enumerate(fields_all)}
+
+
 def plot_pcls_mat_transfer(pcls_mat_unfilt, pcls_mat_filt, lb, file_name,
                            lmax=None):
     """
@@ -254,26 +280,74 @@ def plot_pcls_mat_transfer(pcls_mat_unfilt, pcls_mat_filt, lb, file_name,
     plt.savefig(file_name, bbox_inches="tight")
 
 
-def bin_theory_cls(cls, bpwf):
+def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
+                  cb_data=None, cb_data_err=None, add_theory=False,
+                  lth=None, clth=None, cbth=None, save_file=None):
     """
     """
-    fields_theory = {"TT": 0, "EE": 1, "BB": 2, "TE": 3}
-    fields_all = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
-    nl_th = cls["TT"].shape[0]
+    plt.figure(figsize=(8, 6))
+    grid = plt.GridSpec(4, 1, wspace=0, hspace=0)
+    if add_theory:
+        main = plt.subplot(grid[:-1])
+        sub = plt.subplot(grid[-1])
+        sub.set_xlabel(r"$\ell$")
+        sub.set_ylabel(r"$\Delta C_\ell / (\sigma / \sqrt{N_\mathrm{sims}})$")
+    else:
+        main = plt.subplot(grid[:])
+        main.set_xlabel(r"$\ell$")
 
-    size, n_bins, _, nl = bpwf.shape
-    assert size == 9, "Unexpected number of fields in coupling matrix"
-    assert nl <= nl_th, f"Theory spectrum must contain ell up to {nl}."
+    main.set_ylabel(r"$\ell (\ell + 1) C_\ell^{%s} / 2\pi$" % ylabel)
+    main.set_title(title)
 
-    cls_dict = {}
-    for fp in fields_all:
-        if fp in fields_theory:
-            cls_dict[fp] = cls[fp][:nl]
-        else:
-            cls_dict[fp] = np.zeros(nl)
-    cls_vec = np.array([cls_dict[fp] for fp in fields_all])
+    fac = lb * (lb + 1) / (2 * np.pi)
+    offset = 0 if cb_data is None else 1
 
-    clb = np.dot(bpwf.reshape(size*n_bins, size*nl), cls_vec.reshape(size*nl))
-    clb = clb.reshape(size, n_bins)
+    if add_theory:
+        fac_th = lth * (lth + 1) / (2 * np.pi)
+        main.plot(lth, fac_th * clth, c="darkgray", ls="-.", lw=2.6,
+                  label="theory")
 
-    return {fp: clb[ifp] for ifp, fp in enumerate(fields_all)}
+    main.errorbar(
+        lb-offset, fac * cb, yerr=fac * cb_err, marker="o", ls="None",
+        markerfacecolor="white", markeredgecolor="navy", label="sims",
+        elinewidth=1.75, ecolor="navy", markeredgewidth=1.75
+    )
+
+    if cb_data is not None:
+        main.errorbar(
+            lb+offset, fac * cb_data, yerr=fac * cb_data_err, marker="o",
+            ls="None", markerfacecolor="white", markeredgecolor="darkorange",
+            elinewidth=1.75, ecolor="darkorange", markeredgewidth=1.75,
+            label="data"
+        )
+
+    main.legend(fontsize=13)
+    main.set_xlim(*xlim)
+
+    if add_theory:
+        sub.axhspan(-3, 3, color="gray", alpha=0.1)
+        sub.axhspan(-2, 2, color="gray", alpha=0.4)
+        sub.axhspan(-1, 1, color="gray", alpha=0.8)
+
+        sub.plot(
+            lb-offset, (cb - cbth) / cb_err, marker="o", ls="None",
+            markerfacecolor="white", markeredgecolor="navy",
+            markeredgewidth=1.75
+        )
+        if cb_data is not None:
+            sub.plot(
+                lb+offset, (cb_data - cbth) / cb_data_err,
+                marker="o", ls="None",
+                markerfacecolor="white", markeredgecolor="darkorange",
+                markeredgewidth=1.75
+            )
+
+        sub.set_xlim(*xlim)
+        sub.set_ylim(-4.5, 4.5)
+
+    if save_file:
+        plt.savefig(save_file, bbox_inches="tight")
+    else:
+        plt.tight_layout()
+        plt.show()
+    plt.close()

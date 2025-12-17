@@ -312,7 +312,6 @@ def _plot_map_hp(map, lims=None, file_name=None, title=None):
     for i in range(ncomp):
         if ncomp != 1:
             f = "TQU"[i]
-        print("np.shape(map)", np.shape(np.atleast_2d(map)))
         hp.mollview(
             np.atleast_2d(map)[i],
             cmap=cmap,

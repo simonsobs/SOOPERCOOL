@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 
 def get_transfer_with_error(mean_pcls_mat_filt,
@@ -107,6 +108,17 @@ def load_mcms(coupling_dir, ps_names=None, full_mcm=False):
     else:
         for ms1, ms2 in ps_names:
             mcm_file = f"{coupling_dir}/{file_root}_{ms1}_{ms2}.npz"
+            mcm_file_swap = f"{coupling_dir}/{file_root}_{ms2}_{ms1}.npz"
+            if not os.path.isfile(mcm_file):
+                if os.path.isfile(mcm_file_swap):
+                    raise FileNotFoundError(
+                        f"It seems the order of map sets ({ms1}, {ms2}) was "
+                        "for the MCMs was swapped. Please recompute the "
+                        "correct couplings.")
+                else:
+                    raise FileNotFoundError(
+                        f"Mode coupling doesn't exist: {mcm_file}"
+                    )
             mcm = read_mcm(mcm_file, binned=True, full_mcm=full_mcm)
             mcms_dict[ms1, ms2] = mcm
         return mcms_dict
@@ -176,12 +188,20 @@ def compute_couplings(mcm, nmt_binning, transfer=None, compute_Dl=False):
         Inverse binned mode-coupling matrix
         of shape (size, n_bins, size, n_bins).
     """
-
     size, n_bins, _, nl = mcm.shape
     if transfer is not None:
+        n_bins_nmt = nmt_binning.get_n_bands()
+        nl_nmt = nmt_binning.lmax + 1
+        size_tf, _, n_bins_tf = transfer.shape
+        if size != size_tf:
+            raise ValueError(
+                "MCM and transfer function have incompatible field dimensions"
+            )
+        n_bins = min(n_bins, n_bins_tf, n_bins_nmt)
+        nl = min(nl, nl_nmt, nmt_binning.get_ell_max(n_bins-1)+1)
         tmcm = np.einsum('ijk,jklm->iklm',
-                         transfer,
-                         mcm)
+                         transfer[:, :, :n_bins],
+                         mcm[:, :n_bins, :, :nl])
     else:
         tmcm = mcm
 
@@ -270,8 +290,7 @@ def get_couplings_dict(mcm_dict, nmt_binning,
                 transfer = None
 
             bpw_win, inv_coupling = compute_couplings(
-                mcm, nmt_binning, transfer,
-                compute_Dl=compute_Dl
+                mcm, nmt_binning, transfer, compute_Dl=compute_Dl
             )
             couplings[ms1, ms2]["bp_win"] = bpw_win
             couplings[ms1, ms2]["inv_coupling"] = inv_coupling
@@ -286,8 +305,7 @@ def get_couplings_dict(mcm_dict, nmt_binning,
                 transfer = None
 
             bpw_win, inv_coupling = compute_couplings(
-                mcm, nmt_binning, transfer,
-                compute_Dl=compute_Dl
+                mcm, nmt_binning, transfer, compute_Dl=compute_Dl
             )
             couplings[ftag1, ftag2]["bp_win"] = bpw_win
             couplings[ftag1, ftag2]["inv_coupling"] = inv_coupling
