@@ -64,7 +64,7 @@ def main(args):
         freq_tag = meta.freq_tag_from_map_set(ms)
 
         out_dir = meta.output_directory
-        beam_dir = f"{out_dir}/gaussian_beams"
+        beam_dir = f"{out_dir}/beams"
         BBmeta.make_dir(beam_dir)
 
         fname = f"{beam_dir}/beam_{ms}.dat"

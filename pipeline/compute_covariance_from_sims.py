@@ -3,6 +3,8 @@ from soopercool import BBmeta
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import os
+from itertools import product
 
 
 def main(args):
@@ -14,16 +16,25 @@ def main(args):
     """
     meta = BBmeta(args.globals)
     do_plots = not args.no_plots
-
     out_dir = meta.output_directory
-    cov_dir = f"{out_dir}/covariances"
-    meta.make_dir(cov_dir)
+
+    cl_dir = {}
+    if os.path.isdir(f"{out_dir}/cells_sims/coadd"):
+        for typ in ["signal", "noise", "coadd"]:
+            cl_dir[typ] = f"{out_dir}/cells_sims/{typ}"
+    else:
+        cl_dir["coadd"] = f"{out_dir}/cells_sims"
+
+    cltypes = list(cl_dir.keys())
 
     if do_plots:
-        plot_dir = f"{out_dir}/plots/covariances"
+        plot_dir = f"{out_dir}/plots/mc_covariances"
         meta.make_dir(plot_dir)
 
-    cl_dir = f"{out_dir}/cells_sims"
+    cov_dir = {}
+    for typ in cl_dir:
+        cov_dir[typ] = f"{out_dir}/mc_covariances/{typ}"
+        meta.make_dir(cov_dir[typ])
 
     nmt_bins = meta.read_nmt_binning()
     n_bins = nmt_bins.get_n_bands()
@@ -46,26 +57,26 @@ def main(args):
 
     # Load the simulations
     cl_dict = {}
-    for ms1, ms2 in cross_ps_names:
-        cl_dict[ms1, ms2] = []
+    for cltyp, (ms1, ms2) in product(cltypes, cross_ps_names):
+        cl_dict[cltyp, ms1, ms2] = []
         for iii in range(Nsims):
             cells_dict = np.load(
-                f"{cl_dir}/decoupled_cross_pcls_{ms1}_x_{ms2}_{iii:04d}.npz", # noqa
+                f"{cl_dir[cltyp]}/decoupled_cross_pcls_{ms1}_x_{ms2}_{iii:04d}.npz", # noqa
             )
             cl_vec = np.concatenate(
                 [
                     cells_dict[field_pair] for field_pair in field_pairs
                 ]
             )
-            cl_dict[ms1, ms2].append(cl_vec)
+            cl_dict[cltyp, ms1, ms2].append(cl_vec)
 
-        cl_dict[ms1, ms2] = np.array(cl_dict[ms1, ms2])
+        cl_dict[cltyp, ms1, ms2] = np.array(cl_dict[cltyp, ms1, ms2])
 
     full_cov_dict = {}
-    for ms1, ms2, ms3, ms4 in cov_names:
+    for cltyp, (ms1, ms2, ms3, ms4) in product(cltypes, cov_names):
 
-        cl12 = cl_dict[ms1, ms2]
-        cl34 = cl_dict[ms3, ms4]
+        cl12 = cl_dict[cltyp, ms1, ms2]
+        cl34 = cl_dict[cltyp, ms3, ms4]
 
         cl12_mean = np.mean(cl12, axis=0)
         cl34_mean = np.mean(cl34, axis=0)
@@ -73,7 +84,7 @@ def main(args):
             np.einsum("ij,ik->ijk", cl12-cl12_mean, cl34-cl34_mean),
             axis=0
         )
-        full_cov_dict[ms1, ms2, ms3, ms4] = cov
+        full_cov_dict[cltyp, ms1, ms2, ms3, ms4] = cov
 
         cov_dict = {}
         for i, field_pair_1 in enumerate(field_pairs):
@@ -83,7 +94,7 @@ def main(args):
                 cov_dict[field_pair_1 + field_pair_2] = cov_block
 
         np.savez(
-            f"{cov_dir}/mc_cov_{ms1}_x_{ms2}_{ms3}_x_{ms4}.npz",
+            f"{cov_dir[cltyp]}/mc_cov_{ms1}_x_{ms2}_{ms3}_x_{ms4}.npz",
             **cov_dict
         )
 
@@ -92,31 +103,33 @@ def main(args):
         n_spec = len(cross_ps_names)
 
         full_size = n_spec*n_fields*n_bins
-        full_cov = np.zeros((full_size, full_size))
 
-        for i, (ms1, ms2) in enumerate(cross_ps_names):
-            for j, (ms3, ms4) in enumerate(cross_ps_names):
-                if i > j:
-                    continue
+        for clt in cltypes:
+            full_cov = np.zeros((full_size, full_size))
+            for i, (ms1, ms2) in enumerate(cross_ps_names):
+                for j, (ms3, ms4) in enumerate(cross_ps_names):
+                    if i > j:
+                        continue
 
-                full_cov[
-                    i*n_fields*n_bins:(i+1)*n_fields*n_bins,
-                    j*n_fields*n_bins:(j+1)*n_fields*n_bins
-                ] = full_cov_dict[ms1, ms2, ms3, ms4]
+                    full_cov[
+                        i*n_fields*n_bins:(i+1)*n_fields*n_bins,
+                        j*n_fields*n_bins:(j+1)*n_fields*n_bins
+                    ] = full_cov_dict[clt, ms1, ms2, ms3, ms4]
 
-        # Symmetrize
-        full_cov = np.triu(full_cov)
-        full_cov += full_cov.T - np.diag(full_cov.diagonal())
-        covdiag = full_cov.diagonal()
-        full_corr = full_cov / np.outer(np.sqrt(covdiag), np.sqrt(covdiag))
+            # Symmetrize
+            full_cov = np.triu(full_cov)
+            full_cov += full_cov.T - np.diag(full_cov.diagonal())
+            covdiag = full_cov.diagonal()
+            full_corr = full_cov / np.outer(np.sqrt(covdiag),
+                                            np.sqrt(covdiag))
 
-        plt.figure(figsize=(8, 8))
-        im = plt.imshow(full_corr, vmin=-1, vmax=1, cmap="RdBu_r")
-        divider = make_axes_locatable(plt.gca())
-        cax = divider.append_axes("right", size=0.3, pad=0.1)
-        plt.colorbar(im, cax=cax)
-        plt.savefig(f"{plot_dir}/full_corr.png", dpi=300,
-                    bbox_inches="tight")
+            plt.figure(figsize=(8, 8))
+            im = plt.imshow(full_corr, vmin=-1, vmax=1, cmap="RdBu_r")
+            divider = make_axes_locatable(plt.gca())
+            cax = divider.append_axes("right", size=0.3, pad=0.1)
+            plt.colorbar(im, cax=cax)
+            plt.savefig(f"{plot_dir}/full_corr_{clt}.png", dpi=300,
+                        bbox_inches="tight")
 
 
 if __name__ == "__main__":

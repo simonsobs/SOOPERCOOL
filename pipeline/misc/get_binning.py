@@ -16,9 +16,12 @@ def main(args):
         binning_dir = args.binning_dir
     BBmeta.make_dir(binning_dir)
 
-    from pixell import enmap
-    geometry = enmap.read_map_geometry(meta.car_template)
-    lmax = mu._lmax_from_car_geometry(geometry)
+    if args.lmax is not None:
+        lmax = args.lmax
+    else:
+        from pixell import enmap
+        geometry = enmap.read_map_geometry(meta.car_template)
+        lmax = mu._lmax_from_car_geometry(geometry)
 
     # nmt_bins.lmax+1 cannot extend beyond lmax-1 because otherwise
     # coupled_cells would have len == lmax < nmt_bins.lmax+1
@@ -51,6 +54,7 @@ if __name__ == "__main__":
     parser.add_argument("--globals", help="Path to the global parameter file.")
     parser.add_argument("--deltal", type=int,
                         help="Delta ell for the binning.")
+    parser.add_argument("--lmax", type=int, default=None)
     parser.add_argument("--binning_dir", default=None,
                         help="Directory to save binning at.")
     args = parser.parse_args()

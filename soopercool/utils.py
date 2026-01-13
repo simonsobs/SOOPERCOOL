@@ -37,9 +37,10 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30):
         "TT": powers["total"][:, 0][lmin:lmax+1]*bl_sq,
         "EE": powers["total"][:, 1][lmin:lmax+1]*bl_sq,
         "TE": powers["total"][:, 3][lmin:lmax+1]*bl_sq,
+        "ET": powers["total"][:, 3][lmin:lmax+1]*bl_sq,
         "BB": powers["total"][:, 2][lmin:lmax+1]*bl_sq,
     }
-    for spec in ["EB", "TB"]:
+    for spec in ["EB", "TB", "BE", "BT"]:
         cl_th[spec] = np.zeros_like(lth)
 
     return lth, cl_th
@@ -627,3 +628,17 @@ def read_beam_from_file(beam_file, lmax=None):
     if lmax is not None:
         return l[:lmax+1], bl[:lmax+1]
     return l, bl
+
+
+def multipole_min_from_tf(tf_file, field_pairs, snr_cut=3.):
+    """
+    """
+    tf = np.load(tf_file)
+    idx_bad_tf = {}
+    for fp in field_pairs:
+        name = f"{fp}_to_{fp}"
+        snr = tf[name] / tf[f"{name}_std"]
+        idx = np.where(snr < snr_cut)[0]
+        idx_bad_tf[fp] = idx.max() if idx.size > 0 else 0
+
+    return idx_bad_tf
