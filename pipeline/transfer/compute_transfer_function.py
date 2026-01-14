@@ -50,6 +50,7 @@ def main(args):
     )
     full_tf = {}
     for ftag1, ftag2 in filtering_pairs:
+        print(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
         tf = trans[ftag1, ftag2]
         np.savez(
             f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz",
@@ -70,6 +71,7 @@ def main(args):
                 ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"],
                 file_name=f"{plot_dir}/transfer_{ftag1}_x_{ftag2}.pdf"
             )
+        print(plot_dir)
 
 
 if __name__ == "__main__":

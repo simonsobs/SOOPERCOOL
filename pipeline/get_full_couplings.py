@@ -1,8 +1,8 @@
 import argparse
 from soopercool import BBmeta
 import numpy as np
-import pymaster as nmt
 from soopercool import coupling_utils as cu
+import os
 
 
 def main(args):
@@ -13,9 +13,7 @@ def main(args):
     out_dir = meta.output_directory
     couplings_dir = f"{out_dir}/couplings"
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    nmt_bins = meta.read_nmt_binning()
 
     tf_settings = meta.transfer_settings
 
@@ -46,16 +44,27 @@ def main(args):
         for ms1, ms2 in ps_names
     }
 
-    couplings = cu.get_couplings_dict(
+    couplings_filtered = cu.get_couplings_dict(
         mcms_dict, nmt_bins,
         transfer_dict=tf_dict,
-        ps_names_and_ftags=ps_names_and_ftags
+        ps_names_and_ftags=ps_names_and_ftags,
+        compute_Dl=meta.compute_Dl
+    )
+    couplings_unfiltered = cu.get_couplings_dict(
+        mcms_dict, nmt_bins,
+        transfer_dict=None,
+        ps_names_and_ftags=ps_names_and_ftags,
+        compute_Dl=meta.compute_Dl
     )
 
     for ms1, ms2 in ps_names:
         np.savez(
             f"{couplings_dir}/couplings_{ms1}_{ms2}.npz",
-            **couplings[ms1, ms2]
+            **couplings_filtered[ms1, ms2]
+        )
+        np.savez(
+            f"{couplings_dir}/couplings_unfiltered_{ms1}_{ms2}.npz",
+            **couplings_unfiltered[ms1, ms2]
         )
 
 

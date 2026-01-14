@@ -42,6 +42,16 @@ def main(args):
               "SWITCHING OFF purification.")
         purify_b = False
 
+    lmax = mu.lmax_from_map(
+        meta.masks["analysis_mask"],
+        pix_type=meta.pix_type
+    )
+    if meta.lmax > lmax:
+        raise ValueError(
+            f"Specified lmax {meta.lmax} is larger than "
+            f"the maximum lmax from map resolution {lmax}"
+        )
+
     filtering_tags = meta.get_filtering_tags()
     filtering_tag_pairs = meta.get_independent_filtering_pairs()
 

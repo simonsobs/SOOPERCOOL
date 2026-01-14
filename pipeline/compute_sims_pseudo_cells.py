@@ -2,84 +2,248 @@ from soopercool import BBmeta
 from soopercool import ps_utils as pu
 from soopercool import map_utils as mu
 from soopercool import mpi_utils as mpi
+import os
 import argparse
 import numpy as np
 import pymaster as nmt
+from pixell import enmap
+import healpy as hp
+from itertools import product
 
 
 def main(args):
     """
     """
     meta = BBmeta(args.globals)
-    # do_plots = not args.no_plots
     verbose = args.verbose
 
     out_dir = meta.output_directory
     cells_dir = f"{out_dir}/cells_sims"
     couplings_dir = f"{out_dir}/couplings"
-    sims_dir = f"{out_dir}/cov_sims"
+    nsims = meta.covariance["cov_num_sims"]
+    coadd_on_the_fly = True
+    if "coadd_on_the_fly" in meta.covariance:
+        coadd_on_the_fly = meta.covariance["coadd_on_the_fly"]
 
     BBmeta.make_dir(cells_dir)
 
-    mask = mu.read_map(meta.masks["analysis_mask"],
-                       pix_type=meta.pix_type)
+    print("WARNING: Assuming signal sims are beam convolved.")
+    use_alms, use_maps = (False, False)
+    if "signal_alm_sims_dir" in meta.covariance:
+        use_alms = meta.covariance["signal_alm_sims_dir"] is not None
+    if not use_alms and "signal_map_sims_dir" in meta.covariance:
+        use_maps = meta.covariance["signal_map_sims_dir"] is not None
+    if use_alms:
+        print("Using alms for signal covariance")
+        signal_alm_dirs = meta.covariance["signal_alm_sims_dir"]
+        signal_alm_templates = meta.covariance["signal_alm_sims_template"]
+    if use_maps:
+        print("Using maps for signal covariance")
+        signal_map_dirs = meta.covariance["signal_map_sims_dir"]
+        signal_map_templates = meta.covariance["signal_map_sims_template"]
+    if not use_alms and not use_maps:
+        print("Using noise sims only for covariance")
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    binary_dir = meta.masks["analysis_mask"].replace("analysis", "binary")
+    binary = mu.read_map(binary_dir,
+                         pix_type=meta.pix_type,
+                         car_template=meta.car_template)
+    map_types = ["signal", "noise", "coadd"]
+    for typ in map_types:
+        BBmeta.make_dir(f"{cells_dir}/{typ}")
+    if coadd_on_the_fly:
+        print("WARNING: Assuming signal sims are beam convolved.")
+        use_alms, use_maps = (False, False)
+        if "signal_alm_sims_dir" in meta.covariance:
+            use_alms = meta.covariance["signal_alm_sims_dir"] is not None
+        if not use_alms and "signal_map_sims_dir" in meta.covariance:
+            use_maps = meta.covariance["signal_map_sims_dir"] is not None
+        if use_alms:
+            print("Using alms for signal covariance")
+            signal_alm_dirs = meta.covariance["signal_alm_sims_dir"]
+            signal_alm_templates = meta.covariance["signal_alm_sims_template"]
+        if use_maps:
+            print("Using maps for signal covariance")
+            signal_map_dirs = meta.covariance["signal_map_sims_dir"]
+            signal_map_templates = meta.covariance["signal_map_sims_template"]
+        if not use_alms and not use_maps:
+            print("Using noise sims only for covariance")
+
+        binary_dir = meta.masks["analysis_mask"].replace("analysis", "binary")
+        binary = mu.read_map(binary_dir,
+                             pix_type=meta.pix_type,
+                             car_template=meta.car_template)
+        for typ in ["signal", "noise", "coadd"]:
+            BBmeta.make_dir(f"{cells_dir}/{typ}")
+
+    mask = mu.read_map(meta.masks["analysis_mask"],
+                       pix_type=meta.pix_type,
+                       car_template=meta.car_template)
+
+    lmax = mu.lmax_from_map(
+        meta.masks["analysis_mask"],
+        pix_type=meta.pix_type
+    )
+    if meta.lmax > lmax:
+        raise ValueError(
+            f"Specified lmax {meta.lmax} is larger than "
+            f"the maximum lmax from map resolution {lmax}"
+        )
+
+    nmt_bins = meta.read_nmt_binning()
     n_bins = nmt_bins.get_n_bands()
+    ps_pairs = meta.get_ps_names_list(type="all", coadd=False)
 
     inv_couplings_beamed = {}
 
     for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
-        inv_couplings_beamed[ms1, ms2] = np.load(f"{couplings_dir}/couplings_{ms1}_{ms2}.npz")["inv_coupling"].reshape([n_bins*9, n_bins*9]) # noqa
+        cname = f"{couplings_dir}/couplings_{ms1}_{ms2}.npz"
+        if not os.path.isfile(cname):
+            cname = f"{couplings_dir}/couplings_{ms2}_{ms1}.npz"
 
-    mpi.init(True)
+        inv_couplings_beamed[ms1, ms2] = np.load(cname)["inv_coupling"][:, :n_bins, :, :n_bins].reshape([n_bins*9, n_bins*9])  # noqa
 
-    for id_sim in mpi.taskrange(meta.covariance["cov_num_sims"] - 1):
-        base_dir = f"{sims_dir}/{id_sim:04d}"
+    decoupled_pcls = {
+        ps: [] for ps in meta.get_ps_names_list(type="all", coadd=False)
+    }
+    cls_dict_sims = {pn: {} for pn in ps_pairs}
+
+    rank, size, comm = mpi.init(True, logger=None)
+    id_start = meta.covariance["cov_id_start"]
+    nsims = meta.covariance["cov_num_sims"]
+    sim_ids = [i for i in range(id_start, id_start+nsims)]
+
+    # Initialize tasks for MPI sharing
+    mpi_shared_list = [(i, m) for i, m in product(sim_ids, map_types)]
+
+    # Every rank must have the same shared list
+    mpi_shared_list = comm.bcast(mpi_shared_list, root=0)
+    task_ids = mpi.distribute_tasks(size, rank, len(mpi_shared_list),
+                                    logger=None)
+    local_mpi_list = [mpi_shared_list[i] for i in task_ids]
+
+    for id_sim, map_type in local_mpi_list:
 
         # Create namaster fields
         fields = {}
-        for map_name in meta.maps_list:
-            map_set, id_bundle = map_name.split("__")
-            map_fname = f"{base_dir}/cov_sims_{map_set}_bundle{id_bundle}.fits"
+        for ims, ms in enumerate(meta.map_sets_list):
+            if verbose and rank == 0:
+                print(f"Namaster fields - {ims+1}/{len(meta.map_sets_list)}")
+            ft = meta.freq_tag_from_map_set(ms)
+            if use_alms:
+                fname = signal_alm_templates[ms].format(id_sim=id_sim,
+                                                        freq_tag=ft)
+                alms = hp.read_alm(f"{signal_alm_dirs[ms]}/{fname}",
+                                   hdu=(1, 2, 3))  # alms in muK_CMB
+                signal = mu.alm2map(alms,
+                                    pix_type=meta.pix_type,
+                                    nside=meta.nside,
+                                    car_map_template=meta.car_template)
+            if use_maps:
+                fname = signal_map_templates[ms].format(id_sim=id_sim,
+                                                        freq_tag=ft)
+                signal = mu.read_map(
+                    f"{signal_map_dirs[ms]}/{fname}",
+                    pix_type=meta.pix_type,
+                    fields_hp=[0, 1, 2],
+                    car_template=meta.car_template,
+                    convert_K_to_muK=False,  # signal maps are in muK_CMB
+                )
+            for id_bundle in range(meta.n_bundles_from_map_set(ms)):
+                noise_map_dir = meta.covariance["noise_map_sims_dir"][ms]
+                noise_map_template = meta.covariance["noise_map_sims_template"][ms]  # noqa
+                fname = noise_map_template.format(
+                    id_sim=id_sim, map_set=ms, id_bundle=id_bundle
+                )
+                noise_map = mu.read_map(
+                    f"{noise_map_dir}/{fname}",
+                    pix_type=meta.pix_type,
+                    fields_hp=[0, 1, 2],
+                    convert_K_to_muK=True,  # noise maps are in K_CMB
+                    car_template=meta.car_template
+                )
+                if map_type == "signal":
+                    m = signal.copy()
+                elif map_type == "noise":
+                    m = noise_map.copy()
+                elif map_type == "coadd":
+                    m = noise_map.copy()
+                    mu.add_map(signal, m, meta.pix_type)
+                mu.multiply_map(binary, m, meta.pix_type)
 
-            m = mu.read_map(map_fname, field=[0, 1, 2],
-                            pix_type=meta.pix_type, convert_K_to_muK=True)
-            field_spin0 = nmt.NmtField(mask, m[:1])
-            field_spin2 = nmt.NmtField(mask, m[1:], purify_b=meta.pure_B)
+                wcs = None
+                if meta.pix_type == "car":
+                    # This is a patch. Reproject mask and map onto template
+                    # geometry.
+                    tshape, twcs = enmap.read_map_geometry(meta.car_template)  # noqa
+                    if twcs != m.wcs:
+                        shape, wcs = enmap.overlap(m.shape, m.wcs,
+                                                   tshape, twcs)
+                    else:
+                        shape, wcs = tshape, twcs
+                    if mask.wcs != wcs:
+                        shape, wcs = enmap.overlap(mask.shape, mask.wcs,
+                                                   shape, wcs)
+                    if not (m.wcs == mask.wcs == twcs):
+                        flat_template = enmap.zeros((3, shape[0], shape[1]),
+                                                    wcs)
+                        mask = enmap.insert(flat_template.copy()[0], mask)
+                        m = enmap.insert(flat_template.copy(), m)
+                field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs,
+                                           lmax=meta.lmax)
+                field_spin2 = nmt.NmtField(mask, m[1:], wcs=wcs,
+                                           lmax=meta.lmax,
+                                           purify_b=meta.pure_B)
+                fields[ms, id_bundle] = {
+                    "spin0": field_spin0,
+                    "spin2": field_spin2
+                }
 
-            fields[map_set, id_bundle] = {
-                "spin0": field_spin0,
-                "spin2": field_spin2
-            }
+        for ips, (map_name1, map_name2) in enumerate(ps_pairs):
+            if verbose and rank == 0:
+                print(f"Coupled Cls - {ips+1}/{len(ps_pairs)}")
+            fname = f"{cells_dir}/{map_type}/decoupled_pcls_{map_name1}_x_{map_name2}_{id_sim:04d}.npz"  # noqa
+            map_set1, id_bundle1 = map_name1.split("__")
+            map_set2, id_bundle2 = map_name2.split("__")
 
-        for map_name1, map_name2 in meta.get_ps_names_list(type="all",
-                                                           coadd=False):
-            map_set1, id_split1 = map_name1.split("__")
-            map_set2, id_split2 = map_name2.split("__")
-            if verbose:
-                print(f"# {id_sim+1} | ({map_set1}, split {id_split1}) x "
-                      f"({map_set2}, split {id_split2})")
+            if os.path.isfile(fname) and args.no_overwrite:
+                cls_dict = np.load(fname)
+                for fp, cls in cls_dict.items():
+                    if fp not in cls_dict_sims[(map_name1, map_name2)]:
+                        cls_dict_sims[(map_name1, map_name2)][fp] = []
+                    cls_dict_sims[(map_name1, map_name2)][fp] += [cls]
+                continue
             pcls = pu.get_coupled_pseudo_cls(
-                    fields[map_set1, id_split1],
-                    fields[map_set2, id_split2],
-                    nmt_bins
-                    )
-
+                fields[map_set1, int(id_bundle1)],
+                fields[map_set2, int(id_bundle2)],
+                nmt_bins
+            )
             decoupled_pcls = pu.decouple_pseudo_cls(
-                    pcls, inv_couplings_beamed[map_set1, map_set2]
-                    )
+                pcls, inv_couplings_beamed[map_set1, map_set2]
+            )
+            for fp, cls in decoupled_pcls.items():
+                if fp not in cls_dict_sims[(map_name1, map_name2)]:
+                    cls_dict_sims[(map_name1, map_name2)][fp] = []
+                cls_dict_sims[(map_name1, map_name2)][fp] += [np.array(cls).squeeze()]  # noqa
 
-            np.savez(f"{cells_dir}/decoupled_pcls_{map_name1}_x_{map_name2}_{id_sim:04d}.npz",  # noqa
-                     **decoupled_pcls, lb=nmt_bins.get_effective_ells())
+            np.savez(fname, **decoupled_pcls, lb=nmt_bins.get_effective_ells())
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--globals", help="Path to the global parameter file.")
-    parser.add_argument("--no-plots", action="store_false", help="Do not make plots.") # noqa
-    parser.add_argument("--verbose", action="store_true", help="Verbose mode.")
+    parser.add_argument(
+        "--globals",
+        help="Path to the global parameter file."
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Verbose mode."
+    )
+    parser.add_argument(
+        "--no_overwrite",
+        action="store_true",
+        help="Do not overwrite spectra if existing."
+    )
     args = parser.parse_args()
     main(args)

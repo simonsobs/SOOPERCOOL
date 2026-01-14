@@ -5,6 +5,8 @@ import pymaster as nmt
 import numpy as np
 import soopercool.utils as su
 
+from pixell import enmap
+
 
 def main(args):
     """
@@ -24,38 +26,51 @@ def main(args):
 
     nspec = 7
 
-    mask = mu.read_map(meta.masks["analysis_mask"],
-                       pix_type=meta.pix_type,
-                       car_template=meta.car_template)
-    lmax = mu.lmax_from_map(mask, pix_type=meta.pix_type)
-    nl = lmax + 1
+    nmt_bins = meta.read_nmt_binning()
+    n_bins = nmt_bins.get_n_bands()
 
-    if meta.pix_type == "car":
-        _, wcs = mask.geometry
+    mask_file = meta.masks["analysis_mask"]
+    if mask_file is not None:
+        mask = mu.read_map(mask_file,
+                           pix_type=meta.pix_type,
+                           car_template=meta.car_template)
+        lmax = mu.lmax_from_map(mask_file, pix_type=meta.pix_type)
     else:
-        wcs = None
+        raise FileNotFoundError("The analysis mask must be specified.")
+
+    if meta.lmax > lmax:
+        raise ValueError(
+            f"Specified lmax {meta.lmax} is larger than "
+            f"the maximum lmax from map resolution {lmax}"
+        )
+    nl = meta.lmax + 1
+
+    binner = np.array([nmt_bins.bin_cell(np.array([cl]))[0]
+                       for cl in np.eye(nl)]).T
+
+    wcs = None
+    if hasattr(mask, 'wcs'):
+        # This is a patch. Reproject mask onto template geometry.
+        tshape, twcs = enmap.read_map_geometry(meta.car_template)
+        shape, wcs = enmap.overlap(mask.shape, mask.wcs, tshape, twcs)
+        flat_template = enmap.zeros(shape, wcs)
+        mask = enmap.insert(flat_template.copy(), mask)
 
     field_spin0 = nmt.NmtField(
         mask,
         None,
         wcs=wcs,
-        spin=0
+        spin=0,
+        lmax=meta.lmax
     )
     field_spin2 = nmt.NmtField(
         mask,
         None,
         wcs=wcs,
         spin=2,
+        lmax=meta.lmax,
         purify_b=meta.pure_B
     )
-
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
-    n_bins = nmt_bins.get_n_bands()
-
-    binner = np.array([nmt_bins.bin_cell(np.array([cl]))[0]
-                       for cl in np.eye(nl)]).T
 
     # Alright, compute and reshape coupling matrix.
     print("Computing MCM")
@@ -74,7 +89,7 @@ def main(args):
 
         _, bl = su.read_beam_from_file(
             f"{beam_dir}/{beam_file}",
-            lmax=lmax
+            lmax=meta.lmax
         )
         beams[map_set] = bl
 

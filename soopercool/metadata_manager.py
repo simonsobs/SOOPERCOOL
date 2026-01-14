@@ -90,6 +90,10 @@ class BBmeta(object):
         """
         for key, value in self.general_pars.items():
             setattr(self, key, value)
+        # Set a default value for compute_Dl
+        # to make it backward compatible
+        if not hasattr(self, "compute_Dl"):
+            self.compute_Dl = False
 
     def _get_map_sets_list(self):
         """
@@ -303,29 +307,71 @@ class BBmeta(object):
         fname = getattr(self, f"{cl_type}_cls_file")
         np.savez(fname, l=ell, **cl_dict)
 
-    def load_fiducial_cl(self, cl_type):
+    def load_fiducial_cl(self):
         """
-        Load a fiducial power spectra dictionary from disk.
+        Load fiducial power spectra from healpy-like fits file indicated
+        in the parameter file and coadds them.
+        Accepted keys are "fiducial_cmb", "fiducial_dust", and "fiducial_synch"
+        or a subset thereof. If no file is found, load Planck 2018 camb file
+        with r=0 and AL=1.
 
-        Parameters
-        ----------
-        cl_type : str
-            Type of power spectra.
-            Can be "cosmo", "tf_est", "tf_val" or "noise".
+        Return
+        ------
+        cl_th: dict
+            Unbinned coadded cross-map set power spectra.
         """
-        fname = getattr(self, f"{cl_type}_cls_file")
-        data = np.load(fname)
-        data = dict(data)
+        import healpy as hp
+        bins = self.read_nmt_binning()
+        ps_names = self.get_ps_names_list(type="all", coadd=True)
+        cl_theory = {}
+        for ms1, ms2 in ps_names:
+            cl_theory[ms1, ms2] = None
 
-        to_update = []
-        for k, v in data.items():
-            if not (k[::-1] in data):
-                to_update.append((k[::-1], v))
+        if hasattr(self, "fiducial_cmb"):
+            if self.fiducial_cmb is not None:
+                cmb_cl = hp.read_cl(self.fiducial_cmb)[:, :bins.lmax+1]
+                for ps in ps_names:
+                    cl_theory[ps] = cmb_cl
+        if hasattr(self, "fiducial_dust"):
+            if self.fiducial_dust is not None:
+                if "{nu1}" not in self.fiducial_dust:
+                    raise KeyError("self.fiducial_dust lacks {nu1} marker.")
+                if "{nu2}" not in self.fiducial_dust:
+                    raise KeyError("self.fiducial_dust lacks {nu2} marker.")
+                for ms1, ms2 in ps_names:
+                    dust_cl = hp.read_cl(
+                        self.fiducial_dust.format(
+                            nu1=self.get_freq_tag_from_map_set(ms1),
+                            nu2=self.get_freq_tag_from_map_set(ms2)
+                        )
+                    )[:, :bins.lmax+1]
+                if cl_theory[ms1, ms2]:
+                    cl_theory[ms1, ms2] += dust_cl
+                else:
+                    cl_theory = dust_cl
+        if hasattr(self, "fiducial_synch"):
+            if self.fiducial_synch is not None:
+                if "{nu1}" not in self.fiducial_synch:
+                    raise KeyError("self.fiducial_synch lacks {nu1} marker.")
+                if "{nu2}" not in self.fiducial_synch:
+                    raise KeyError("self.fiducial_synch lacks {nu2} marker.")
+                for ms1, ms2 in ps_names:
+                    synch_cl = hp.read_cl(
+                        self.fiducial_synch.format(
+                            nu1=self.get_freq_tag_from_map_set(ms1),
+                            nu2=self.get_freq_tag_from_map_set(ms2)
+                        )
+                    )[:, :bins.lmax+1]
+                if cl_theory[ms1, ms2]:
+                    cl_theory[ms1, ms2] += synch_cl
+                else:
+                    cl_theory = synch_cl
 
-        for k, v in to_update:
-            data[k] = v
-
-        return data
+        if all(x is None for x in cl_theory.values()):
+            _, cl_th = su.get_theory_cls()  # Load default theory Cls
+            for ps in ps_names:
+                cl_theory[ps] = cl_th
+        return cl_theory
 
     def plot_dir_from_output_dir(self, out_dir):
         """
@@ -539,8 +585,8 @@ class BBmeta(object):
             noise-biased spectra, while "cross" returns all unique
             noise-biased spectra. "all" is the union of both.
         coadd: bool, optional
-            If True, return the cross (and/or auto) bundle power spectra names.
-            Else, return the (bundle-)coadded power spectra names.
+            If True, return the (bundle-)coadded power spectra names.
+            If False, return cross (and/or auto) bundle power spectra names.
         """
         map_iterable = self.map_sets_list if coadd else self.maps_list
 
@@ -648,31 +694,44 @@ class BBmeta(object):
             filtering_pairs.append((fp1, fp2))
         return list(set(filtering_pairs))
 
-    def get_inverse_couplings(self, beamed=False):
+    def get_inverse_couplings(self, return_bpwf=False):
         """
-        This function outputs a dictionary with the inverse mode coupling
-        matrices
+        This function outputs a dictionary with the filtered and unfiltered
+        inverse mode coupling matrices and (optionally,) the bandpower window
+        functions.
         """
-        filter_flags = [""] if beamed else ["filtered", "unfiltered"]
-        map_set_pairs = (self.get_ps_names_list(type="all", coadd=True)
-                         if beamed else [("", "")])
-        inv_couplings = {}
+        couplings_dir = f"{self.output_directory}/couplings"
+        filter_labels = {"filtered": "", "unfiltered": "_unfiltered"}
+        ps_pairs = self.get_ps_names_list(type="all", coadd=True)
+        inv_couplings = {f_type: {} for f_type in filter_labels}
+        bandpower_window_functions = {f_type: {} for f_type in filter_labels}
 
-        for ms1, ms2 in map_set_pairs:
-            for filter_flag in filter_flags:
-                map_label = f"{ms1}_{ms2}" if beamed else ""
-                fname = f"couplings_{map_label}{filter_flag}"
-                couplings = np.load(f"{self.coupling_directory}/{fname}.npz")
+        for ms1, ms2 in ps_pairs:
+            ftag1 = self.filtering_tag_from_map_set(ms1)
+            ftag2 = self.filtering_tag_from_map_set(ms2)
+
+            for f_type, filter_label in filter_labels.items():
+                fname = f"couplings{filter_label}_{ftag1}_{ftag2}"
+                if not os.path.isfile(f"{couplings_dir}/{fname}.npz"):
+                    raise ValueError(
+                        f"Coupling file does not exist: {couplings_dir}/{fname}.npz"  # noqa
+                    )
+
+                couplings = np.load(f"{couplings_dir}/{fname}.npz")
                 npairs, ndata, _, _ = np.shape(couplings['inv_coupling'])
                 c = couplings['inv_coupling'].reshape((npairs*ndata,
                                                        npairs*ndata))
-                if beamed:
-                    inv_couplings[ms1, ms2] = c
-                    if ms1 != ms2:
-                        inv_couplings[ms2, ms1] = c
-                else:
-                    inv_couplings[filter_flag] = c
-        return inv_couplings
+                bpwf = couplings['bp_win']
+                bandpower_window_functions[f_type][ftag1, ftag2] = bpwf
+                inv_couplings[f_type][ftag1, ftag2] = c
+
+                if ftag1 != ftag2:
+                    inv_couplings[f_type][ftag2, ftag1] = c
+                    bandpower_window_functions[f_type][ftag2, ftag1] = bpwf
+
+        if not return_bpwf:
+            return inv_couplings
+        return inv_couplings, bandpower_window_functions
 
     @classmethod
     def make_dir(cls, dir):

@@ -39,6 +39,18 @@ def get_sat_beam(freq_tag, lmax):
     return ll, beam_gaussian(ll, beams_list[freq_tag])
 
 
+def get_sat_iso_beam(freq_tag, exp_tag, lmax):
+    """
+    ISO v1 beam estimates, Gaussian isotropic approximation.
+    """
+    beams_list = {
+        ("SATp1", 90): 28.4, ("SATp1", 150): 20.0,
+        ("SATp3", 90): 28.0, ("SATp3", 150): 19.4
+    }
+    ll = np.arange(lmax + 1)
+    return ll, beam_gaussian(ll, beams_list[(exp_tag, freq_tag)])
+
+
 def main(args):
     """
     """
@@ -48,17 +60,18 @@ def main(args):
     lmax_sim = 3000
 
     for ms in meta.map_sets_list:
+        exp_tag = meta.exp_tag_from_map_set(ms)
         freq_tag = meta.freq_tag_from_map_set(ms)
 
         out_dir = meta.output_directory
-        beam_dir = f"{out_dir}/gaussian_beams"
+        beam_dir = f"{out_dir}/beams"
         BBmeta.make_dir(beam_dir)
 
         fname = f"{beam_dir}/beam_{ms}.dat"
 
         if verbose:
             print(f"Written to {fname}.")
-        l, bl = get_sat_beam(freq_tag, lmax_sim)
+        l, bl = get_sat_iso_beam(freq_tag, exp_tag, lmax_sim)
         np.savetxt(fname, np.transpose([l, bl]))
 
 

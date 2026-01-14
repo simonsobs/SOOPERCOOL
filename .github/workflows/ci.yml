@@ -52,6 +52,7 @@ jobs:
           pip install -U pytest
           pip install -U pytest-cov
           pip install -U coveralls
+          pip install -U pixell
           python setup.py install
 
       - name: Lint
