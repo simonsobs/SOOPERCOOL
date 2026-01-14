@@ -103,7 +103,8 @@ def read_map(map_file,
              pix_type='hp',
              fields_hp=None,
              convert_K_to_muK=False,
-             geometry=None):
+             geometry=None,
+             car_template=None):
     """
     Read a map from a file, regardless of the pixellization type.
 
@@ -119,6 +120,8 @@ def read_map(map_file,
         Convert K to muK.
     geometry : enmap.geometry, optional
         Enmap geometry.
+    car_template: str
+        Path to CAR geometry template.
 
     Returns
     -------
@@ -133,6 +136,8 @@ def read_map(map_file,
         kwargs = {"field": fields_hp} if fields_hp is not None else {}
         m = hp.read_map(map_file, **kwargs)
     else:
+        if geometry is None:
+            geometry = enmap.read_map_geometry(car_template)
         m = enmap.read_map(map_file, geometry=geometry)
 
     return conv*m
@@ -408,3 +413,43 @@ def template_from_map(map, ncomp, pix_type="hp"):
         new_shape = (ncomp,) + shape[-2:]
 
         return enmap.zeros(new_shape, wcs)
+
+
+def sky_average(map, pix_type="hp"):
+    """
+    Compute the sky average of a map
+    depending on its pixellization type.
+    Parameters
+    ----------
+    map : np.ndarray or enmap.ndmap
+        Input map.
+    pix_type : str, optional
+        Pixellization type. Either 'hp' or 'car'.
+    Returns
+    -------
+    float
+        Sky average of the map.
+    """
+    _check_pix_type(pix_type)
+    if pix_type == "hp":
+        if len(map.shape) > 1:
+            return np.mean(map, axis=1)
+        else:
+            return np.mean(map)
+    else:
+        shape, wcs = map.geometry
+        pixel_area_sr = enmap.pixsizemap(shape, wcs)
+
+        if len(map.shape) > 2:
+            avg = []
+            for i in range(map.shape[0]):
+                weighted_sum = np.sum(
+                    map[i] * pixel_area_sr,
+                )
+                avg.append(weighted_sum / np.sum(pixel_area_sr))
+            return np.array(avg)
+        else:
+            weighted_sum = np.sum(
+                map * pixel_area_sr,
+            )
+            return weighted_sum / np.sum(pixel_area_sr)

@@ -157,7 +157,7 @@ def get_weighted_pcls(pcls, mask, pix_type="car"):
         shape, wcs = mask.geometry
         pixsizemap = enmap.pixsizemap(shape, wcs)  # sterradians
         weights = np.sum(mask ** 2 * pixsizemap) / (4*np.pi)
-    
+
     for k in pcls_dict:
         pcls_dict[k] = pcls_dict[k] / weights
 
@@ -191,7 +191,8 @@ def field_pairs_from_spins(cls_in_dict):
     return cls_out_dict
 
 
-def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
+def get_pcls_mat_transfer(fields, nmt_binning, fields2=None,
+                          return_unbinned=False):
     """
     Compute coupled binned pseudo-C_ell estimates from
     pure-E and pure-B transfer function estimation simulations,
@@ -212,13 +213,32 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
     n_bins = nmt_binning.get_n_bands()
     pcls_mat = np.zeros((9, 9, n_bins))
 
+    if return_unbinned:
+        pcls_mat_unbinned = np.zeros((9, 9, nmt_binning.lmax+1))
+        tmp_pcls_unbinned = {}
+
     index = 0
     cases = ["pureT", "pureE", "pureB"]
     tmp_pcls = {}
     for index, (pure_type1, pure_type2) in enumerate(product(cases, cases)):
-        pcls = get_coupled_pseudo_cls(fields[pure_type1],
-                                      fields2[pure_type2],
-                                      nmt_binning)
+        pcls = get_coupled_pseudo_cls(
+            fields[pure_type1],
+            fields2[pure_type2],
+            nmt_binning,
+            return_unbinned=return_unbinned
+        )
+        if return_unbinned:
+            pcls, pcls_unbinned = pcls
+            tmp_pcls_unbinned[pure_type1, pure_type2] = {
+                "TT": pcls_unbinned["spin0xspin0"][0],
+                "TE": pcls_unbinned["spin0xspin2"][0],
+                "TB": pcls_unbinned["spin0xspin2"][1],
+                "EE": pcls_unbinned["spin2xspin2"][0],
+                "EB": pcls_unbinned["spin2xspin2"][1],
+                "BE": pcls_unbinned["spin2xspin2"][2],
+                "BB": pcls_unbinned["spin2xspin2"][3]
+            }
+
         tmp_pcls[pure_type1, pure_type2] = {
             "TT": pcls["spin0xspin0"][0],
             "TE": pcls["spin0xspin2"][0],
@@ -242,4 +262,19 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
             tmp_pcls[pure_type1, pure_type2]["BB"]
         ])
 
+        if return_unbinned:
+            pcls_mat_unbinned[idx] = np.array([
+                tmp_pcls_unbinned[pure_type1, pure_type2]["TT"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["TE"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["TB"],
+                tmp_pcls_unbinned[pure_type2, pure_type1]["TE"],
+                tmp_pcls_unbinned[pure_type2, pure_type1]["TB"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["EE"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["EB"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["BE"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["BB"]
+            ])
+
+    if return_unbinned:
+        return pcls_mat, pcls_mat_unbinned
     return pcls_mat

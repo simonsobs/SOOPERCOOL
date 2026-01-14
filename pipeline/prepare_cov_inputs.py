@@ -2,9 +2,56 @@ from soopercool import BBmeta
 from itertools import product
 import numpy as np
 import argparse
-import pymaster as nmt
-from soopercool import utils as su
-from scipy.interpolate import interp1d
+import matplotlib.pyplot as plt
+import sklearn.gaussian_process as gp
+from scipy.stats import binned_statistic
+
+
+def gp_fit(x, y, noise_std, xpred):
+    """
+    """
+    kernel = 1.0 * gp.kernels.Matern(
+        length_scale=10,
+        length_scale_bounds=(1e-4, 1e5),
+        nu=5/2
+    )
+    # kernel = 1.0 * gp.kernels.RBF(
+    #     length_scale=10,
+    #     length_scale_bounds=(1e-4, 1e4)
+    # )
+    model = gp.GaussianProcessRegressor(
+        kernel=kernel,
+        n_restarts_optimizer=10,
+        alpha=noise_std**2
+    )
+    model.fit(
+        x.reshape(-1, 1),
+        y.reshape(-1, 1)
+    )
+    ypred = model.predict(xpred.reshape(-1, 1))
+    return ypred
+
+
+def bin_data(x, y, bins):
+    """
+    """
+    mu, edges, _ = binned_statistic(
+        x, y,
+        statistic="mean",
+        bins=bins
+    )
+    std = binned_statistic(
+        x, y,
+        statistic="std",
+        bins=bins
+    )[0] / np.sqrt(
+        binned_statistic(
+            x, y,
+            statistic="count",
+            bins=bins
+        )[0]
+    )
+    return (edges[1:] + edges[:-1]) / 2, mu, std
 
 
 def main(args):
@@ -18,12 +65,13 @@ def main(args):
 
     out_dir = meta.output_directory
     cells_dir = f"{out_dir}/cells"
+    cells_tf_dir = f"{out_dir}/cells_tf_est"
+    if args.plots:
+        plot_dir = f"{out_dir}/plots/cov_inputs"
+        meta.make_dir(plot_dir)
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
-    lb = nmt_bins.get_effective_ells()
-    ell = np.arange(nmt_bins.lmax + 1)
+    tf_settings = meta.transfer_settings
+
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
 
     ps_names = {
@@ -34,9 +82,7 @@ def main(args):
     cross_split_list = meta.get_ps_names_list(type="all", coadd=False)
     cross_map_set_list = meta.get_ps_names_list(type="all", coadd=True)
 
-    # Load split C_ells
-
-    # Initialize output dictionary
+    # Initialize output Cells dict
     cells_coadd = {
         "cross": {
             (ms1, ms2): {
@@ -49,18 +95,6 @@ def main(args):
             } for ms1, ms2 in cross_map_set_list
         }
     }
-
-    # Load beams
-    beams = {}
-    for map_set in meta.map_sets_list:
-        beam_dir = meta.beam_dir_from_map_set(map_set)
-        beam_file = meta.beam_file_from_map_set(map_set)
-
-        _, bl = su.read_beam_from_file(
-            f"{beam_dir}/{beam_file}",
-            lmax=nmt_bins.lmax
-        )
-        beams[map_set] = bl
 
     # Loop over all map set pairs
     for map_name1, map_name2 in cross_split_list:
@@ -102,43 +136,111 @@ def main(args):
                     cells_coadd["auto"][map_set1, map_set2][field_pair] - \
                     cells_coadd["cross"][map_set1, map_set2][field_pair]
 
-        # First attempt at introducing filtering corrections
-        # This is a handwavy approach to interpolate the per
-        # multipole TF
-        tf_settings = meta.transfer_settings
-        tf_dir = tf_settings["transfer_directory"]
+        # Below, we try to build a filtering correction at power spectrum level
+        # to model the increased variance induced by filtering
+        # We will build this based on a set of simulations which has
+        # already been generated for transfer function estimation
         ftag1 = meta.filtering_tag_from_map_set(map_set1)
         ftag2 = meta.filtering_tag_from_map_set(map_set2)
-        tf = np.load(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
-        tf_interp = {}
-        for fp in field_pairs:
-            tfint = interp1d(
-                lb, tf[f"{fp}_to_{fp}"],
-                fill_value="extrapolate"
-            )
-            tfint = tfint(ell)
-            tfint[ell > 600] = tfint[600]
-            tfint[ell <= ell[tfint < 0][-1]] = tfint[ell[tfint < 0][-1]+1]
-            tf_interp[fp] = tfint
 
+        sim_ids = range(
+            tf_settings["sim_id_start"],
+            tf_settings["sim_id_start"] + tf_settings["tf_est_num_sims"]
+        )
+
+        ps_mat_filtered = []
+        ps_mat_unfiltered = []
+        for sim_id in sim_ids:
+            ps_mat_filtered.append(
+                np.load(
+                    f"{cells_tf_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_filtered_unbinned_{sim_id:04d}.npz" # noqa
+                )["pcls_mat"]
+            )
+            ps_mat_unfiltered.append(
+                np.load(
+                    f"{cells_tf_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_unbinned_{sim_id:04d}.npz" # noqa
+                )["pcls_mat"]
+            )
+
+        ps_mat_filtered = np.array(ps_mat_filtered)
+        ps_mat_unfiltered = np.array(ps_mat_unfiltered)
+
+        var_filtered = np.std(ps_mat_filtered, axis=0) ** 2
+        var_unfiltered = np.std(ps_mat_unfiltered, axis=0) ** 2
+
+        # Compute 4pt and 2pt diagonal
+        # transfer functions
+        T4 = np.nan_to_num(var_filtered / var_unfiltered)
+        T2 = np.nan_to_num(
+            ps_mat_filtered / ps_mat_unfiltered
+        )
+        invT2sq = np.nan_to_num(
+            np.mean(
+                1 / T2**2,
+                axis=0
+            )
+        )
+        T4_over_T2sq = np.nan_to_num(T4 * invT2sq)
+
+        ps_mat_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
+        pure_pairs = list(product(
+            ["pureT", "pureE", "pureB"],
+            ["pureT", "pureE", "pureB"]
+        ))
+        correction = {}
+        for ps_idx, fp in enumerate(ps_mat_pairs):
+            pure_idx = pure_pairs.index((f"pure{fp[0]}", f"pure{fp[1]}"))
+            y = T4_over_T2sq[pure_idx, ps_idx, :]
+            nl = y.shape[0]
+            x = np.arange(nl)
+            x, y, ystd = bin_data(
+                x,
+                y,
+                [0, 2, 6, 10, 30, 50, 70, 90, 100, 200,
+                 300, 400, 500, 600, 700, 800, 900, nl]
+            )
+            msk_fit = (x >= 2) & (x <= 650)
+            corr = gp_fit(
+                np.log10(x[msk_fit]),
+                np.nan_to_num(y)[msk_fit],
+                np.nan_to_num(ystd)[msk_fit],
+                np.log10(np.arange(1, nl))
+            )
+            correction[fp] = np.concatenate(([0], corr))
+
+            if args.plots:
+                plt.figure(figsize=(8, 6))
+                plt.plot(
+                    np.arange(nl),
+                    T4_over_T2sq[pure_idx, ps_idx, :],
+                    color="k"
+                )
+                plt.plot(
+                    np.arange(1, nl),
+                    corr,
+                    color="DodgerBlue"
+                )
+                plt.errorbar(
+                    x, y, ystd,
+                    fmt=".",
+                    color="DodgerBlue",
+                    markerfacecolor="white"
+                )
+                plt.xlim(2, 650)
+                plt.ylim(0.8, 1.5)
+                plt.savefig(
+                    f"{plot_dir}/4pt_correction_{fp}.pdf",
+                    bbox_inches="tight"
+                )
+
+        # Save out coadded cells with filtering correction applied
         for type in ["cross", "noise"]:
             cells_to_save = {
-                # ansatz for the fitlering to be improved.
-                # This is a temporary placeholder
-                # Need to fit for the TF exponent
-                fp: cells_coadd[type][map_set1, map_set2][fp] / tf_interp[fp] * tf_interp[fp] ** 0.75  # noqa
+                fp: cells_coadd[type][map_set1, map_set2][fp] *
+                np.nan_to_num(np.sqrt(correction[fp]))
                 for fp in field_pairs
             }
-            # Note that we don't deconvolve the beam above to
-            # avoid huge numerical instabilities when deconvolving
-            # the MCMs
-            if type == "cross":
-                for fp in ["TB", "EB", "BE", "BT"]:
-                    cells_to_save[fp] = np.zeros_like(cells_to_save[fp])
-            elif type == "noise":
-                for fp in field_pairs:
-                    if fp != fp[::-1]:
-                        cells_to_save[fp] = np.zeros_like(cells_to_save[fp])
+
             np.savez(
                 f"{cells_dir}/weighted_{type}_pcls_{map_set1}_x_{map_set2}.npz",  # noqa
                 ell=np.arange(len(cells_to_save["TT"])),
@@ -148,7 +250,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Prepare covariance inputs for SOOPERCOOL pipeline"
+        description="Prepare covariance inputs"
     )
     parser.add_argument(
         "--globals",
@@ -160,6 +262,11 @@ if __name__ == "__main__":
         "--verbose",
         action="store_true",
         help="Enable verbose output",
+    )
+    parser.add_argument(
+        "--plots",
+        action="store_true",
+        help="Save plots"
     )
     args = parser.parse_args()
     main(args)

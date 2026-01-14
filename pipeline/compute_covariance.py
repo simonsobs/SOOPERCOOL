@@ -2,9 +2,8 @@ import argparse
 from soopercool import BBmeta
 import numpy as np
 from soopercool import cov_utils as cov
-from soopercool import map_utils as mu
-import pymaster as nmt
 from soopercool import utils as su
+from soopercool import mpi_utils as mpi
 
 
 def main(args):
@@ -22,14 +21,11 @@ def main(args):
     ps_dir = f"{out_dir}/cells"
 
     # Load binning
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    nmt_bins = meta.read_nmt_binning()
     n_bins = nmt_bins.get_n_bands()
 
     # Define useful variables
     field_pairs = [f"{m1}{m2}" for m1 in "TEB" for m2 in "TEB"]
-
     cross_ps_names = meta.get_ps_names_list(type="all", coadd=True)
 
     # Load beams
@@ -86,23 +82,8 @@ def main(args):
                 continue
             cov_names.append((ms1, ms2, ms3, ms4))
 
-    # Load analysis mask
-    mask = mu.read_map(
-        meta.masks["analysis_mask"],
-        pix_type=meta.pix_type,
-        car_template=meta.car_template
-    )
-    wcs = mask.wcs if meta.pix_type == "car" else None
-
-    # Compute NaMaster workspaces
-    print("Loading workspaces ...")
-    wsp, cwsp = cov.compute_covariance_workspace(
-        mask,
-        nmt_bins,
-        wcs=wcs,
-        purify_b=meta.pure_B,
-        save_dir=cov_dir
-    )
+    wsp = cov.load_workspace(cov_dir)
+    cwsp = cov.load_covariance_workspace(cov_dir)
 
     # Load transfer functions
     tf_settings = meta.transfer_settings
@@ -119,7 +100,12 @@ def main(args):
     for map_set in meta.map_sets:
         n_bundles[map_set] = meta.n_bundles_from_map_set(map_set)
 
-    for ms1, ms2, ms3, ms4 in cov_names:
+    rank, size, comm = mpi.init(True)
+    cov_names = comm.bcast(cov_names, root=0)
+    task_ids = mpi.distribute_tasks(size, rank, len(cov_names))
+    local_cov_names = [cov_names[i] for i in task_ids]
+
+    for ms1, ms2, ms3, ms4 in local_cov_names:
 
         print(f"Computing covariance for {ms1} x {ms2}, {ms3} x {ms4}")
         # Compute each covariance blocks
@@ -138,22 +124,24 @@ def main(args):
         beam34 = beams[ms3] * beams[ms4]
 
         # Normalize with transfer function
-        # and beams
+        # and beams. Should be done ell per ell
+        # but leads to huge instabilities
         for fp1 in field_pairs:
             for fp2 in field_pairs:
                 tf1 = tf_dict[ms1, ms2][f"{fp1}_to_{fp1}"]
                 tf2 = tf_dict[ms3, ms4][f"{fp2}_to_{fp2}"]
+
                 cov_dict[fp1, fp2] /= tf1[:, None] * tf2[None, :]
                 cov_dict[fp1, fp2] /= beam12[:, None] * beam34[None, :]
 
         full_cov = np.zeros((n_bins*len(field_pairs), n_bins*len(field_pairs)))
-        print(field_pairs)
         for i, fp1 in enumerate(field_pairs):
             for j, fp2 in enumerate(field_pairs):
                 full_cov[
                     i*n_bins:(i+1)*n_bins,
                     j*n_bins:(j+1)*n_bins
                 ] = cov_dict[fp1, fp2]
+
         # Save block covariance matrix
         np.savez(
             f"{cov_dir}/analytic_cov_{ms1}_x_{ms2}_{ms3}_x_{ms4}.npz",

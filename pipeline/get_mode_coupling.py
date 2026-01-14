@@ -25,7 +25,8 @@ def main(args):
     nspec = 7
 
     mask = mu.read_map(meta.masks["analysis_mask"],
-                       pix_type=meta.pix_type)
+                       pix_type=meta.pix_type,
+                       car_template=meta.car_template)
     lmax = mu.lmax_from_map(mask, pix_type=meta.pix_type)
     nl = lmax + 1
 

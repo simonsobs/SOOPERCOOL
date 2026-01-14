@@ -5,13 +5,51 @@ from itertools import product
 import pymaster as nmt
 import numpy as np
 import os
+from soopercool import map_utils as mu
+
+
+def load_covariance_workspace(cov_dir):
+    """
+    """
+    spin_pairs = list(product(["spin0", "spin2"], repeat=2))
+    spin_combos = [
+        (s0, s1, s2, s3)
+        for (s0, s1) in spin_pairs
+        for (s2, s3) in spin_pairs
+    ]
+    cwsp = {}
+    for s0, s1, s2, s3 in spin_combos:
+        cwsp[s0, s1, s2, s3] = nmt.NmtCovarianceWorkspace.from_file(
+            f"{cov_dir}/cwsp_{s0}_{s1}_{s2}_{s3}"
+        )
+        for kind in ["snsn", "snns", "nssn", "nsns", "nn"]:
+            cwsp[s0, s1, s2, s3, kind] = \
+                nmt.NmtCovarianceWorkspace.from_file(
+                    f"{cov_dir}/cwsp_{kind}_{s0}_{s1}_{s2}_{s3}"
+                )
+
+    return cwsp
+
+
+def load_workspace(cov_dir):
+    """
+    """
+    spin_pairs = list(product(["spin0", "spin2"], repeat=2))
+    wsp = {}
+    for s0, s1 in spin_pairs:
+        wsp[s0, s1] = nmt.NmtWorkspace.from_file(
+            f"{cov_dir}/wsp_{s0}_{s1}"
+        )
+    return wsp
 
 
 def compute_covariance_workspace(analysis_mask,
                                  nmt_bins,
+                                 lmax,
                                  wcs=None,
                                  purify_b=False,
-                                 save_dir=None):
+                                 save_dir=None,
+                                 hits_map=None):
     """
     Return dictionary of NmtWorkspace and NmtCovarianceWorkspace objects
     for the given analysis mask and binning.
@@ -27,6 +65,9 @@ def compute_covariance_workspace(analysis_mask,
         Only required if the analysis mask is a CAR map.
     purify_b : bool, optional
         Whether to purify the B-mode map. Default is False.*
+    hits_map: array, optional
+        If provided, use hits map to also save noise
+        covariance workspace.
 
     Returns
     -------
@@ -37,21 +78,59 @@ def compute_covariance_workspace(analysis_mask,
         Dictionary of NmtCovarianceWorkspace objects for the given analysis
         mask and binning.
     """
+    print("Getting fields")
     fields = {}
     fields["spin0"] = nmt.NmtField(
         analysis_mask,
         maps=None,
-        purify_b=True,
         wcs=wcs,
-        spin=0
+        spin=0,
+        lmax=lmax
     )
     fields["spin2"] = nmt.NmtField(
         analysis_mask,
         maps=None,
         purify_b=purify_b,
         wcs=wcs,
-        spin=2
+        spin=2,
+        lmax=lmax
     )
+
+    if hits_map is not None:
+        print("Using hits map to get noise inhom.")
+
+        sigma = hits_map.copy()
+        sigma[hits_map > 0] = 1 / np.sqrt(hits_map[hits_map > 0])
+        mask_noise = analysis_mask * sigma
+        # This works only in Healpix !!!!
+        # rescale_noise = np.mean(
+        #     (sigma * analysis_mask) ** 2
+        # ) / np.mean(analysis_mask ** 2)
+        pix_type = "car" if hasattr(analysis_mask, "geometry") else "hp"
+        rescale_noise = mu.sky_average(
+            (sigma * analysis_mask) ** 2,
+            pix_type=pix_type
+        ) / mu.sky_average(
+            analysis_mask ** 2,
+            pix_type=pix_type
+        )
+
+        fields["spin0", "noise"] = nmt.NmtField(
+            mask_noise / np.sqrt(rescale_noise),
+            maps=None,
+            wcs=wcs,
+            spin=0,
+            lmax=lmax
+        )
+        fields["spin2", "noise"] = nmt.NmtField(
+            mask_noise / np.sqrt(rescale_noise),
+            maps=None,
+            purify_b=purify_b,
+            wcs=wcs,
+            spin=2,
+            lmax=lmax
+        )
+
     spin_pairs = list(product(["spin0", "spin2"], repeat=2))
 
     wsp = {}
@@ -62,6 +141,8 @@ def compute_covariance_workspace(analysis_mask,
         else:
             fname_wsp = None
 
+        # Only needs to compute it for signal,
+        # optionally with purification
         if not os.path.exists(fname_wsp):
             wsp[s0, s1] = nmt.NmtWorkspace(
                 fields[s0],
@@ -80,7 +161,7 @@ def compute_covariance_workspace(analysis_mask,
                 fname_cwsp = None
             # if i > j:
             #    continue
-
+            # Signal-Signal part
             if (not os.path.exists(fname_cwsp)):
                 cwsp[s0, s1, s2, s3] = nmt.NmtCovarianceWorkspace(
                     fields[s0],
@@ -94,6 +175,109 @@ def compute_covariance_workspace(analysis_mask,
                 cwsp[s0, s1, s2, s3] = nmt.NmtCovarianceWorkspace.from_file(
                     fname_cwsp
                 )
+            # Signal-Noise part (if hits_map is provided)
+            if hits_map is not None:
+
+                # snsn
+                if save_dir is not None:
+                    fname_cwsp = f"{save_dir}/cwsp_snsn_{s0}_{s1}_{s2}_{s3}"
+                else:
+                    fname_cwsp = None
+                if (not os.path.exists(fname_cwsp)):
+                    cwsp[s0, s1, s2, s3, "snsn"] = nmt.NmtCovarianceWorkspace(
+                        fields[s0],
+                        fields[s1, "noise"],
+                        fields[s2],
+                        fields[s3, "noise"]
+                    )
+                    if fname_cwsp is not None:
+                        cwsp[s0, s1, s2, s3, "snsn"].write_to(fname_cwsp)
+                else:
+                    cwsp[s0, s1, s2, s3, "snsn"] = \
+                        nmt.NmtCovarianceWorkspace.from_file(
+                            fname_cwsp
+                        )
+                # snns
+                if save_dir is not None:
+                    fname_cwsp = f"{save_dir}/cwsp_snns_{s0}_{s1}_{s2}_{s3}"
+                else:
+                    fname_cwsp = None
+                if (not os.path.exists(fname_cwsp)):
+                    cwsp[s0, s1, s2, s3, "snns"] = nmt.NmtCovarianceWorkspace(
+                        fields[s0],
+                        fields[s1, "noise"],
+                        fields[s2, "noise"],
+                        fields[s3]
+                    )
+                    if fname_cwsp is not None:
+                        cwsp[s0, s1, s2, s3, "snns"].write_to(fname_cwsp)
+
+                else:
+                    cwsp[s0, s1, s2, s3, "snns"] = \
+                        nmt.NmtCovarianceWorkspace.from_file(
+                            fname_cwsp
+                        )
+
+                # nssn
+                if save_dir is not None:
+                    fname_cwsp = f"{save_dir}/cwsp_nssn_{s0}_{s1}_{s2}_{s3}"
+                else:
+                    fname_cwsp = None
+                if (not os.path.exists(fname_cwsp)):
+                    cwsp[s0, s1, s2, s3, "nssn"] = nmt.NmtCovarianceWorkspace(
+                        fields[s0, "noise"],
+                        fields[s1],
+                        fields[s2],
+                        fields[s3, "noise"]
+                    )
+                    if fname_cwsp is not None:
+                        cwsp[s0, s1, s2, s3, "nssn"].write_to(fname_cwsp)
+                else:
+                    cwsp[s0, s1, s2, s3, "nssn"] = \
+                        nmt.NmtCovarianceWorkspace.from_file(
+                            fname_cwsp
+                        )
+
+                # nsns
+                if save_dir is not None:
+                    fname_cwsp = f"{save_dir}/cwsp_nsns_{s0}_{s1}_{s2}_{s3}"
+                else:
+                    fname_cwsp = None
+                if (not os.path.exists(fname_cwsp)):
+                    cwsp[s0, s1, s2, s3, "nsns"] = nmt.NmtCovarianceWorkspace(
+                        fields[s0, "noise"],
+                        fields[s1],
+                        fields[s2, "noise"],
+                        fields[s3]
+                    )
+                    if fname_cwsp is not None:
+                        cwsp[s0, s1, s2, s3, "nsns"].write_to(fname_cwsp)
+                else:
+                    cwsp[s0, s1, s2, s3, "nsns"] = \
+                        nmt.NmtCovarianceWorkspace.from_file(
+                            fname_cwsp
+                        )
+
+                # Noise-Noise part
+                if save_dir is not None:
+                    fname_cwsp = f"{save_dir}/cwsp_nn_{s0}_{s1}_{s2}_{s3}"
+                else:
+                    fname_cwsp = None
+                if (not os.path.exists(fname_cwsp)):
+                    cwsp[s0, s1, s2, s3, "nn"] = nmt.NmtCovarianceWorkspace(
+                        fields[s0, "noise"],
+                        fields[s1, "noise"],
+                        fields[s2, "noise"],
+                        fields[s3, "noise"]
+                    )
+                    if fname_cwsp is not None:
+                        cwsp[s0, s1, s2, s3, "nn"].write_to(fname_cwsp)
+                else:
+                    cwsp[s0, s1, s2, s3, "nn"] = \
+                        nmt.NmtCovarianceWorkspace.from_file(
+                            fname_cwsp
+                        )
+
     return wsp, cwsp
 
 
@@ -112,6 +296,8 @@ def compute_covariance_block(map_set1,
                              nmt_bins,
                              n_bundles):
     """
+    Compute covariance block for the map_set1 x map_set2 and
+    map_set3 x map_set4 cross-spectra.
     """
     n1 = n_bundles[map_set1]
     n2 = n_bundles[map_set2]
@@ -131,7 +317,10 @@ def compute_covariance_block(map_set1,
     }
 
     covs = {}
-    for s1, s2, s3, s4 in cwsp.keys():
+    cwsp_keys = list(cwsp.keys())
+    # filter out only the 4 spin values
+    cwsp_keys = [k for k in cwsp_keys if len(k) == 4]
+    for s1, s2, s3, s4 in cwsp_keys:
 
         fps13 = field_pairs[s1, s3]
         fps14 = field_pairs[s1, s4]
@@ -161,7 +350,7 @@ def compute_covariance_block(map_set1,
         )
         factor = n1 * (exp1 == exp2 == exp3 == exp4)
 
-        # cl11, cl14, nl23, nl24
+        # cl13, cl14, nl23, nl24
         factor24 = factor + n1 * n2 * n3 * (exp2 == exp4)
         factor24 -= n1 * n3 * ((exp1 == exp2 == exp4) + (exp2 == exp3 == exp4))
 
@@ -171,14 +360,38 @@ def compute_covariance_block(map_set1,
         factor24 /= Npairs_12 * Npairs_34
         factor23 /= Npairs_12 * Npairs_34
 
+        # This is the old way of doing it.
+        # With noise inhomogeneities, we need to split those contributions
+        # covar += nmt.gaussian_covariance(
+        #     cwsp[s1, s2, s3, s4],
+        #     int(s1[-1]), int(s2[-1]),
+        #     int(s3[-1]), int(s4[-1]),
+        #     cl13,
+        #     cl14,
+        #     nl23 * factor23,
+        #     nl24 * factor24,
+        #     wa=wsp[s1, s2],
+        #     wb=wsp[s3, s4]
+        # )
         covar += nmt.gaussian_covariance(
-            cwsp[s1, s2, s3, s4],
+            cwsp[s1, s2, s3, s4, "snsn"],
             int(s1[-1]), int(s2[-1]),
             int(s3[-1]), int(s4[-1]),
             cl13,
+            cl14*0.,
+            nl23*0.,
+            nl24 * factor24,
+            wa=wsp[s1, s2],
+            wb=wsp[s3, s4]
+        )
+        covar += nmt.gaussian_covariance(
+            cwsp[s1, s2, s3, s4, "snns"],
+            int(s1[-1]), int(s2[-1]),
+            int(s3[-1]), int(s4[-1]),
+            cl13 * 0.,
             cl14,
             nl23 * factor23,
-            nl24 * factor24,
+            nl24 * 0.,
             wa=wsp[s1, s2],
             wb=wsp[s3, s4]
         )
@@ -193,13 +406,35 @@ def compute_covariance_block(map_set1,
         factor13 /= Npairs_12 * Npairs_34
         factor14 /= Npairs_12 * Npairs_34
 
+        # covar += nmt.gaussian_covariance(
+        #     cwsp[s1, s2, s3, s4],
+        #     int(s1[-1]), int(s2[-1]),
+        #     int(s3[-1]), int(s4[-1]),
+        #     nl13 * factor13,
+        #     nl14 * factor14,
+        #     cl23,
+        #     cl24,
+        #     wa=wsp[s1, s2],
+        #     wb=wsp[s3, s4]
+        # )
         covar += nmt.gaussian_covariance(
-            cwsp[s1, s2, s3, s4],
+            cwsp[s1, s2, s3, s4, "nssn"],
+            int(s1[-1]), int(s2[-1]),
+            int(s3[-1]), int(s4[-1]),
+            nl13 * 0.,
+            nl14 * factor14,
+            cl23,
+            cl24 * 0.,
+            wa=wsp[s1, s2],
+            wb=wsp[s3, s4]
+        )
+        covar += nmt.gaussian_covariance(
+            cwsp[s1, s2, s3, s4, "nsns"],
             int(s1[-1]), int(s2[-1]),
             int(s3[-1]), int(s4[-1]),
             nl13 * factor13,
-            nl14 * factor14,
-            cl23,
+            nl14 * 0.,
+            cl23 * 0.,
             cl24,
             wa=wsp[s1, s2],
             wb=wsp[s3, s4]
@@ -216,7 +451,7 @@ def compute_covariance_block(map_set1,
         factor_1423 /= Npairs_12 * Npairs_34
 
         covar += nmt.gaussian_covariance(
-            cwsp[s1, s2, s3, s4],
+            cwsp[s1, s2, s3, s4, "nn"],
             int(s1[-1]), int(s2[-1]),
             int(s3[-1]), int(s4[-1]),
             nl13 * np.sqrt(factor_1324),

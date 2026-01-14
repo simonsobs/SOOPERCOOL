@@ -43,6 +43,7 @@ def main(args):
     BBmeta.make_dir(sacc_dir)
 
     cov_dir = f"{out_dir}/covariances"
+    couplings_dir = f"{out_dir}/couplings"
 
     binning = np.load(meta.binning_file)
     nmt_binning = nmt.NmtBin.from_edges(binning["bin_low"],
@@ -78,18 +79,14 @@ def main(args):
             if i > j:
                 continue
             cov_dict = np.load(
-                f"{cov_dir}/mc_cov_{ms1}_x_{ms2}_{ms3}_x_{ms4}.npz"
+                f"{cov_dir}/analytic_cov_{ms1}_x_{ms2}_{ms3}_x_{ms4}.npz"
             )
 
-            cov_size = len(field_pairs)*len(lb)
-            cov = np.zeros((cov_size, cov_size))
-            for ifp1, fp1 in enumerate(field_pairs):
-                for ifp2, fp2 in enumerate(field_pairs):
-                    cov[ifp1*len(lb):(ifp1+1)*len(lb),
-                        ifp2*len(lb):(ifp2+1)*len(lb)] = cov_dict[fp1+fp2]
+            # cov_size = len(field_pairs)*len(lb)
+            cov = cov_dict["cov"]
 
             covs[ms1, ms2, ms3, ms4] = thin_covariance(
-                cov, len(lb), len(field_pairs), order=0
+                cov, len(lb), len(field_pairs), order=None
             )
 
     full_cov_size = len(ps_names)*len(lb)*len(field_pairs)
@@ -146,9 +143,26 @@ def main(args):
             cl_file = f"{cl_dir}/decoupled_cross_pcls_{ms1}_x_{ms2}{sim_label}.npz" # noqa
             cells = np.load(cl_file)
 
+            bbl = np.load(
+                f"{couplings_dir}/couplings_{ms1}_{ms2}.npz"
+            )["bp_win"]
+            # s_wins = sacc.BandpowerWindow(
+            #     np.arange(bbl.shape[-1]),
+            #     bbl.T
+            # )
             for fp in field_pairs:
 
                 f1, f2 = fp
+                fp_idx = [
+                    "TT",
+                    "TE", "TB",
+                    "ET", "BT",
+                    "EE", "EB", "BE", "BB"
+                ].index(fp)
+                s_wins = sacc.BandpowerWindow(
+                    np.arange(bbl.shape[-1]),
+                    bbl[fp_idx, :, fp_idx, :].T
+                )
                 s.add_ell_cl(**{
                     "data_type": f"cl_{data_types[f1]}{data_types[f2]}",
                     "tracer1": f"{ms1}",

@@ -4,6 +4,7 @@ import yaml
 import numpy as np
 import os
 import time
+import pymaster as nmt
 
 
 class BBmeta(object):
@@ -220,10 +221,31 @@ class BBmeta(object):
         """
         Read the binning file and return the corresponding NmtBin object.
         """
-        import pymaster as nmt
-        binning = np.load(self.path_to_binning)
-        return nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+        binning = np.load(self.binning_file)
+        bin_low, bin_high = binning["bin_low"], binning["bin_high"]
+        bin_lmax = bin_high[-1]
+
+        if bin_lmax < self.lmax:
+            raise ValueError(
+                f"lmax in binning {bin_lmax} is lower than {self.lmax}."
+                " Update config file to change lmax or binning scheme."
+            )
+        else:
+            # Truncate binning
+            select = bin_low < self.lmax
+            bin_low = bin_low[select]
+            bin_high = bin_high[select]
+
+            bin_high = np.concatenate((
+                bin_high[:-1],
+                np.array([self.lmax])
+            ))
+
+        return nmt.NmtBin.from_edges(
+            bin_low,
+            bin_high + 1,
+            is_Dell=self.compute_Dl
+        )
 
     def get_n_bandpowers(self):
         """
@@ -537,11 +559,17 @@ class BBmeta(object):
                 else:
                     map_set_1, split_1 = map1.split("__")
                     map_set_2, split_2 = map2.split("__")
+                    idx1 = self.map_sets_list.index(map_set_1)
+                    idx2 = self.map_sets_list.index(map_set_2)
+                    if idx1 > idx2:
+                        continue
 
-                    if (map2, map1) in ps_name_list:
-                        continue
-                    if (map_set_1 == map_set_2) and (split_1 > split_2):
-                        continue
+                    # I want to loop over all of them
+                    # e.g. for ms1, ms2 TE I need to have both 0x1 and 1x0
+                    # if (map2, map1) in ps_name_list:
+                    #    continue
+                    # if (map_set_1 == map_set_2) and (split_1 > split_2):
+                    #    continue
 
                     exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
                     exp_tag_2 = self.exp_tag_from_map_set(map_set_2)

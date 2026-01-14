@@ -24,9 +24,7 @@ def main(args):
                        pix_type=meta.pix_type,
                        car_template=meta.car_template)
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    nmt_bins = meta.read_nmt_binning()
     n_bins = nmt_bins.get_n_bands()
 
     if do_plots:
@@ -71,7 +69,7 @@ def main(args):
         m = mu.read_map(f"{map_dir}/{map_file}", pix_type=meta.pix_type,
                         fields_hp=[0, 1, 2],
                         car_template=meta.car_template,
-                        convert_K_to_muK=True)
+                        convert_K_to_muK=False)
         if do_plots:
             for i, f in enumerate(["T", "Q", "U"]):
                 hp.mollview(m[i],
@@ -85,8 +83,14 @@ def main(args):
 
         wcs = m.wcs if meta.pix_type == "car" else None
 
-        field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs)
-        field_spin2 = nmt.NmtField(mask, m[1:], wcs=wcs, purify_b=meta.pure_B)
+        field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs, lmax=meta.lmax)
+        field_spin2 = nmt.NmtField(
+            mask,
+            m[1:],
+            wcs=wcs,
+            purify_b=meta.pure_B,
+            lmax=meta.lmax
+        )
 
         fields[map_set, id_bundle] = {
             "spin0": field_spin0,
@@ -96,7 +100,9 @@ def main(args):
     inv_couplings_beamed = {}
 
     for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
-        inv_couplings_beamed[ms1, ms2] = np.load(f"{couplings_dir}/couplings_{ms1}_{ms2}.npz")["inv_coupling"].reshape([n_bins*9, n_bins*9]) # noqa
+        inv_couplings_beamed[ms1, ms2] = np.load(
+            f"{couplings_dir}/couplings_{ms1}_{ms2}.npz"
+        )["inv_coupling"].reshape([n_bins*9, n_bins*9])
 
     for map_name1, map_name2 in meta.get_ps_names_list(type="all",
                                                        coadd=False):
