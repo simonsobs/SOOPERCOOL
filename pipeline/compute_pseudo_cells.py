@@ -14,6 +14,7 @@ def main(args):
     do_plots = not args.no_plots
     out_dir = meta.output_directory
     cells_dir = f"{out_dir}/cells"
+    couplings_dir = f"{out_dir}/couplings"
 
     BBmeta.make_dir(cells_dir)
 
@@ -31,6 +32,7 @@ def main(args):
             f"the maximum lmax from map resolution {lmax}"
         )
     nmt_bins = meta.read_nmt_binning()
+    n_bins = nmt_bins.get_n_bands()
 
     if do_plots:
         import healpy as hp
@@ -78,7 +80,7 @@ def main(args):
                         pix_type=meta.pix_type,
                         fields_hp=[0, 1, 2],
                         car_template=meta.car_template,
-                        convert_K_to_muK=True)
+                        convert_K_to_muK=False)
         if do_plots:
             fname = f"{map_plot_dir}/map_{map_set}_bundle{id_bundle}"
             lims = [[-5000, 5000], [-300, 300], [-300, 300]]
@@ -97,16 +99,26 @@ def main(args):
             mask = enmap.insert(flat_template.copy()[0], mask)
             m = enmap.insert(flat_template.copy(), m)
 
-        field_spin0 = nmt.NmtField(mask, m[:1], lmax=meta.lmax, wcs=wcs)
-        field_spin2 = nmt.NmtField(mask, m[1:], lmax=meta.lmax, wcs=wcs,
-                                   purify_b=meta.pure_B)
+        field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs, lmax=meta.lmax)
+        field_spin2 = nmt.NmtField(
+            mask,
+            m[1:],
+            wcs=wcs,
+            purify_b=meta.pure_B,
+            lmax=meta.lmax
+        )
 
         fields[map_set, id_bundle] = {
             "spin0": field_spin0,
             "spin2": field_spin2
         }
 
-    inv_couplings_beamed = meta.get_inverse_couplings()
+    inv_couplings_beamed = {}
+
+    for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
+        inv_couplings_beamed[ms1, ms2] = np.load(
+            f"{couplings_dir}/couplings_{ms1}_{ms2}.npz"
+        )["inv_coupling"].reshape([n_bins*9, n_bins*9])
 
     for map_name1, map_name2 in meta.get_ps_names_list(type="all",
                                                        coadd=False):
@@ -115,15 +127,24 @@ def main(args):
         ftag1 = meta.filtering_tag_from_map_set(map_set1)
         ftag2 = meta.filtering_tag_from_map_set(map_set2)
         if args.verbose:
-            print(f"  Computing ({map_set1}, {ftag1}) x ({map_set1}, {ftag1})")
-        pcls = pu.get_coupled_pseudo_cls(
+            print(f"  Computing ({map_set1}, {ftag1}) x ({map_set2}, {ftag2})")
+        pcls, pcls_unbinned = pu.get_coupled_pseudo_cls(
                 fields[map_set1, id_bundle1],
                 fields[map_set2, id_bundle2],
-                nmt_bins
+                nmt_bins,
+                return_unbinned=True
                 )
 
+        weighted_pcls = pu.get_weighted_pcls(
+            pcls_unbinned,
+            mask,
+            pix_type=meta.pix_type
+        )
+        np.savez(f"{cells_dir}/weighted_pcls_{map_name1}_x_{map_name2}.npz",
+                 **weighted_pcls, ell=np.arange(len(weighted_pcls["TT"])))
+
         decoupled_pcls = pu.decouple_pseudo_cls(
-                pcls, inv_couplings_beamed["filtered"][ftag1, ftag2]
+                pcls, inv_couplings_beamed[map_set1, map_set2]
                 )
 
         np.savez(f"{cells_dir}/decoupled_pcls_{map_name1}_x_{map_name2}.npz",

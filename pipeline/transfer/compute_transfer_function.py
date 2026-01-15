@@ -48,7 +48,6 @@ def main(args):
         pcls_mat_dict,
         filtering_pairs
     )
-
     full_tf = {}
     for ftag1, ftag2 in filtering_pairs:
         print(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
