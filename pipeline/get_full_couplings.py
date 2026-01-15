@@ -2,7 +2,6 @@ import argparse
 from soopercool import BBmeta
 import numpy as np
 from soopercool import coupling_utils as cu
-import os
 
 
 def main(args):

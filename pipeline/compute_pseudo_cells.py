@@ -14,6 +14,7 @@ def main(args):
     do_plots = not args.no_plots
     out_dir = meta.output_directory
     cells_dir = f"{out_dir}/cells"
+    couplings_dir = f"{out_dir}/couplings"
 
     BBmeta.make_dir(cells_dir)
 
@@ -31,6 +32,7 @@ def main(args):
             f"the maximum lmax from map resolution {lmax}"
         )
     nmt_bins = meta.read_nmt_binning()
+    n_bins = nmt_bins.get_n_bands()
 
     if do_plots:
         import healpy as hp
@@ -142,7 +144,7 @@ def main(args):
                  **weighted_pcls, ell=np.arange(len(weighted_pcls["TT"])))
 
         decoupled_pcls = pu.decouple_pseudo_cls(
-                pcls, inv_couplings_beamed["filtered"][ftag1, ftag2]
+                pcls, inv_couplings_beamed[map_set1, map_set2]
                 )
 
         np.savez(f"{cells_dir}/decoupled_pcls_{map_name1}_x_{map_name2}.npz",
