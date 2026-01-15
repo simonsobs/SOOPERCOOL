@@ -127,7 +127,7 @@ def main(args):
         ftag1 = meta.filtering_tag_from_map_set(map_set1)
         ftag2 = meta.filtering_tag_from_map_set(map_set2)
         if args.verbose:
-            print(f"  Computing ({map_set1}, {ftag1}) x ({map_set1}, {ftag1})")
+            print(f"  Computing ({map_set1}, {ftag1}) x ({map_set2}, {ftag2})")
         pcls, pcls_unbinned = pu.get_coupled_pseudo_cls(
                 fields[map_set1, id_bundle1],
                 fields[map_set2, id_bundle2],
