@@ -497,6 +497,46 @@ def template_from_map(map, ncomp, pix_type="hp"):
         return enmap.zeros(new_shape, wcs)
 
 
+def sky_average(map, pix_type="hp"):
+    """
+    Compute the sky average of a map
+    depending on its pixellization type.
+    Parameters
+    ----------
+    map : np.ndarray or enmap.ndmap
+        Input map.
+    pix_type : str, optional
+        Pixellization type. Either 'hp' or 'car'.
+    Returns
+    -------
+    float
+        Sky average of the map.
+    """
+    _check_pix_type(pix_type)
+    if pix_type == "hp":
+        if len(map.shape) > 1:
+            return np.mean(map, axis=1)
+        else:
+            return np.mean(map)
+    else:
+        shape, wcs = map.geometry
+        pixel_area_sr = enmap.pixsizemap(shape, wcs)
+
+        if len(map.shape) > 2:
+            avg = []
+            for i in range(map.shape[0]):
+                weighted_sum = np.sum(
+                    map[i] * pixel_area_sr,
+                )
+                avg.append(weighted_sum / np.sum(pixel_area_sr))
+            return np.array(avg)
+        else:
+            weighted_sum = np.sum(
+                map * pixel_area_sr,
+            )
+            return weighted_sum / np.sum(pixel_area_sr)
+
+
 def binary_mask_from_map(map, pix_type="hp", geometry=None):
     """
     Generate a binary mask from a map.

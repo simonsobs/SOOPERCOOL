@@ -3,6 +3,7 @@ from itertools import product
 import pymaster as nmt
 import numpy as np
 import matplotlib.pyplot as plt
+from pixell import enmap
 
 
 def get_validation_power_spectra(meta, id_sim, mask, nmt_binning,
@@ -81,7 +82,8 @@ def get_binned_cls(bp_win_dict, cls_dict_unbinned):
     return field_pairs_from_spins(cls_dict_binned)
 
 
-def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
+def get_coupled_pseudo_cls(fields1, fields2, nmt_binning,
+                           return_unbinned=False):
     """
     Compute the binned coupled pseudo-C_ell estimates from two
     (spin-0 or spin-2) NaMaster fields and a multipole binning scheme.
@@ -95,6 +97,8 @@ def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
     spins = list(fields1.keys())
 
     pcls = {}
+    if return_unbinned:
+        pcls_unbinned = {}
     for spin1 in spins:
         for spin2 in spins:
 
@@ -105,6 +109,11 @@ def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
             coupled_cell = coupled_cell[:, :nmt_binning.lmax+1]
 
             pcls[f"{spin1}x{spin2}"] = nmt_binning.bin_cell(coupled_cell)
+            if return_unbinned:
+                pcls_unbinned[f"{spin1}x{spin2}"] = coupled_cell
+    if return_unbinned:
+        return pcls, pcls_unbinned
+
     return pcls
 
 
@@ -138,6 +147,24 @@ def decouple_pseudo_cls(coupled_pseudo_cells, coupling_inv):
     return decoupled_pcls
 
 
+def get_weighted_pcls(pcls, mask, pix_type="car"):
+    """
+    """
+    pcls_dict = field_pairs_from_spins(pcls)
+
+    if pix_type == "hp":
+        weights = np.mean(mask ** 2)
+    elif pix_type == "car":
+        shape, wcs = mask.geometry
+        pixsizemap = enmap.pixsizemap(shape, wcs)  # sterradians
+        weights = np.sum(mask ** 2 * pixsizemap) / (4*np.pi)
+
+    for k in pcls_dict:
+        pcls_dict[k] = pcls_dict[k] / weights
+
+    return pcls_dict
+
+
 def field_pairs_from_spins(cls_in_dict):
     """
     Reorders power spectrum dictionary with a given input spin
@@ -165,7 +192,8 @@ def field_pairs_from_spins(cls_in_dict):
     return cls_out_dict
 
 
-def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
+def get_pcls_mat_transfer(fields, nmt_binning, fields2=None,
+                          return_unbinned=False):
     """
     Compute coupled binned pseudo-C_ell estimates from
     pure-E and pure-B transfer function estimation simulations,
@@ -186,13 +214,32 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
     n_bins = nmt_binning.get_n_bands()
     pcls_mat = np.zeros((9, 9, n_bins))
 
+    if return_unbinned:
+        pcls_mat_unbinned = np.zeros((9, 9, nmt_binning.lmax+1))
+        tmp_pcls_unbinned = {}
+
     index = 0
     cases = ["pureT", "pureE", "pureB"]
     tmp_pcls = {}
     for index, (pure_type1, pure_type2) in enumerate(product(cases, cases)):
-        pcls = get_coupled_pseudo_cls(fields[pure_type1],
-                                      fields2[pure_type2],
-                                      nmt_binning)
+        pcls = get_coupled_pseudo_cls(
+            fields[pure_type1],
+            fields2[pure_type2],
+            nmt_binning,
+            return_unbinned=return_unbinned
+        )
+        if return_unbinned:
+            pcls, pcls_unbinned = pcls
+            tmp_pcls_unbinned[pure_type1, pure_type2] = {
+                "TT": pcls_unbinned["spin0xspin0"][0],
+                "TE": pcls_unbinned["spin0xspin2"][0],
+                "TB": pcls_unbinned["spin0xspin2"][1],
+                "EE": pcls_unbinned["spin2xspin2"][0],
+                "EB": pcls_unbinned["spin2xspin2"][1],
+                "BE": pcls_unbinned["spin2xspin2"][2],
+                "BB": pcls_unbinned["spin2xspin2"][3]
+            }
+
         tmp_pcls[pure_type1, pure_type2] = {
             "TT": pcls["spin0xspin0"][0],
             "TE": pcls["spin0xspin2"][0],
@@ -216,6 +263,21 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
             tmp_pcls[pure_type1, pure_type2]["BB"]
         ])
 
+        if return_unbinned:
+            pcls_mat_unbinned[idx] = np.array([
+                tmp_pcls_unbinned[pure_type1, pure_type2]["TT"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["TE"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["TB"],
+                tmp_pcls_unbinned[pure_type2, pure_type1]["TE"],
+                tmp_pcls_unbinned[pure_type2, pure_type1]["TB"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["EE"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["EB"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["BE"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["BB"]
+            ])
+
+    if return_unbinned:
+        return pcls_mat, pcls_mat_unbinned
     return pcls_mat
 
 
@@ -247,6 +309,11 @@ def bin_theory_cls(cls, bpwf):
 def plot_pcls_mat_transfer(pcls_mat_unfilt, pcls_mat_filt, lb, file_name,
                            lmax=None):
     """
+    Related to the covariance PR comments, this
+    function has a bug and inconsistently loop over
+    pure pairs. We will homogeneize this in
+    all soopercool scripts in the future to avoid
+    confusion.
     """
     import matplotlib.pyplot as plt
 

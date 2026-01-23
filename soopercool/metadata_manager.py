@@ -605,11 +605,17 @@ class BBmeta(object):
                 else:
                     map_set_1, split_1 = map1.split("__")
                     map_set_2, split_2 = map2.split("__")
+                    idx1 = self.map_sets_list.index(map_set_1)
+                    idx2 = self.map_sets_list.index(map_set_2)
+                    if idx1 > idx2:
+                        continue
 
-                    if (map2, map1) in ps_name_list:
-                        continue
-                    if (map_set_1 == map_set_2) and (split_1 > split_2):
-                        continue
+                    # I want to loop over all of them
+                    # e.g. for ms1, ms2 TE I need to have both 0x1 and 1x0
+                    # if (map2, map1) in ps_name_list:
+                    #    continue
+                    # if (map_set_1 == map_set_2) and (split_1 > split_2):
+                    #    continue
 
                     exp_tag_1 = self.exp_tag_from_map_set(map_set_1)
                     exp_tag_2 = self.exp_tag_from_map_set(map_set_2)

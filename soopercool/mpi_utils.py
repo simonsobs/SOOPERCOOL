@@ -45,6 +45,8 @@ def init(switch=False, logger=None):
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
         size = comm.Get_size()
+        print_rnk0(f"MPI: rank {rank} is initalized",
+                   rank, if_rank=rank, logger=logger)
 
     except ImportError as exc:
         sys.stderr.write("IMPORT ERROR: " + __file__ + " (" + str(exc) + "). "
@@ -128,17 +130,19 @@ def distribute_tasks(size, rank, ntasks, id_start=0, logger=None):
     if rank >= ntasks:
         local_task_ids = []
 
-    # If there are more tasks than size and ntasks is not divisible by size,
-    # there will be a set of ntasks_left < size leftover tasks. We distribute
-    # one of them each to the first ntasks_left workers.
+    # If ntasks is not divisible by size, there will be a set of
+    # ntasks_left < size leftover tasks. Distribute one of them each to the
+    # first ntasks_left workers.
     if ntasks % size != 0 and size < ntasks:
         leftover = np.arange(ntasks)[-(ntasks % size):]
         if rank < len(leftover):
             local_task_ids.append(leftover[rank])
 
-    print_rnk0(f"Rank {rank} has {len(local_task_ids)} tasks: "
-               f"{np.array(local_task_ids, dtype=int)}",
+    print_rnk0(f"Rank {rank} has {len(local_task_ids)} tasks" "\n"
+               f"Total number of tasks is {ntasks}",
                rank, if_rank=rank, logger=logger)
-    print_rnk0(f"Total number of tasks is {ntasks}", rank, logger=logger)
+    print_rnk0(f"Rank {rank} | local_task_ids: "
+               f"{np.array(local_task_ids, dtype=int)}",
+               rank, logger=logger)
 
     return local_task_ids
