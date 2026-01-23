@@ -355,19 +355,7 @@ def compute_covariance_block(map_set1,
         factor24 /= Npairs_12 * Npairs_34
         factor23 /= Npairs_12 * Npairs_34
 
-        # This is the old way of doing it.
         # With noise inhomogeneities, we need to split those contributions
-        # covar += nmt.gaussian_covariance(
-        #     cwsp[s1, s2, s3, s4],
-        #     int(s1[-1]), int(s2[-1]),
-        #     int(s3[-1]), int(s4[-1]),
-        #     cl13,
-        #     cl14,
-        #     nl23 * factor23,
-        #     nl24 * factor24,
-        #     wa=wsp[s1, s2],
-        #     wb=wsp[s3, s4]
-        # )
         covar += nmt.gaussian_covariance(
             cwsp[s1, s2, s3, s4, "snsn"],
             int(s1[-1]), int(s2[-1]),
@@ -401,17 +389,6 @@ def compute_covariance_block(map_set1,
         factor13 /= Npairs_12 * Npairs_34
         factor14 /= Npairs_12 * Npairs_34
 
-        # covar += nmt.gaussian_covariance(
-        #     cwsp[s1, s2, s3, s4],
-        #     int(s1[-1]), int(s2[-1]),
-        #     int(s3[-1]), int(s4[-1]),
-        #     nl13 * factor13,
-        #     nl14 * factor14,
-        #     cl23,
-        #     cl24,
-        #     wa=wsp[s1, s2],
-        #     wb=wsp[s3, s4]
-        # )
         covar += nmt.gaussian_covariance(
             cwsp[s1, s2, s3, s4, "nssn"],
             int(s1[-1]), int(s2[-1]),
