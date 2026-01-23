@@ -155,8 +155,7 @@ def compute_covariance_workspace(analysis_mask,
                 fname_cwsp = f"{save_dir}/cwsp_{s0}_{s1}_{s2}_{s3}"
             else:
                 fname_cwsp = None
-            # if i > j:
-            #    continue
+
             # Signal-Signal part
             if (not os.path.exists(fname_cwsp)):
                 cwsp[s0, s1, s2, s3] = nmt.NmtCovarianceWorkspace(
