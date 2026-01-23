@@ -102,10 +102,6 @@ def compute_covariance_workspace(analysis_mask,
         sigma = hits_map.copy()
         sigma[hits_map > 0] = 1 / np.sqrt(hits_map[hits_map > 0])
         mask_noise = analysis_mask * sigma
-        # This works only in Healpix !!!!
-        # rescale_noise = np.mean(
-        #     (sigma * analysis_mask) ** 2
-        # ) / np.mean(analysis_mask ** 2)
         pix_type = "car" if hasattr(analysis_mask, "geometry") else "hp"
         rescale_noise = mu.sky_average(
             (sigma * analysis_mask) ** 2,
