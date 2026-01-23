@@ -133,7 +133,7 @@ def distribute_tasks(size, rank, ntasks, id_start=0, logger=None):
     # If ntasks is not divisible by size, there will be a set of
     # ntasks_left < size leftover tasks. Distribute one of them each to the
     # first ntasks_left workers.
-    if ntasks % size != 0:
+    if ntasks % size != 0 and size < ntasks:
         leftover = np.arange(ntasks)[-(ntasks % size):]
         if rank < len(leftover):
             local_task_ids.append(leftover[rank])
