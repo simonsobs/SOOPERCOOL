@@ -309,6 +309,11 @@ def bin_theory_cls(cls, bpwf):
 def plot_pcls_mat_transfer(pcls_mat_unfilt, pcls_mat_filt, lb, file_name,
                            lmax=None):
     """
+    Related to the covariance PR comments, this
+    function has a bug and inconsistently loop over
+    pure pairs. We will homogeneize this in
+    all soopercool scripts in the future to avoid
+    confusion.
     """
     import matplotlib.pyplot as plt
 
