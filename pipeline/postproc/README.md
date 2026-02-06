@@ -15,9 +15,9 @@ sudo apt-get install python3-tk
 ```
 if not provided in your default python install. You can then run the app with
 ```
-streamlit run sat_spectra_viewer.py
+streamlit run sacc_viewer/sat_spectra_viewer.py
 ```
-which will open a local session in your default browser (don't forget to use tunelling to view it if you're on a cluster). You can then select the `sacc` file you want to visualize through an (ugly) GUI interface.
+which will open a local session in your default browser (don't forget to use tunelling to view it if you're on a cluster). You can then select the `sacc` file you want to visualize through an (ugly) GUI interface. This will open a web interface to visualize spectra for different `map_set` pairs as well as an additional tab to show power spectra residuals, computing $\chi^2$ and PTEs on the fly.
 
 ### EB angles fit and rotation of spectra
 We provide a post-processing python script to fit for EB mixing angles for each of the `map_sets` defined in the `sacc` file provided. It then write down a new `sacc` file where polarization has been rotated back using the best fit angles.
