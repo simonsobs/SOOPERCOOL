@@ -138,9 +138,7 @@ if st.session_state.clicked:
     plt.xlim(*range_x)
     # Dynamically define y axis limits
     min_y, max_y = plt.gca().get_ylim()
-    # min_y = st.sidebar.number_input("Y-axis min", value=min_y, format="%.3f")
-    # max_y = st.sidebar.number_input("Y-axis max", value=max_y, format="%.3f")
-    # range_y = (min_y, max_y)
+
     min_y = st.sidebar.number_input(
         "Y-axis min", value=None, format="%.3f", key="ymin"
     )
