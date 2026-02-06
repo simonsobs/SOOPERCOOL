@@ -176,19 +176,28 @@ def main(args):
     for dtype in s.get_data_types():
         for t1, t2 in s.get_tracer_combinations():
             idx = s.indices(dtype, tracers=(t1, t2))
+            f1, f2 = dtype.split("_")[-1]
+            if f1 in ["e", "b"]:
+                c1 = cals.get(t1, 1.0)
+            else:
+                c1 = 1.0
+            if f2 in ["e", "b"]:
+                c2 = cals.get(t2, 1.0)
+            else:
+                c2 = 1.0
             s_out.add_ell_cl(
                 **{
                     "data_type": dtype,
                     "tracer1": t1,
                     "tracer2": t2,
                     "ell": lb,
-                    "x": ps_vec[idx] * cals.get(t1, 1.0) * cals.get(t2, 1.0),
+                    "x": ps_vec[idx] * c1 * c2,
                     "window": s.get_bandpower_windows(idx),
                 }
             )
             tot_idx += list(idx)
             cal_vec.append(
-                np.full_like(idx, cals.get(t1, 1.0) * cals.get(t2, 1.0))
+                np.full_like(idx, c1 * c2)
             )
     cal_vec = np.concatenate(cal_vec)
     cov_cal = cov[np.ix_(tot_idx, tot_idx)] * np.outer(cal_vec, cal_vec)
