@@ -30,3 +30,16 @@ python fit_EB_angles.py --sacc-file /path/to/sacc \
                         --lmax-sacc ... [int]
 ```
 The parameter `lmax-sacc` is used to cut sacc files before building the full rotation matrix to rotate it and save it back. It is usually useful to set it to a relatively low value (e.g. 650) to make this step less computationally expensive.
+
+### EE relative amplitude correction
+We provide a post-processing python script to fit for calibration amplitudes from the EE power spectra. You need to select a `map_set` among the `sacc` tracers to be the reference of this calibration procedure and list the `map_sets` you would like to get the calibration amplitude of.
+
+Instructions to run it are
+```
+python fit_EE_cals.py --sacc-file /path/to/sacc \
+                      --lmin-fit ... [int] \
+                      --lmax-fit ... [int] \
+                      --lmax-sacc ... [int] \
+                      --map-set-ref name_of_reference_map_set \
+                      --map-sets-to-fit map_set1,map_set2,...
+```
