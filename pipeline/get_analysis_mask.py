@@ -9,7 +9,6 @@ import numpy as np
 def main(args):
     """
     """
-    print("hello")
     meta = BBmeta(args.globals)
     do_plots = not args.no_plots
     verbose = args.verbose
@@ -31,10 +30,16 @@ def main(args):
             pix_type=meta.pix_type,
             car_template=meta.car_template
         )
+        #######
+        # ALP: If using a global hits file, it just means that
+        # we will weight the binary mask with the hits,
+        # but the binary mask will still be defined as
+        # the union of all map_sets footprints
+        #######
         # Create binary
-        binary = sum_hits.copy()
-        binary[:] = 1
-        binary[sum_hits == 0] = 0
+        # binary = sum_hits.copy()
+        # binary[:] = 1
+        # binary[sum_hits == 0] = 0
     else:
         # Loop over the (map_set, id_bundles)
         # pairs to define a common binary mask
@@ -80,32 +85,89 @@ def main(args):
                 if verbose:
                     print(f"    file_name: {map_dir}/{map_file}")
 
-                hits = mu.read_map(
-                    f"{map_dir}/{map_file}",
-                    pix_type=meta.pix_type,
-                    car_template=meta.car_template
-                )
+                # Raise an error if file does not exists
+                try:
+                    hits = mu.read_map(
+                        f"{map_dir}/{map_file}",
+                        pix_type=meta.pix_type,
+                        car_template=meta.car_template
+                    )
+                except FileNotFoundError:
+                    raise FileNotFoundError(
+                        f"File {map_dir}/{map_file} not found. "
+                        "Please check the map directory and template "
+                        "in the parameter file or provide a global hits file."
+                    )
                 hit_maps.append(hits)
 
-        # Create binary and normalized hitmap
-        mp = hit_maps[0]
         if masks_settings["use_weights"]:
-            mp = mp[1]
-        binary = mp.copy()
-        sum_hits = mp.copy()
-        binary[:] = 1
-        sum_hits[:] = 0
-        for hit_map in hit_maps:
-            if masks_settings["use_weights"]:
-                hit_map = np.sqrt(hit_map[1]**2 + hit_map[2]**2)
-            binary[hit_map == 0] = 0
-            sum_hits += hit_map
-        sum_hits[binary == 0] = 0
-
-        if masks_settings["use_weights"]:
-            # Select threshold
+            sum_hits = hit_maps[0][1].copy() * 0.
+            for h in hit_maps:
+                sum_hits += np.sqrt(h[1]**2 + h[2]**2)
             threshold = np.median(sum_hits[sum_hits > 0])
             sum_hits[sum_hits < threshold] = 0
+        else:
+            sum_hits = hit_maps[0].copy() * 0.
+            for h in hit_maps:
+                sum_hits += h
+    #####
+    # ALP: Now we need to define the binary mask. In case we
+    # don't provide any hits/weights, the binary mask has to be
+    # read from maps footprints
+    #####
+    binary = sum_hits.copy()
+    binary[:] = 1
+
+    for map_set in meta.map_sets_list:
+        n_bundles = meta.n_bundles_from_map_set(map_set)
+        for id_bundle in range(n_bundles):
+            map_dir = meta.map_dir_from_map_set(map_set)
+            map_template = meta.map_template_from_map_set(map_set)
+            map_file = map_template.replace(
+                "{id_bundle}",
+                str(id_bundle)
+            )
+            type_options = [
+                f for f in re.findall(r"\{.*?\}", map_template)
+                if "|" in f
+            ]
+            if not type_options:
+                raise ValueError(
+                    "The map directory must contain both maps "
+                    "and hits files, indicated by a "
+                    "corresponding suffix."
+                )
+            else:
+                # Select the map
+                option = type_options[0].replace("{", "")
+                option = option.replace("}", "").split("|")[0]
+
+                map_file = map_file.replace(
+                    type_options[0],
+                    option
+                )
+
+                print(f"Reading map for {map_set} - bundle {id_bundle}")
+                print(f"    file_name: {map_dir}/{map_file}")
+                if verbose:
+                    print(f"    file_name: {map_dir}/{map_file}")
+
+                # Raise an error if file does not exists
+                try:
+                    map = mu.read_map(
+                        f"{map_dir}/{map_file}",
+                        pix_type=meta.pix_type,
+                        car_template=meta.car_template
+                    )
+                except FileNotFoundError:
+                    raise FileNotFoundError(
+                        f"File {map_dir}/{map_file} not found. "
+                        "Please check the map directory and template "
+                        "in the parameter file."
+                    )
+            # Select only the pixels that are observed
+            # in this map_set and bundle
+            binary[map[1] == 0] = 0
 
     if masks_settings["box_mask"] is not None:
         from pixell import enmap
@@ -128,9 +190,12 @@ def main(args):
     else:
         sum_hits /= np.amax(sum_hits)
 
-    # Calculate and print the fraction of the sky covered by the mask
-    fsky = np.mean(sum_hits)
-    print(f"Fraction of the sky covered by the mask (fsky): {fsky}")
+    #####
+    # ALP: This does not work with CAR, functions exist for this
+    #####
+    # # Calculate and print the fraction of the sky covered by the mask
+    # fsky = np.mean(sum_hits)
+    # print(f"Fraction of the sky covered by the mask (fsky): {fsky}")
 
     # Save products
     mu.write_map(
@@ -173,6 +238,7 @@ def main(args):
         gal_mask = mu.read_map(masks_settings["galactic_mask"],
                                pix_type=meta.pix_type,
                                geometry=analysis_mask.geometry)
+        gal_mask[gal_mask != 0] = 1.
         if do_plots:
             mu.plot_map(
                 gal_mask,
@@ -182,6 +248,14 @@ def main(args):
                 lims=[-1, 1]
             )
         analysis_mask *= gal_mask
+        if do_plots:
+            mu.plot_map(
+                analysis_mask,
+                title="Analysis mask after galactic mask",
+                file_name=f"{plot_dir}/binary_galactic_mask",
+                pix_type=meta.pix_type,
+                lims=[-analysis_mask.max(), analysis_mask.max()]
+            )
 
     if masks_settings["external_mask"] is not None:
         print("Reading external mask ...")
@@ -199,19 +273,68 @@ def main(args):
                 lims=[-1, 1]
             )
         analysis_mask *= ext_mask
+        if do_plots:
+            mu.plot_map(
+                analysis_mask,
+                title="Analysis mask after external mask",
+                file_name=f"{plot_dir}/binary_external_mask",
+                pix_type=meta.pix_type,
+                lims=[-analysis_mask.max(), analysis_mask.max()]
+            )
 
-    # Smooth and apodize analysis mask
-    analysis_mask = mu.smooth_map(
+    #####
+    # ALP: This should never be done in my opinion,
+    # as it will make the mask extend beyond the binary+galactic mask
+    # region
+    #####
+    # # Smooth and apodize analysis mask
+    # analysis_mask = mu.smooth_map(
+    #     analysis_mask,
+    #     fwhm_deg=masks_settings['smoothing_radius'],
+    #     pix_type=meta.pix_type
+    # )
+    # if do_plots:
+    #     mu.plot_map(
+    #             analysis_mask,
+    #             title="Analysis mask",
+    #             file_name=f"{plot_dir}/analysis_mask_smoothed",
+    #             pix_type=meta.pix_type,
+    #             lims=[-analysis_mask.max(), analysis_mask.max()]
+    #         )
+
+    #####
+    # ALP: A better solution might be to crop the
+    # binary mask to make it more "continuous"
+    #####
+    analysis_mask = mu.crop_borders(
         analysis_mask,
-        fwhm_deg=masks_settings['smoothing_radius'],
+        crop_size=2.0,
+        smooth_scale=0.7,
         pix_type=meta.pix_type
     )
+    if do_plots:
+        mu.plot_map(
+            analysis_mask,
+            title="Analysis mask after cropping borders",
+            file_name=f"{plot_dir}/binary_galactic_cropped_mask",
+            pix_type=meta.pix_type,
+            lims=[-analysis_mask.max(), analysis_mask.max()]
+        )
+
     analysis_mask = mu.apodize_mask(
         analysis_mask,
         apod_radius_deg=masks_settings["apod_radius"],
         apod_type=masks_settings["apod_type"],
         pix_type=meta.pix_type
     )
+    if do_plots:
+        mu.plot_map(
+            analysis_mask,
+            title="Analysis mask after apodization",
+            file_name=f"{plot_dir}/binary_galactic_cropped_apodized_mask",
+            pix_type=meta.pix_type,
+            lims=[-analysis_mask.max(), analysis_mask.max()]
+        )
 
     if masks_settings["point_source_mask"] is not None:
         print("Reading point source mask ...")
@@ -236,6 +359,14 @@ def main(args):
             )
 
         analysis_mask *= ps_mask
+        if do_plots:
+            mu.plot_map(
+                analysis_mask,
+                title="Analysis mask after point source mask",
+                file_name=f"{plot_dir}/binary_galactic_cropped_apodized_ps_mask", # noqa
+                pix_type=meta.pix_type,
+                lims=[-analysis_mask.max(), analysis_mask.max()]
+            )
 
     # Weight with hitmap
     analysis_mask *= sum_hits

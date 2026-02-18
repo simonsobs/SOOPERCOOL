@@ -273,6 +273,37 @@ def smooth_map(map, fwhm_deg, pix_type="hp"):
         return enmap.smooth_gauss(map, np.deg2rad(sigma_deg))
 
 
+def crop_borders(map, crop_size, smooth_scale, pix_type="hp"):
+    """
+    Crop the borders of a map by setting to zero all pixels
+    within a given distance from the border. Both distance
+    and smoothing scale are given in degrees.
+
+    Parameters
+    ----------
+    map : enmap.ndmap
+        Input map.
+    crop_size : float
+        Distance from the border to crop in degrees.
+    smooth_scale : float
+        Smoothing scale in degrees.
+    pix_type : str, optional
+        Pixellization type.
+    """
+    out_map = map.copy()
+    _check_pix_type(pix_type)
+    if pix_type == "hp":
+        raise NotImplementedError(
+            "Border cropping not implemented for HEALPix maps."
+        )
+    else:
+        dist = enmap.distance_transform(map)
+        dist_smooth = enmap.smooth_gauss(dist, np.deg2rad(smooth_scale))
+        out_map[(dist_smooth < np.deg2rad(crop_size)) & (map != 0)] = 0.
+
+    return out_map
+
+
 def _plot_map_hp(map, lims=None, file_name=None, title=None):
     """
     Hidden function to plot HEALPIX maps and either show it
