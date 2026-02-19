@@ -26,9 +26,7 @@ def main(args):
     pcls_tf_est_dir = f"{out_dir}/cells_tf_est"
     BBmeta.make_dir(pcls_tf_est_dir)
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
 
     mask_file = meta.masks["analysis_mask"]
@@ -43,6 +41,16 @@ def main(args):
               "constructed from filtered data. "
               "SWITCHING OFF purification.")
         purify_b = False
+
+    lmax = mu.lmax_from_map(
+        meta.masks["analysis_mask"],
+        pix_type=meta.pix_type
+    )
+    if meta.lmax > lmax:
+        raise ValueError(
+            f"Specified lmax {meta.lmax} is larger than "
+            f"the maximum lmax from map resolution {lmax}"
+        )
 
     filtering_tags = meta.get_filtering_tags()
     filtering_tag_pairs = meta.get_independent_filtering_pairs()
@@ -162,14 +170,34 @@ def main(args):
                     _, wcs = enmap.read_map_geometry(meta.car_template)
 
                 field = {
-                    "spin0": nmt.NmtField(mask, map[:1], wcs=wcs),
-                    "spin2": nmt.NmtField(mask, map[1:],
-                                          purify_b=purify_b, wcs=wcs)
+                    "spin0": nmt.NmtField(
+                        mask,
+                        map[:1],
+                        wcs=wcs,
+                        lmax=meta.lmax
+                    ),
+                    "spin2": nmt.NmtField(
+                        mask,
+                        map[1:],
+                        purify_b=purify_b,
+                        wcs=wcs,
+                        lmax=meta.lmax
+                    )
                 }
                 field_filtered = {
-                    "spin0": nmt.NmtField(mask, map_filtered[:1], wcs=wcs),
-                    "spin2": nmt.NmtField(mask, map_filtered[1:],
-                                          purify_b=purify_b, wcs=wcs)
+                    "spin0": nmt.NmtField(
+                        mask,
+                        map_filtered[:1],
+                        wcs=wcs,
+                        lmax=meta.lmax
+                    ),
+                    "spin2": nmt.NmtField(
+                        mask,
+                        map_filtered[1:],
+                        purify_b=purify_b,
+                        wcs=wcs,
+                        lmax=meta.lmax
+                    )
                 }
 
                 fields[ftag]["unfiltered"][pure_type] = field
@@ -178,20 +206,24 @@ def main(args):
         if ftag1 is None and ftag2 is None:
             continue
 
-        pcls_mat_filtered = ps_utils.get_pcls_mat_transfer(
-            fields[ftag1]["filtered"],
-            nmt_bins, fields2=fields[ftag2]["filtered"]
-        )
-        pcls_mat_unfiltered = ps_utils.get_pcls_mat_transfer(
-            fields[ftag1]["unfiltered"],
-            nmt_bins, fields2=fields[ftag2]["unfiltered"]
-        )
+        pcls_mat_filtered, pcls_mat_filtered_unbinned = \
+            ps_utils.get_pcls_mat_transfer(
+                fields[ftag1]["filtered"],
+                nmt_bins, fields2=fields[ftag2]["filtered"],
+                return_unbinned=True
+            )
+        pcls_mat_unfiltered, pcls_mat_unfiltered_unbinned = \
+            ps_utils.get_pcls_mat_transfer(
+                fields[ftag1]["unfiltered"],
+                nmt_bins, fields2=fields[ftag2]["unfiltered"],
+                return_unbinned=True
+            )
 
         out_f = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_filtered_{id_sim:04d}.npz"  # noqa
         out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_{id_sim:04d}.npz"  # noqa
-        fplt = f"{plot_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_{id_sim:04d}.pdf"  # noqa
 
         if do_plot:
+            fplt = f"{plot_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_{id_sim:04d}.pdf"  # noqa
             ps_utils.plot_pcls_mat_transfer(
                 pcls_mat_unfiltered, pcls_mat_filtered, lb, fplt,
                 lmax=600
@@ -200,7 +232,10 @@ def main(args):
         np.savez(out_f, pcls_mat=pcls_mat_filtered)
         np.savez(out_unf, pcls_mat=pcls_mat_unfiltered)
 
-        comm.Barrier()
+        out_f = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_filtered_unbinned_{id_sim:04d}.npz"  # noqa
+        out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_unbinned_{id_sim:04d}.npz"  # noqa
+        np.savez(out_f, pcls_mat=pcls_mat_filtered_unbinned)
+        np.savez(out_unf, pcls_mat=pcls_mat_unfiltered_unbinned)
 
 
 if __name__ == "__main__":

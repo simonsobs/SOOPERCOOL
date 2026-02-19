@@ -1,7 +1,6 @@
 import argparse
 from soopercool import BBmeta
 import numpy as np
-import pymaster as nmt
 from soopercool import coupling_utils as cu
 
 
@@ -13,21 +12,26 @@ def main(args):
     out_dir = meta.output_directory
     couplings_dir = f"{out_dir}/couplings"
 
-    binning = np.load(meta.binning_file)
-    nmt_bins = nmt.NmtBin.from_edges(binning["bin_low"],
-                                     binning["bin_high"] + 1)
+    nmt_bins = meta.read_nmt_binning()
 
     tf_settings = meta.transfer_settings
 
     ps_names = meta.get_ps_names_list("all", coadd=True)
     filtering_pairs = meta.get_independent_filtering_pairs()
 
-    tf_dir = tf_settings["transfer_directory"]
-
     tf_dict = {}
-    for ftag1, ftag2 in filtering_pairs:
-        tf = np.load(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
-        tf_dict[ftag1, ftag2] = tf["full_tf"]
+
+    if filtering_pairs == [(None, None)]:
+        tf_unity = np.zeros((9, 9, nmt_bins.get_n_bands()))
+        for i in range(9):
+            tf_unity[i, i, :] = 1.0
+        tf_dict[None, None] = tf_unity
+    else:
+        tf_dir = tf_settings["transfer_directory"]
+
+        for ftag1, ftag2 in filtering_pairs:
+            tf = np.load(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
+            tf_dict[ftag1, ftag2] = tf["full_tf"]
 
     mcms_dict = cu.load_mcms(couplings_dir,
                              ps_names=ps_names, full_mcm=True)
@@ -42,12 +46,14 @@ def main(args):
     couplings_filtered = cu.get_couplings_dict(
         mcms_dict, nmt_bins,
         transfer_dict=tf_dict,
-        ps_names_and_ftags=ps_names_and_ftags
+        ps_names_and_ftags=ps_names_and_ftags,
+        compute_Dl=meta.compute_Dl
     )
     couplings_unfiltered = cu.get_couplings_dict(
         mcms_dict, nmt_bins,
         transfer_dict=None,
-        ps_names_and_ftags=ps_names_and_ftags
+        ps_names_and_ftags=ps_names_and_ftags,
+        compute_Dl=meta.compute_Dl
     )
 
     for ms1, ms2 in ps_names:

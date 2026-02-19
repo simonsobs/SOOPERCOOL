@@ -273,6 +273,37 @@ def smooth_map(map, fwhm_deg, pix_type="hp"):
         return enmap.smooth_gauss(map, np.deg2rad(sigma_deg))
 
 
+def crop_borders(map, crop_size, smooth_scale, pix_type="hp"):
+    """
+    Crop the borders of a map by setting to zero all pixels
+    within a given distance from the border. Both distance
+    and smoothing scale are given in degrees.
+
+    Parameters
+    ----------
+    map : enmap.ndmap
+        Input map.
+    crop_size : float
+        Distance from the border to crop in degrees.
+    smooth_scale : float
+        Smoothing scale in degrees.
+    pix_type : str, optional
+        Pixellization type.
+    """
+    out_map = map.copy()
+    _check_pix_type(pix_type)
+    if pix_type == "hp":
+        raise NotImplementedError(
+            "Border cropping not implemented for HEALPix maps."
+        )
+    else:
+        dist = enmap.distance_transform(map)
+        dist_smooth = enmap.smooth_gauss(dist, np.deg2rad(smooth_scale))
+        out_map[(dist_smooth < np.deg2rad(crop_size)) & (map != 0)] = 0.
+
+    return out_map
+
+
 def _plot_map_hp(map, lims=None, file_name=None, title=None):
     """
     Hidden function to plot HEALPIX maps and either show it
@@ -312,7 +343,6 @@ def _plot_map_hp(map, lims=None, file_name=None, title=None):
     for i in range(ncomp):
         if ncomp != 1:
             f = "TQU"[i]
-        print("np.shape(map)", np.shape(np.atleast_2d(map)))
         hp.mollview(
             np.atleast_2d(map)[i],
             cmap=cmap,
@@ -457,10 +487,10 @@ def apodize_mask(mask, apod_radius_deg, apod_type, pix_type="hp"):
         # mask_apo[idx] = 1
         if apod_type == "C1":
             mask_apo = enmap.apod_mask(
-                mask, width=apod_radius_deg*utils.degree
+                mask, width=np.deg2rad(apod_radius_deg)
             )
         else:
-            raise NotImplementedError(f"Unknown apodization type {apod_type}")
+            raise NotImplementedError(f"Unknown apodization type {apod_type}")  # noqa
 
     return mask_apo
 
@@ -496,6 +526,46 @@ def template_from_map(map, ncomp, pix_type="hp"):
         new_shape = (ncomp,) + shape[-2:]
 
         return enmap.zeros(new_shape, wcs)
+
+
+def sky_average(map, pix_type="hp"):
+    """
+    Compute the sky average of a map
+    depending on its pixellization type.
+    Parameters
+    ----------
+    map : np.ndarray or enmap.ndmap
+        Input map.
+    pix_type : str, optional
+        Pixellization type. Either 'hp' or 'car'.
+    Returns
+    -------
+    float
+        Sky average of the map.
+    """
+    _check_pix_type(pix_type)
+    if pix_type == "hp":
+        if len(map.shape) > 1:
+            return np.mean(map, axis=1)
+        else:
+            return np.mean(map)
+    else:
+        shape, wcs = map.geometry
+        pixel_area_sr = enmap.pixsizemap(shape, wcs)
+
+        if len(map.shape) > 2:
+            avg = []
+            for i in range(map.shape[0]):
+                weighted_sum = np.sum(
+                    map[i] * pixel_area_sr,
+                )
+                avg.append(weighted_sum / np.sum(pixel_area_sr))
+            return np.array(avg)
+        else:
+            weighted_sum = np.sum(
+                map * pixel_area_sr,
+            )
+            return weighted_sum / np.sum(pixel_area_sr)
 
 
 def binary_mask_from_map(map, pix_type="hp", geometry=None):

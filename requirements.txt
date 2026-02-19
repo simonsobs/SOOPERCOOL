@@ -4,6 +4,5 @@ healpy
 pymaster
 sacc
 camb
-Jinja2
 wget
 pixell

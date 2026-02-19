@@ -37,9 +37,10 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30):
         "TT": powers["total"][:, 0][lmin:lmax+1]*bl_sq,
         "EE": powers["total"][:, 1][lmin:lmax+1]*bl_sq,
         "TE": powers["total"][:, 3][lmin:lmax+1]*bl_sq,
+        "ET": powers["total"][:, 3][lmin:lmax+1]*bl_sq,
         "BB": powers["total"][:, 2][lmin:lmax+1]*bl_sq,
     }
-    for spec in ["EB", "TB"]:
+    for spec in ["EB", "TB", "BE", "BT"]:
         cl_th[spec] = np.zeros_like(lth)
 
     return lth, cl_th
@@ -314,89 +315,93 @@ def m_filter_map_old(map, map_file, mask, m_cut):
     mu.write_map(map_file.replace('.fits', '_filtered.fits'),
                  filtered_map, dtype=np.float32)
 
+####
+# This function is currently not used since filtering is an external module.
+# Jinja prevents unittests from running properly on github actions.
+# this is commented out for now
+####
+# def toast_filter_map(map, map_file, mask,
+#                      template, config, schedule,
+#                      nside, instrument, band,
+#                      sbatch_job_name, sbatch_dir,
+#                      nhits_map_only=False, sim_noise=False):
+#     """
+#     Create sbatch scripts for each simulation, based on given template file.
 
-def toast_filter_map(map, map_file, mask,
-                     template, config, schedule,
-                     nside, instrument, band,
-                     sbatch_job_name, sbatch_dir,
-                     nhits_map_only=False, sim_noise=False):
-    """
-    Create sbatch scripts for each simulation, based on given template file.
+#     Parameters
+#     ----------
+#     map : array-like (unused)
+#         This is an unused argument included for compatibility with other
+#         filters. TOAST won't read the map itself.
+#     map_file : str
+#         File path of the unfiltered map.
+#     mask : array-like (unused)
+#         This is an unused argument included for compatibility with other
+#         filters. TOAST won't read the mask itself.
+#     template : str
+#         Path to sbatch template file in Jinja2.
+#     config : str
+#         Path to TOAST toml config file.
+#     schedule : str
+#         Path to TOAST schedule file.
+#     nside : int
+#         Healpix Nside parameter of the filtered map.
+#     instrument : str
+#         Name of the instrument simulated by TOAST.
+#     band : str
+#         Name of the frequency band simulated by TOAST.
+#     sbatch_job_name : str
+#         Sbatch job name
+#     sbatch_dir : str
+#         Sbatch output directory.
+#     nhits_map_only : bool
+#         If True, only get a hits map from TOAST schedule file.
+#     sim_noise : bool
+#         If True, simulate noise with TOAST.
+#     """
+#     from jinja2 import Environment, FileSystemLoader
+#     from pathlib import Path
 
-    Parameters
-    ----------
-    map : array-like (unused)
-        This is an unused argument included for compatibility with other
-        filters. TOAST won't read the map itself.
-    map_file : str
-        File path of the unfiltered map.
-    mask : array-like (unused)
-        This is an unused argument included for compatibility with other
-        filters. TOAST won't read the mask itself.
-    template : str
-        Path to sbatch template file in Jinja2.
-    config : str
-        Path to TOAST toml config file.
-    schedule : str
-        Path to TOAST schedule file.
-    nside : int
-        Healpix Nside parameter of the filtered map.
-    instrument : str
-        Name of the instrument simulated by TOAST.
-    band : str
-        Name of the frequency band simulated by TOAST.
-    sbatch_job_name : str
-        Sbatch job name
-    sbatch_dir : str
-        Sbatch output directory.
-    nhits_map_only : bool
-        If True, only get a hits map from TOAST schedule file.
-    sim_noise : bool
-        If True, simulate noise with TOAST.
-    """
-    from jinja2 import Environment, FileSystemLoader
-    from pathlib import Path
+#     del map, mask  # delete unused arguments
 
-    del map, mask  # delete unused arguments
+#     # Path(...).resovle() will return absolute path.
+#     map_file = Path(map_file).resolve()
+#     if nhits_map_only:
+#         map_dir = map_file.parent
+#         map_dir.mkdir(parents=True, exist_ok=True)
+#     template_file = Path(template).resolve()
+#     template_dir = template_file.parent
+#     template_name = template_file.name
+#     config_file = Path(config).resolve()
+#     schedule_file = Path(schedule).resolve()
+#     sbatch_dir = Path(sbatch_dir).resolve()
+#     sbatch_outdir = sbatch_dir/sbatch_job_name
+#     sbatch_outdir.mkdir(parents=True, exist_ok=True)
+#     sbatch_file = sbatch_dir/(sbatch_job_name + '.sh')
+#     sbatch_log = sbatch_dir/(sbatch_job_name + '.log')
 
-    # Path(...).resovle() will return absolute path.
-    map_file = Path(map_file).resolve()
-    if nhits_map_only:
-        map_dir = map_file.parent
-        map_dir.mkdir(parents=True, exist_ok=True)
-    template_file = Path(template).resolve()
-    template_dir = template_file.parent
-    template_name = template_file.name
-    config_file = Path(config).resolve()
-    schedule_file = Path(schedule).resolve()
-    sbatch_dir = Path(sbatch_dir).resolve()
-    sbatch_outdir = sbatch_dir/sbatch_job_name
-    sbatch_outdir.mkdir(parents=True, exist_ok=True)
-    sbatch_file = sbatch_dir/(sbatch_job_name + '.sh')
-    sbatch_log = sbatch_dir/(sbatch_job_name + '.log')
+#     jinja2_env = Environment(
+#         loader=FileSystemLoader(template_dir),
+#         trim_blocks=True,
+#         lstrip_blocks=True)
+#     jinja2_temp = jinja2_env.get_template(template_name)
 
-    jinja2_env = Environment(
-        loader=FileSystemLoader(template_dir),
-        trim_blocks=True,
-        lstrip_blocks=True)
-    jinja2_temp = jinja2_env.get_template(template_name)
-
-    with open(sbatch_file, mode='w') as f:
-        f.write(jinja2_temp.render(
-            sbatch_job_name=sbatch_job_name,
-            sbatch_log=sbatch_log,
-            outdir=str(sbatch_outdir),
-            nside=nside,
-            band=band,
-            telescope=instrument,
-            config=str(config_file),
-            schedule=str(schedule_file),
-            map_file=str(map_file),
-            nhits_map_only=nhits_map_only,
-            sim_noise=sim_noise,
-            ))
-    os.chmod(sbatch_file, 0o755)
-    return sbatch_file
+#     with open(sbatch_file, mode='w') as f:
+#         f.write(jinja2_temp.render(
+#             sbatch_job_name=sbatch_job_name,
+#             sbatch_log=sbatch_log,
+#             outdir=str(sbatch_outdir),
+#             nside=nside,
+#             band=band,
+#             telescope=instrument,
+#             config=str(config_file),
+#             schedule=str(schedule_file),
+#             map_file=str(map_file),
+#             nhits_map_only=nhits_map_only,
+#             sim_noise=sim_noise,
+#             ))
+#     os.chmod(sbatch_file, 0o755)
+#     return sbatch_file
 
 
 def get_split_pairs_from_coadd_ps_name(map_set1, map_set2,
@@ -623,3 +628,17 @@ def read_beam_from_file(beam_file, lmax=None):
     if lmax is not None:
         return l[:lmax+1], bl[:lmax+1]
     return l, bl
+
+
+def multipole_min_from_tf(tf_file, field_pairs, snr_cut=3.):
+    """
+    """
+    tf = np.load(tf_file)
+    idx_bad_tf = {}
+    for fp in field_pairs:
+        name = f"{fp}_to_{fp}"
+        snr = tf[name] / tf[f"{name}_std"]
+        idx = np.where(snr < snr_cut)[0]
+        idx_bad_tf[fp] = idx.max() if idx.size > 0 else 0
+
+    return idx_bad_tf

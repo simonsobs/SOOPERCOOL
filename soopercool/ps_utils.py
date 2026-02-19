@@ -2,6 +2,8 @@ import soopercool.map_utils as mu
 from itertools import product
 import pymaster as nmt
 import numpy as np
+import matplotlib.pyplot as plt
+from pixell import enmap
 
 
 def get_validation_power_spectra(meta, id_sim, mask, nmt_binning,
@@ -80,7 +82,8 @@ def get_binned_cls(bp_win_dict, cls_dict_unbinned):
     return field_pairs_from_spins(cls_dict_binned)
 
 
-def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
+def get_coupled_pseudo_cls(fields1, fields2, nmt_binning,
+                           return_unbinned=False):
     """
     Compute the binned coupled pseudo-C_ell estimates from two
     (spin-0 or spin-2) NaMaster fields and a multipole binning scheme.
@@ -94,6 +97,8 @@ def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
     spins = list(fields1.keys())
 
     pcls = {}
+    if return_unbinned:
+        pcls_unbinned = {}
     for spin1 in spins:
         for spin2 in spins:
 
@@ -104,6 +109,11 @@ def get_coupled_pseudo_cls(fields1, fields2, nmt_binning):
             coupled_cell = coupled_cell[:, :nmt_binning.lmax+1]
 
             pcls[f"{spin1}x{spin2}"] = nmt_binning.bin_cell(coupled_cell)
+            if return_unbinned:
+                pcls_unbinned[f"{spin1}x{spin2}"] = coupled_cell
+    if return_unbinned:
+        return pcls, pcls_unbinned
+
     return pcls
 
 
@@ -137,6 +147,24 @@ def decouple_pseudo_cls(coupled_pseudo_cells, coupling_inv):
     return decoupled_pcls
 
 
+def get_weighted_pcls(pcls, mask, pix_type="car"):
+    """
+    """
+    pcls_dict = field_pairs_from_spins(pcls)
+
+    if pix_type == "hp":
+        weights = np.mean(mask ** 2)
+    elif pix_type == "car":
+        shape, wcs = mask.geometry
+        pixsizemap = enmap.pixsizemap(shape, wcs)  # sterradians
+        weights = np.sum(mask ** 2 * pixsizemap) / (4*np.pi)
+
+    for k in pcls_dict:
+        pcls_dict[k] = pcls_dict[k] / weights
+
+    return pcls_dict
+
+
 def field_pairs_from_spins(cls_in_dict):
     """
     Reorders power spectrum dictionary with a given input spin
@@ -164,7 +192,8 @@ def field_pairs_from_spins(cls_in_dict):
     return cls_out_dict
 
 
-def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
+def get_pcls_mat_transfer(fields, nmt_binning, fields2=None,
+                          return_unbinned=False):
     """
     Compute coupled binned pseudo-C_ell estimates from
     pure-E and pure-B transfer function estimation simulations,
@@ -185,13 +214,32 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
     n_bins = nmt_binning.get_n_bands()
     pcls_mat = np.zeros((9, 9, n_bins))
 
+    if return_unbinned:
+        pcls_mat_unbinned = np.zeros((9, 9, nmt_binning.lmax+1))
+        tmp_pcls_unbinned = {}
+
     index = 0
     cases = ["pureT", "pureE", "pureB"]
     tmp_pcls = {}
     for index, (pure_type1, pure_type2) in enumerate(product(cases, cases)):
-        pcls = get_coupled_pseudo_cls(fields[pure_type1],
-                                      fields2[pure_type2],
-                                      nmt_binning)
+        pcls = get_coupled_pseudo_cls(
+            fields[pure_type1],
+            fields2[pure_type2],
+            nmt_binning,
+            return_unbinned=return_unbinned
+        )
+        if return_unbinned:
+            pcls, pcls_unbinned = pcls
+            tmp_pcls_unbinned[pure_type1, pure_type2] = {
+                "TT": pcls_unbinned["spin0xspin0"][0],
+                "TE": pcls_unbinned["spin0xspin2"][0],
+                "TB": pcls_unbinned["spin0xspin2"][1],
+                "EE": pcls_unbinned["spin2xspin2"][0],
+                "EB": pcls_unbinned["spin2xspin2"][1],
+                "BE": pcls_unbinned["spin2xspin2"][2],
+                "BB": pcls_unbinned["spin2xspin2"][3]
+            }
+
         tmp_pcls[pure_type1, pure_type2] = {
             "TT": pcls["spin0xspin0"][0],
             "TE": pcls["spin0xspin2"][0],
@@ -215,12 +263,57 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None):
             tmp_pcls[pure_type1, pure_type2]["BB"]
         ])
 
+        if return_unbinned:
+            pcls_mat_unbinned[idx] = np.array([
+                tmp_pcls_unbinned[pure_type1, pure_type2]["TT"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["TE"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["TB"],
+                tmp_pcls_unbinned[pure_type2, pure_type1]["TE"],
+                tmp_pcls_unbinned[pure_type2, pure_type1]["TB"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["EE"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["EB"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["BE"],
+                tmp_pcls_unbinned[pure_type1, pure_type2]["BB"]
+            ])
+
+    if return_unbinned:
+        return pcls_mat, pcls_mat_unbinned
     return pcls_mat
+
+
+def bin_theory_cls(cls, bpwf):
+    """
+    """
+    fields_theory = {"TT": 0, "EE": 1, "BB": 2, "TE": 3}
+    fields_all = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
+    nl_th = cls["TT"].shape[0]
+
+    size, n_bins, _, nl = bpwf.shape
+    assert size == 9, "Unexpected number of fields in coupling matrix"
+    assert nl <= nl_th, f"Theory spectrum must contain ell up to {nl}."
+
+    cls_dict = {}
+    for fp in fields_all:
+        if fp in fields_theory:
+            cls_dict[fp] = cls[fp][:nl]
+        else:
+            cls_dict[fp] = np.zeros(nl)
+    cls_vec = np.array([cls_dict[fp] for fp in fields_all])
+
+    clb = np.dot(bpwf.reshape(size*n_bins, size*nl), cls_vec.reshape(size*nl))
+    clb = clb.reshape(size, n_bins)
+
+    return {fp: clb[ifp] for ifp, fp in enumerate(fields_all)}
 
 
 def plot_pcls_mat_transfer(pcls_mat_unfilt, pcls_mat_filt, lb, file_name,
                            lmax=None):
     """
+    Related to the covariance PR comments, this
+    function has a bug and inconsistently loop over
+    pure pairs. We will homogeneize this in
+    all soopercool scripts in the future to avoid
+    confusion.
     """
     import matplotlib.pyplot as plt
 
@@ -254,26 +347,74 @@ def plot_pcls_mat_transfer(pcls_mat_unfilt, pcls_mat_filt, lb, file_name,
     plt.savefig(file_name, bbox_inches="tight")
 
 
-def bin_theory_cls(cls, bpwf):
+def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
+                  cb_data=None, cb_data_err=None, add_theory=False,
+                  lth=None, clth=None, cbth=None, save_file=None):
     """
     """
-    fields_theory = {"TT": 0, "EE": 1, "BB": 2, "TE": 3}
-    fields_all = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
-    nl_th = cls["TT"].shape[0]
+    plt.figure(figsize=(8, 6))
+    grid = plt.GridSpec(4, 1, wspace=0, hspace=0)
+    if add_theory:
+        main = plt.subplot(grid[:-1])
+        sub = plt.subplot(grid[-1])
+        sub.set_xlabel(r"$\ell$")
+        sub.set_ylabel(r"$\Delta C_\ell / (\sigma / \sqrt{N_\mathrm{sims}})$")
+    else:
+        main = plt.subplot(grid[:])
+        main.set_xlabel(r"$\ell$")
 
-    size, n_bins, _, nl = bpwf.shape
-    assert size == 9, "Unexpected number of fields in coupling matrix"
-    assert nl <= nl_th, f"Theory spectrum must contain ell up to {nl}."
+    main.set_ylabel(r"$\ell (\ell + 1) C_\ell^{%s} / 2\pi$" % ylabel)
+    main.set_title(title)
 
-    cls_dict = {}
-    for fp in fields_all:
-        if fp in fields_theory:
-            cls_dict[fp] = cls[fp][:nl]
-        else:
-            cls_dict[fp] = np.zeros(nl)
-    cls_vec = np.array([cls_dict[fp] for fp in fields_all])
+    fac = lb * (lb + 1) / (2 * np.pi)
+    offset = 0 if cb_data is None else 1
 
-    clb = np.dot(bpwf.reshape(size*n_bins, size*nl), cls_vec.reshape(size*nl))
-    clb = clb.reshape(size, n_bins)
+    if add_theory:
+        fac_th = lth * (lth + 1) / (2 * np.pi)
+        main.plot(lth, fac_th * clth, c="darkgray", ls="-.", lw=2.6,
+                  label="theory")
 
-    return {fp: clb[ifp] for ifp, fp in enumerate(fields_all)}
+    main.errorbar(
+        lb-offset, fac * cb, yerr=fac * cb_err, marker="o", ls="None",
+        markerfacecolor="white", markeredgecolor="navy", label="sims",
+        elinewidth=1.75, ecolor="navy", markeredgewidth=1.75
+    )
+
+    if cb_data is not None:
+        main.errorbar(
+            lb+offset, fac * cb_data, yerr=fac * cb_data_err, marker="o",
+            ls="None", markerfacecolor="white", markeredgecolor="darkorange",
+            elinewidth=1.75, ecolor="darkorange", markeredgewidth=1.75,
+            label="data"
+        )
+
+    main.legend(fontsize=13)
+    main.set_xlim(*xlim)
+
+    if add_theory:
+        sub.axhspan(-3, 3, color="gray", alpha=0.1)
+        sub.axhspan(-2, 2, color="gray", alpha=0.4)
+        sub.axhspan(-1, 1, color="gray", alpha=0.8)
+
+        sub.plot(
+            lb-offset, (cb - cbth) / cb_err, marker="o", ls="None",
+            markerfacecolor="white", markeredgecolor="navy",
+            markeredgewidth=1.75
+        )
+        if cb_data is not None:
+            sub.plot(
+                lb+offset, (cb_data - cbth) / cb_data_err,
+                marker="o", ls="None",
+                markerfacecolor="white", markeredgecolor="darkorange",
+                markeredgewidth=1.75
+            )
+
+        sub.set_xlim(*xlim)
+        sub.set_ylim(-4.5, 4.5)
+
+    if save_file:
+        plt.savefig(save_file, bbox_inches="tight")
+    else:
+        plt.tight_layout()
+        plt.show()
+    plt.close()
