@@ -29,7 +29,7 @@ matplotlib.rcParams["text.usetex"] = True
 matplotlib.rcParams["xtick.direction"] = "in"
 matplotlib.rcParams["ytick.direction"] = "in"
 
-st.set_page_config(page_title="SAT null viewer", layout="wide")
+st.set_page_config(page_title="SOOPERpower", layout="wide")
 
 
 if "clicked" not in st.session_state:

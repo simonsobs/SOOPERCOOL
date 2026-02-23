@@ -31,33 +31,48 @@ matplotlib.rcParams["ytick.direction"] = "in"
 st.set_page_config(page_title="SOOPERpower", layout="wide")
 
 
-if "clicked" not in st.session_state:
-    st.session_state.clicked = False
+if "clicked1" not in st.session_state:
+    st.session_state.clicked1 = False
+if "clicked2" not in st.session_state:
+    st.session_state.clicked2 = False
 
 
-def open_file_dialog():
+def open_file_dialog1():
     root = tk.Tk()
-    # root.withdraw()
-    # root.mainloop()
     file_path = filedialog.askopenfilename()
     root.destroy()
-    st.session_state.file_path = file_path
-    st.session_state.clicked = True
+    st.session_state.file_path1 = file_path
+    st.session_state.clicked1 = True
 
 
-st.sidebar.text("Select a sacc file")
-st.sidebar.button("Browse", on_click=open_file_dialog)
+def open_file_dialog2():
+    root = tk.Tk()
+    file_path = filedialog.askopenfilename()
+    root.destroy()
+    st.session_state.file_path2 = file_path
+    st.session_state.clicked2 = True
+
+
+st.sidebar.text("Select SACC n°1")
+st.sidebar.button("Browse", on_click=open_file_dialog1, key="browse1")
 st.sidebar.markdown(
-    "Selected file: `%s`" % st.session_state.get("file_path", "None")
+    "Selected file: `%s`" % st.session_state.get("file_path1", "None")
 )
-if st.session_state.clicked:
+st.sidebar.text("Select SACC n°2")
+st.sidebar.button("Browse", on_click=open_file_dialog2, key="browse2")
+st.sidebar.markdown(
+    "Selected file: `%s`" % st.session_state.get("file_path2", "None")
+)
+if st.session_state.clicked1 and st.session_state.clicked2:
 
     # Load data
     # @st.cache_data
     def load_data():
-        s = sacc.Sacc.load_fits(st.session_state.file_path)
-        st.session_state.loaded_path = st.session_state.file_path
-        st.session_state.data = s
+        sacc1 = sacc.Sacc.load_fits(st.session_state.file_path1)
+        sacc2 = sacc.Sacc.load_fits(st.session_state.file_path2)
+        st.session_state.loaded_path1 = st.session_state.file_path1
+        st.session_state.loaded_path2 = st.session_state.file_path2
+        st.session_state.data = (sacc1, sacc2)
 
     def clear_ylims():
         st.session_state["ymin"] = None
@@ -66,13 +81,19 @@ if st.session_state.clicked:
     if "data" not in st.session_state:
         load_data()
     if (
-        "loaded_path" in st.session_state
-        and st.session_state.loaded_path != st.session_state.file_path
+        "loaded_path1" in st.session_state
+        and st.session_state.loaded_path1 != st.session_state.file_path1
     ):
         load_data()
-    s = st.session_state.data
-    tracer_pairs = s.get_tracer_combinations()
-    st.title("SOOPERpower")
+    if (
+        "loaded_path2" in st.session_state
+        and st.session_state.loaded_path2 != st.session_state.file_path2
+    ):
+        load_data()
+    s1, s2 = st.session_state.data
+    tracer_pairs1 = s1.get_tracer_combinations()
+    tracer_pairs2 = s2.get_tracer_combinations()
+    st.title("SACC comparator")
     st.html(
         """
         <style>
@@ -83,13 +104,14 @@ if st.session_state.clicked:
         """
     )
 
-    ms1_unique = np.unique([x[0] for x in tracer_pairs])
-    ms2_unique = np.unique([x[1] for x in tracer_pairs])
+    pair_options1 = [f"{x[0]} x {x[1]}" for x in tracer_pairs1]
+    pair_options2 = [f"{x[0]} x {x[1]}" for x in tracer_pairs2]
 
-    ms1ms2 = [f"{x[0]} x {x[1]}" for x in tracer_pairs]
-
-    pairs_to_display = st.sidebar.multiselect(
-        "Which map set pairs", ms1ms2, default=ms1ms2[0]
+    pairs_to_display1 = st.sidebar.selectbox(
+        "Which map set pairs", pair_options1, index=0, key="pair1"
+    )
+    pairs_to_display2 = st.sidebar.selectbox(
+        "Which map set pairs", pair_options2, index=0, key="pair2"
     )
 
     field_pair = st.sidebar.pills(
@@ -112,24 +134,44 @@ if st.session_state.clicked:
     plt.xlabel(r"$\ell$")
     plt.ylabel(r"$D_\ell^{%s}$" % field_pair)
 
-    for ms1ms2 in pairs_to_display:
-        ms1, ms2 = ms1ms2.split(" x ")
-        lb, cl, cov = s.get_ell_cl(f"cl_{fp}", ms1, ms2, return_cov=True)
-        err = np.sqrt(cov.diagonal())
-
-        plt.errorbar(
-            lb,
-            cl,
-            yerr=err,
-            marker="o",
-            label=f"{ms1} x {ms2}",
-            markerfacecolor="white",
-            markeredgewidth=1.0,
-            markersize=4,
-            elinewidth=1.0,
-            capsize=2.0,
-            ls="None",
-        )
+    lb1, cl1, cov1 = s1.get_ell_cl(
+        f"cl_{fp}",
+        *pairs_to_display1.split(" x "),
+        return_cov=True
+    )
+    lb2, cl2, cov2 = s2.get_ell_cl(
+        f"cl_{fp}",
+        *pairs_to_display2.split(" x "),
+        return_cov=True
+    )
+    err1 = np.sqrt(cov1.diagonal())
+    err2 = np.sqrt(cov2.diagonal())
+    plt.errorbar(
+        lb1,
+        cl1,
+        yerr=err1,
+        marker="o",
+        label=f"SACC1 {pairs_to_display1}",
+        markerfacecolor="white",
+        markeredgewidth=1.0,
+        markersize=4,
+        elinewidth=1.0,
+        capsize=2.0,
+        ls="None",
+    )
+    plt.errorbar(
+        lb2,
+        cl2,
+        yerr=err2,
+        marker="o",
+        label=f"SACC2 {pairs_to_display2}",
+        markerfacecolor="white",
+        markeredgewidth=1.0,
+        markersize=4,
+        elinewidth=1.0,
+        capsize=2.0,
+        ls="None",
+    )
 
     if logscale_xaxis:
         plt.xscale("log")
