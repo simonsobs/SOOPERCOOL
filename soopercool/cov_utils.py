@@ -8,7 +8,7 @@ import os
 from soopercool import map_utils as mu
 
 
-def load_covariance_workspace(cov_dir):
+def load_covariance_workspace(cov_dir, cov_names, hits):
     """
     """
     spin_pairs = list(product(["spin0", "spin2"], repeat=2))
@@ -17,15 +17,27 @@ def load_covariance_workspace(cov_dir):
         for (s0, s1) in spin_pairs
         for (s2, s3) in spin_pairs
     ]
+
+    cov_and_spins = list(product(cov_names, spin_combos))
+
     cwsp = {}
-    for s0, s1, s2, s3 in spin_combos:
+    # for s0, s1, s2, s3 in spin_combos:
+    for (ms0, ms1, ms2, ms3), (s0, s1, s2, s3) in cov_and_spins:
+        h0 = hits[ms0]
+        h1 = hits[ms1]
+        h2 = hits[ms2]
+        h3 = hits[ms3]
         cwsp[s0, s1, s2, s3] = nmt.NmtCovarianceWorkspace.from_file(
             f"{cov_dir}/cwsp_{s0}_{s1}_{s2}_{s3}"
         )
-        for kind in ["snsn", "snns", "nssn", "nsns", "nn"]:
-            cwsp[s0, s1, s2, s3, kind] = \
+        for kind in ["snsn", "snns", "nssn", "nsns", "nnnn"]:
+            n0 = s0 if kind[0] == "s" else f"{h0}_{s0}"
+            n1 = s1 if kind[1] == "s" else f"{h1}_{s1}"
+            n2 = s2 if kind[2] == "s" else f"{h2}_{s2}"
+            n3 = s3 if kind[3] == "s" else f"{h3}_{s3}"
+            cwsp[s0, s1, s2, s3, h0, h1, h2, h3, kind] = \
                 nmt.NmtCovarianceWorkspace.from_file(
-                    f"{cov_dir}/cwsp_{kind}_{s0}_{s1}_{s2}_{s3}"
+                    f"{cov_dir}/cwsp_{kind}_{n0}_{n1}_{n2}_{n3}"
                 )
 
     return cwsp
@@ -289,7 +301,8 @@ def compute_covariance_block(map_set1,
                              signal,
                              noise,
                              nmt_bins,
-                             n_bundles):
+                             n_bundles,
+                             hits):
     """
     Compute covariance block for the map_set1 x map_set2 and
     map_set3 x map_set4 cross-spectra.
@@ -298,6 +311,11 @@ def compute_covariance_block(map_set1,
     n2 = n_bundles[map_set2]
     n3 = n_bundles[map_set3]
     n4 = n_bundles[map_set4]
+
+    h1 = hits[map_set1]
+    h2 = hits[map_set2]
+    h3 = hits[map_set3]
+    h4 = hits[map_set4]
 
     Npairs_12 = n1 * (n2 - (exp1 == exp2))
     Npairs_34 = n3 * (n4 - (exp3 == exp4))
@@ -357,7 +375,12 @@ def compute_covariance_block(map_set1,
 
         # With noise inhomogeneities, we need to split those contributions
         covar += nmt.gaussian_covariance(
-            cwsp[s1, s2, s3, s4, "snsn"],
+            # cwsp[s1, s2, s3, s4, "snsn"],
+            cwsp[
+                s1, s2, s3, s4,
+                h1, h2, h3, h4,
+                "snsn"
+            ],
             int(s1[-1]), int(s2[-1]),
             int(s3[-1]), int(s4[-1]),
             cl13,
@@ -368,7 +391,12 @@ def compute_covariance_block(map_set1,
             wb=wsp[s3, s4]
         )
         covar += nmt.gaussian_covariance(
-            cwsp[s1, s2, s3, s4, "snns"],
+            # cwsp[s1, s2, s3, s4, "snns"],
+            cwsp[
+                s1, s2, s3, s4,
+                h1, h2, h3, h4,
+                "snns"
+            ],
             int(s1[-1]), int(s2[-1]),
             int(s3[-1]), int(s4[-1]),
             cl13 * 0.,
@@ -390,7 +418,12 @@ def compute_covariance_block(map_set1,
         factor14 /= Npairs_12 * Npairs_34
 
         covar += nmt.gaussian_covariance(
-            cwsp[s1, s2, s3, s4, "nssn"],
+            # cwsp[s1, s2, s3, s4, "nssn"],
+            cwsp[
+                s1, s2, s3, s4,
+                h1, h2, h3, h4,
+                "nssn"
+            ],
             int(s1[-1]), int(s2[-1]),
             int(s3[-1]), int(s4[-1]),
             nl13 * 0.,
@@ -401,7 +434,12 @@ def compute_covariance_block(map_set1,
             wb=wsp[s3, s4]
         )
         covar += nmt.gaussian_covariance(
-            cwsp[s1, s2, s3, s4, "nsns"],
+            # cwsp[s1, s2, s3, s4, "nsns"],
+            cwsp[
+                s1, s2, s3, s4,
+                h1, h2, h3, h4,
+                "nsns"
+            ],
             int(s1[-1]), int(s2[-1]),
             int(s3[-1]), int(s4[-1]),
             nl13 * factor13,
@@ -423,7 +461,12 @@ def compute_covariance_block(map_set1,
         factor_1423 /= Npairs_12 * Npairs_34
 
         covar += nmt.gaussian_covariance(
-            cwsp[s1, s2, s3, s4, "nn"],
+            # cwsp[s1, s2, s3, s4, "nn"],
+            cwsp[
+                s1, s2, s3, s4,
+                h1, h2, h3, h4,
+                "nnnn"
+            ],
             int(s1[-1]), int(s2[-1]),
             int(s3[-1]), int(s4[-1]),
             nl13 * np.sqrt(factor_1324),

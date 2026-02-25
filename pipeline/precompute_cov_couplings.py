@@ -36,17 +36,16 @@ def main(args):
     )
     wcs = mask.wcs if meta.pix_type == "car" else None
 
-    # TODO: improve hits input
-    # maybe with the path specified under
-    # map_set in paramfile
-    hits = mu.read_map(
-        meta.masks["analysis_mask"].replace(
-            "analysis_mask.fits",
-            "normalized_hits.fits"
-        ),
-        pix_type=meta.pix_type,
-        car_template=meta.car_template
-    )
+    hits = {}
+    for map_set in meta.map_sets:
+        hits_tag = meta.map_sets[map_set]["hits_tag"]
+        hits_file = meta.covariance["hits_files"][hits_tag]
+        if hits_tag not in hits:
+            hits[hits_tag] = mu.read_map(
+                hits_file,
+                pix_type=meta.pix_type,
+                car_template=meta.car_template
+            )
 
     t0 = time.time()
     fields = {}
@@ -66,33 +65,36 @@ def main(args):
         lmax=meta.lmax
     )
 
-    sigma = hits.copy()
-    sigma[hits > 0] = 1 / np.sqrt(hits[hits > 0])
-    mask_noise = mask * sigma
-    pix_type = "car" if hasattr(mask, "geometry") else "hp"
-    rescale_noise = mu.sky_average(
-        (sigma * mask) ** 2,
-        pix_type=pix_type,
-    ) / mu.sky_average(
-        mask ** 2,
-        pix_type=pix_type,
-    )
+    # for map_set in meta.map_sets:
+    for hits_tag, hit in hits.items():
 
-    fields["spin0", "noise"] = nmt.NmtField(
-        mask_noise / np.sqrt(rescale_noise),
-        maps=None,
-        wcs=wcs,
-        spin=0,
-        lmax=meta.lmax
-    )
-    fields["spin2", "noise"] = nmt.NmtField(
-        mask_noise / np.sqrt(rescale_noise),
-        maps=None,
-        purify_b=meta.pure_B,
-        wcs=wcs,
-        spin=2,
-        lmax=meta.lmax
-    )
+        sigma = hit.copy()
+        sigma[hit > 0] = 1 / np.sqrt(hit[hit > 0])
+        mask_noise = mask * sigma
+        pix_type = "car" if hasattr(mask, "geometry") else "hp"
+        rescale_noise = mu.sky_average(
+            (sigma * mask) ** 2,
+            pix_type=pix_type,
+        ) / mu.sky_average(
+            mask ** 2,
+            pix_type=pix_type,
+        )
+
+        fields["spin0", "noise", hits_tag] = nmt.NmtField(
+            mask_noise / np.sqrt(rescale_noise),
+            maps=None,
+            wcs=wcs,
+            spin=0,
+            lmax=meta.lmax
+        )
+        fields["spin2", "noise", hits_tag] = nmt.NmtField(
+            mask_noise / np.sqrt(rescale_noise),
+            maps=None,
+            purify_b=meta.pure_B,
+            wcs=wcs,
+            spin=2,
+            lmax=meta.lmax
+        )
     logger.info(f"[{rank}] Time to set up nmt fields: {time.time() - t0:.2f}s")
 
     spin_pairs = list(product(["spin0", "spin2"], repeat=2))
@@ -104,8 +106,33 @@ def main(args):
         for (s2, s3) in spin_pairs
     ]
     spin_combos = comm.bcast(spin_combos, root=0)
-    task_ids = mpi.distribute_tasks(size, rank, len(spin_combos))
-    local_spin_combos = [spin_combos[i] for i in task_ids]
+
+    map_set_pairs = meta.get_ps_names_list(
+        type="all",
+        coadd=True
+    )
+    map_sets_for_cov = []
+    for i, (ms0, ms1) in enumerate(map_set_pairs):
+        for j, (ms2, ms3) in enumerate(map_set_pairs):
+            if i > j:
+                continue
+            h0 = meta.map_sets[ms0]["hits_tag"]
+            h1 = meta.map_sets[ms1]["hits_tag"]
+            h2 = meta.map_sets[ms2]["hits_tag"]
+            h3 = meta.map_sets[ms3]["hits_tag"]
+            if not (h0, h1, h2, h3) in map_sets_for_cov:
+                map_sets_for_cov.append((h0, h1, h2, h3))
+
+    spin_and_map_sets = list(product(spin_combos, map_sets_for_cov))
+
+    task_ids = mpi.distribute_tasks(
+        size,
+        rank,
+        len(spin_and_map_sets)
+    )
+    local_spin_and_map_sets = [spin_and_map_sets[i] for i in task_ids]
+    # task_ids = mpi.distribute_tasks(size, rank, len(spin_combos))
+    # local_spin_combos = [spin_combos[i] for i in task_ids]
 
     t0 = time.time()
     wsp = {}
@@ -125,8 +152,12 @@ def main(args):
         f"[{rank}] Time to compute workspaces: {time.time() - t0:.2f}s"
     )
 
-    for s0, s1, s2, s3 in local_spin_combos:
-
+    # for s0, s1, s2, s3 in local_spin_combos:
+    for (s0, s1, s2, s3), (h0, h1, h2, h3) in local_spin_and_map_sets:
+        # h0 = meta.map_sets[ms0]["hits_tag"]
+        # h1 = meta.map_sets[ms1]["hits_tag"]
+        # h2 = meta.map_sets[ms2]["hits_tag"]
+        # h3 = meta.map_sets[ms3]["hits_tag"]
         # signal-signal
         t0 = time.time()
         fname_cwsp = f"{cov_dir}/cwsp_{s0}_{s1}_{s2}_{s3}"
@@ -144,13 +175,14 @@ def main(args):
 
         # signal-noise
         t0 = time.time()
-        fname_cwsp = f"{cov_dir}/cwsp_snsn_{s0}_{s1}_{s2}_{s3}"
+        # fname_cwsp = f"{cov_dir}/cwsp_snsn_{s0}_{s1}_{s2}_{s3}"
+        fname_cwsp = f"{cov_dir}/cwsp_snsn_{s0}_{h1}_{s1}_{s2}_{h3}_{s3}"
         if not os.path.exists(fname_cwsp):
             cwsp = nmt.NmtCovarianceWorkspace(
                 fields[s0],
-                fields[s1, "noise"],
+                fields[s1, "noise", h1],
                 fields[s2],
-                fields[s3, "noise"]
+                fields[s3, "noise", h3]
             )
             cwsp.write_to(fname_cwsp)
         logger.info(
@@ -158,36 +190,39 @@ def main(args):
         )
 
         t0 = time.time()
-        fname_cwsp = f"{cov_dir}/cwsp_snns_{s0}_{s1}_{s2}_{s3}"
+        # fname_cwsp = f"{cov_dir}/cwsp_snns_{s0}_{s1}_{s2}_{s3}"
+        fname_cwsp = f"{cov_dir}/cwsp_snns_{s0}_{h1}_{s1}_{h2}_{s2}_{s3}"
         if not os.path.exists(fname_cwsp):
             cwsp = nmt.NmtCovarianceWorkspace(
                 fields[s0],
-                fields[s1, "noise"],
-                fields[s2, "noise"],
+                fields[s1, "noise", h1],
+                fields[s2, "noise", h2],
                 fields[s3]
             )
             cwsp.write_to(fname_cwsp)
         logger.info(f"[{rank}] snns cwsp computed in {time.time() - t0:.2f} s")
 
         t0 = time.time()
-        fname_cwsp = f"{cov_dir}/cwsp_nssn_{s0}_{s1}_{s2}_{s3}"
+        # fname_cwsp = f"{cov_dir}/cwsp_nssn_{s0}_{s1}_{s2}_{s3}"
+        fname_cwsp = f"{cov_dir}/cwsp_nssn_{h0}_{s0}_{s1}_{s2}_{h3}_{s3}"
         if not os.path.exists(fname_cwsp):
             cwsp = nmt.NmtCovarianceWorkspace(
-                fields[s0, "noise"],
+                fields[s0, "noise", h0],
                 fields[s1],
                 fields[s2],
-                fields[s3, "noise"]
+                fields[s3, "noise", h3]
             )
             cwsp.write_to(fname_cwsp)
         logger.info(f"[{rank}] nssn cwsp computed in {time.time() - t0:.2f} s")
 
         t0 = time.time()
-        fname_cwsp = f"{cov_dir}/cwsp_nsns_{s0}_{s1}_{s2}_{s3}"
+        # fname_cwsp = f"{cov_dir}/cwsp_nsns_{s0}_{s1}_{s2}_{s3}"
+        fname_cwsp = f"{cov_dir}/cwsp_nsns_{h0}_{s0}_{s1}_{h2}_{s2}_{s3}"
         if not os.path.exists(fname_cwsp):
             cwsp = nmt.NmtCovarianceWorkspace(
-                fields[s0, "noise"],
+                fields[s0, "noise", h0],
                 fields[s1],
-                fields[s2, "noise"],
+                fields[s2, "noise", h2],
                 fields[s3]
             )
             cwsp.write_to(fname_cwsp)
@@ -195,13 +230,13 @@ def main(args):
 
         # noise-noise
         t0 = time.time()
-        fname_cwsp = f"{cov_dir}/cwsp_nn_{s0}_{s1}_{s2}_{s3}"
+        fname_cwsp = f"{cov_dir}/cwsp_nnnn_{h0}_{s0}_{h1}_{s1}_{h2}_{s2}_{h3}_{s3}" # noqa
         if not os.path.exists(fname_cwsp):
             cwsp = nmt.NmtCovarianceWorkspace(
-                fields[s0, "noise"],
-                fields[s1, "noise"],
-                fields[s2, "noise"],
-                fields[s3, "noise"]
+                fields[s0, "noise", h0],
+                fields[s1, "noise", h1],
+                fields[s2, "noise", h2],
+                fields[s3, "noise", h3]
             )
             cwsp.write_to(fname_cwsp)
         logger.info(f"[{rank}] nn cwsp computed in {time.time() - t0:.2f}s")
