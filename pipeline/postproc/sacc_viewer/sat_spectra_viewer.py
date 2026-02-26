@@ -117,10 +117,12 @@ if st.session_state.clicked:
         lb, cl, cov = s.get_ell_cl(f"cl_{fp}", ms1, ms2, return_cov=True)
         err = np.sqrt(cov.diagonal())
 
+        mask = (lb >= range_x[0]) & (lb <= range_x[1])
+
         plt.errorbar(
-            lb,
-            cl,
-            yerr=err,
+            lb[mask],
+            cl[mask],
+            yerr=err[mask],
             marker="o",
             label=f"{ms1} x {ms2}",
             markerfacecolor="white",
@@ -140,16 +142,19 @@ if st.session_state.clicked:
     min_y, max_y = plt.gca().get_ylim()
 
     min_y = st.sidebar.number_input(
-        "Y-axis min", value=None, format="%.3f", key="ymin"
+        "Y-axis min", value=None, format="%.2E", key="ymin"
     )
     max_y = st.sidebar.number_input(
-        "Y-axis max", value=None, format="%.3f", key="ymax"
+        "Y-axis max", value=None, format="%.2E", key="ymax"
     )
     range_y = (min_y, max_y)
     plt.ylim(*range_y)
 
     plt.legend(
-        frameon=False, ncol=1, bbox_to_anchor=(1.0, 1.0), loc="upper left"
+        frameon=False,
+        ncol=1,
+        bbox_to_anchor=(0.5, -0.13),
+        loc="upper center"
     )
 
     plt.gca().set_facecolor(stcolor)

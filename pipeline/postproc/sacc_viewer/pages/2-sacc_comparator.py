@@ -182,10 +182,10 @@ if st.session_state.clicked1 and st.session_state.clicked2:
     min_y, max_y = plt.gca().get_ylim()
 
     min_y = st.sidebar.number_input(
-        "Y-axis min", value=None, format="%.3f", key="ymin"
+        "Y-axis min", value=None, format="%.2E", key="ymin"
     )
     max_y = st.sidebar.number_input(
-        "Y-axis max", value=None, format="%.3f", key="ymax"
+        "Y-axis max", value=None, format="%.2E", key="ymax"
     )
     range_y = (min_y, max_y)
     plt.ylim(*range_y)
