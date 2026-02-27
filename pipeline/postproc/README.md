@@ -28,6 +28,7 @@ python fit_EB_angles.py --sacc-file /path/to/sacc \
                         --lmin-fit ... [int] \
                         --lmax-fit ... [int] \
                         --lmax-sacc ... [int]
+                        --map-sets-to-fit map_set1,map_set2,...
 ```
 The parameter `lmax-sacc` is used to cut sacc files before building the full rotation matrix to rotate it and save it back. It is usually useful to set it to a relatively low value (e.g. 650) to make this step less computationally expensive.
 
@@ -43,3 +44,13 @@ python fit_EE_cals.py --sacc-file /path/to/sacc \
                       --map-set-ref name_of_reference_map_set \
                       --map-sets-to-fit map_set1,map_set2,...
 ```
+Alternatively there is also a post-processing script to jointly fit for a EE calibration amplitude and beam fwhm which you can run as
+```
+python fit_cals_and_beams.py --sacc_file /path/to/sacc \
+                             --lmin-fit ... [int] \
+                             --lmax-fit ... [int] \
+                             --lmax-sacc ... [int] \
+                             --map-sets-refs map_set_ref1,map_set_ref2,... \
+                             --map-sets-to-fit map_set1,map_set2,... 
+```
+where `map-sets-refs` and `map-sets-to-fit` should have the same length to be able to select a different reference map for each `map_set` we want to calibrate.
