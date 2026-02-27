@@ -221,7 +221,7 @@ class BBmeta(object):
             os.path.join(self.mask_directory, self.masks["nhits_map"]),
             map, dtype=np.float32, pix_type=self.pix_type)
 
-    def read_nmt_binning(self, force_cl=True):
+    def read_nmt_binning(self, force_cl=False):
         """
         Read the binning file and return the corresponding NmtBin object.
         """
