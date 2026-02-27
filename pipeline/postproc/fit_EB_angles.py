@@ -21,7 +21,9 @@ def main(args):
     s.keep_indices(idx)
 
     tracers = list(s.tracers.keys())
-    n_params = len(tracers)
+
+    map_sets_to_fit = args.map_sets_to_fit.split(",")
+    n_params = len(map_sets_to_fit)
 
     def tomin(p, s):
         """
@@ -31,7 +33,11 @@ def main(args):
         tracer_pairs = s.get_tracer_combinations()
         ps_vec = s.mean
         cov = s.covariance.covmat
-        alpha_EB = {tracer: p[i] for i, tracer in enumerate(tracers)}
+        # alpha_EB = {tracer: p[i] for i, tracer in enumerate(tracers)}
+        alpha_EB = {tracer: p[i] for i, tracer in enumerate(map_sets_to_fit)}
+        for tr in tracers:
+            if tr not in map_sets_to_fit:
+                alpha_EB[tr] = 0.0
         Mrot = pputils.EBrot_mat(s, alpha_EB)
         unrot_ps_vec = np.transpose(Mrot) @ ps_vec
 
@@ -56,7 +62,10 @@ def main(args):
     )
     params = res.x
     print("Minimization stopped !")
-    alpha_EB = {tracer: params[i] for i, tracer in enumerate(tracers)}
+    alpha_EB = {tracer: params[i] for i, tracer in enumerate(map_sets_to_fit)}
+    for tr in tracers:
+        if tr not in map_sets_to_fit:
+            alpha_EB[tr] = 0.0
 
     # Get full multipole range
     print("Reading full sacc file")
@@ -164,6 +173,11 @@ if __name__ == "__main__":
         "--lmax-sacc",
         type=int,
         help="Maximum multipole to keep in the output SACC file",
+    )
+    parser.add_argument(
+        "--map-sets-to-fit",
+        type=str,
+        help="Map set to fit for the EB angles",
     )
     args = parser.parse_args()
 

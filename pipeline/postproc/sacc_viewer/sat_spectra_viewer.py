@@ -109,6 +109,9 @@ if st.session_state.clicked:
 
     stcolor = "#0e1117"
     fig = plt.figure(figsize=(9, 7), facecolor=stcolor)
+    if fp in ["eb", "be", "0b", "b0"]:
+        plt.axhline(0., color="white", ls="--")
+
     plt.xlabel(r"$\ell$")
     plt.ylabel(r"$D_\ell^{%s}$" % field_pair)
 

@@ -131,6 +131,9 @@ if st.session_state.clicked1 and st.session_state.clicked2:
 
     stcolor = "#0e1117"
     fig = plt.figure(figsize=(9, 7), facecolor=stcolor)
+    if fp in ["eb", "be", "0b", "b0"]:
+        plt.axhline(0., color="white", ls="--")
+
     plt.xlabel(r"$\ell$")
     plt.ylabel(r"$D_\ell^{%s}$" % field_pair)
 
@@ -146,10 +149,13 @@ if st.session_state.clicked1 and st.session_state.clicked2:
     )
     err1 = np.sqrt(cov1.diagonal())
     err2 = np.sqrt(cov2.diagonal())
+
+    mask1 = (lb1 >= range_x[0]) & (lb1 <= range_x[1])
+    mask2 = (lb2 >= range_x[0]) & (lb2 <= range_x[1])
     plt.errorbar(
-        lb1,
-        cl1,
-        yerr=err1,
+        lb1[mask1]-1,
+        cl1[mask1],
+        yerr=err1[mask1],
         marker="o",
         label=f"SACC1 {pairs_to_display1}",
         markerfacecolor="white",
@@ -160,9 +166,9 @@ if st.session_state.clicked1 and st.session_state.clicked2:
         ls="None",
     )
     plt.errorbar(
-        lb2,
-        cl2,
-        yerr=err2,
+        lb2[mask2]+1,
+        cl2[mask2],
+        yerr=err2[mask2],
         marker="o",
         label=f"SACC2 {pairs_to_display2}",
         markerfacecolor="white",
@@ -191,7 +197,10 @@ if st.session_state.clicked1 and st.session_state.clicked2:
     plt.ylim(*range_y)
 
     plt.legend(
-        frameon=False, ncol=1, bbox_to_anchor=(1.0, 1.0), loc="upper left"
+        frameon=False,
+        ncol=1,
+        bbox_to_anchor=(0.5, -0.13),
+        loc="upper center"
     )
 
     plt.gca().set_facecolor(stcolor)
