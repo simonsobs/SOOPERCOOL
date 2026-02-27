@@ -115,15 +115,21 @@ if st.session_state.clicked:
     plt.xlabel(r"$\ell$")
     plt.ylabel(r"$D_\ell^{%s}$" % field_pair)
 
-    for ms1ms2 in pairs_to_display:
+    for id12, ms1ms2 in enumerate(pairs_to_display):
         ms1, ms2 = ms1ms2.split(" x ")
         lb, cl, cov = s.get_ell_cl(f"cl_{fp}", ms1, ms2, return_cov=True)
         err = np.sqrt(cov.diagonal())
 
+        offset = (
+            (id12 - len(pairs_to_display) / 2 + 0.5)
+            * (range_x[1] - range_x[0])
+            * 0.002
+        )
+
         mask = (lb >= range_x[0]) & (lb <= range_x[1])
 
         plt.errorbar(
-            lb[mask],
+            lb[mask] + offset,
             cl[mask],
             yerr=err[mask],
             marker="o",
