@@ -18,6 +18,8 @@ def main(args):
     to_fit = args.map_sets_to_fit
     to_fit = to_fit.split(",")
 
+    beam_fit = not args.no_beam_fit
+
     out_dir = "EE_cals_and_beams"
     os.makedirs(out_dir, exist_ok=True)
 
@@ -41,7 +43,8 @@ def main(args):
     cov = s.covariance.covmat
 
     cals = {}
-    fwhms = {}
+    if beam_fit:
+        fwhms = {}
     for tr_to_fit, tr_ref in zip(to_fit, refs):
         if tr_to_fit == tr_ref:
             raise ValueError(
@@ -63,17 +66,22 @@ def main(args):
 
         def tomin(p):
             cal = p[0]
-            fwhm_amin = p[1]
-            fwhm_deg = fwhm_amin / 60.0
-            fwhm_rad = np.deg2rad(fwhm_deg)
 
-            bl = hp.gauss_beam(fwhm=fwhm_rad, lmax=2000)
-            ell = np.arange(len(bl))
-            bl_rescale = bl / ell / (ell+1) * 2 * np.pi
-            bl_rescale[0] = 0.
-            # bl_00 = bpw_00 @ bl_rescale[: bpw_00.shape[-1]]
-            bl_01 = bpw_01 @ bl_rescale[: bpw_01.shape[-1]]
-            bl_11 = bpw_11 @ bl_rescale[: bpw_11.shape[-1]]
+            if beam_fit:
+                fwhm_amin = p[1]
+                fwhm_deg = fwhm_amin / 60.0
+                fwhm_rad = np.deg2rad(fwhm_deg)
+
+                bl = hp.gauss_beam(fwhm=fwhm_rad, lmax=2000)
+                ell = np.arange(len(bl))
+                bl_rescale = bl / ell / (ell+1) * 2 * np.pi
+                bl_rescale[0] = 0.
+                # bl_00 = bpw_00 @ bl_rescale[: bpw_00.shape[-1]]
+                bl_01 = bpw_01 @ bl_rescale[: bpw_01.shape[-1]]
+                bl_11 = bpw_11 @ bl_rescale[: bpw_11.shape[-1]]
+            else:
+                bl_01 = 1.0
+                bl_11 = 1.0
 
             P = np.zeros((2 * nl, len(idx)))
 
@@ -93,19 +101,26 @@ def main(args):
 
             return res.T @ invcov @ res
 
+        p0 = [1.0]
+        if beam_fit:
+            p0.append(20.0)
         res = minimize(
             tomin,
-            x0=np.array([1.0, 20.0]),
+            x0=np.array(p0),
             method="L-BFGS-B",
         )
-        cal, fwhm = res.x[0], res.x[1]
+        if beam_fit:
+            cal, fwhm = res.x[0], res.x[1]
+        else:
+            cal = res.x[0]
         print(
             f"Calibration factor for {tr_to_fit} relative to {tr_ref}: {cal:.4f}" # noqa
         )
-        print(f"Best-fit beam FWHM for {tr_to_fit}: {fwhm:.2f} arcmin")
+        if beam_fit:
+            print(f"Best-fit beam FWHM for {tr_to_fit}: {fwhm:.2f} arcmin")
+            fwhms[tr_to_fit] = fwhm
 
         cals[tr_to_fit] = cal
-        fwhms[tr_to_fit] = fwhm
 
     # Get full multipole range
     print("Reading full sacc file")
@@ -120,8 +135,9 @@ def main(args):
     # Save calibs
     with open(f"{out_dir}/calibrations_lmin{lmin}_lmax{lmax}.pkl", "wb") as f:
         pickle.dump(cals, f)
-    with open(f"{out_dir}/beam_fwhms_lmin{lmin}_lmax{lmax}.pkl", "wb") as f:
-        pickle.dump(fwhms, f)
+    if beam_fit:
+        with open(f"{out_dir}/beam_fwhms_lmin{lmin}_lmax{lmax}.pkl", "wb") as f: # noqa
+            pickle.dump(fwhms, f)
 
     # Save sacc file
     s_out = sacc.Sacc()
@@ -152,31 +168,35 @@ def main(args):
             else:
                 c2 = 1.0
 
-            fwhm1 = fwhms.get(t1, 0.0)
-            fwhm2 = fwhms.get(t2, 0.0)
-            if fwhm1 != 0.0:
-                fwhm_deg = fwhm1 / 60.0
-                fwhm_rad = np.deg2rad(fwhm_deg)
-                bl1 = hp.gauss_beam(fwhm=fwhm_rad, lmax=2000)
-                ell = np.arange(len(bl1))
-                bl_rescale1 = bl1 / ell / (ell+1) * 2 * np.pi
-                bl_rescale1[0] = 0.
-                bpw = s.get_bandpower_windows(idx).weight.T
-                bl_rescale1 = bpw @ bl_rescale1[: bpw.shape[-1]]
-            else:
-                bl_rescale1 = 1
+            if beam_fit:
+                fwhm1 = fwhms.get(t1, 0.0)
+                fwhm2 = fwhms.get(t2, 0.0)
+                if fwhm1 != 0.0:
+                    fwhm_deg = fwhm1 / 60.0
+                    fwhm_rad = np.deg2rad(fwhm_deg)
+                    bl1 = hp.gauss_beam(fwhm=fwhm_rad, lmax=2000)
+                    ell = np.arange(len(bl1))
+                    bl_rescale1 = bl1 / ell / (ell+1) * 2 * np.pi
+                    bl_rescale1[0] = 0.
+                    bpw = s.get_bandpower_windows(idx).weight.T
+                    bl_rescale1 = bpw @ bl_rescale1[: bpw.shape[-1]]
+                else:
+                    bl_rescale1 = 1
 
-            if fwhm2 != 0.0:
-                fwhm_deg = fwhm2 / 60.0
-                fwhm_rad = np.deg2rad(fwhm_deg)
-                bl2 = hp.gauss_beam(fwhm=fwhm_rad, lmax=2000)
-                ell = np.arange(len(bl2))
-                bl_rescale2 = bl2 / ell / (ell+1) * 2 * np.pi
-                bl_rescale2[0] = 0.
-                bpw = s.get_bandpower_windows(idx).weight.T
-                bl_rescale2 = bpw @ bl_rescale2[: bpw.shape[-1]]
+                if fwhm2 != 0.0:
+                    fwhm_deg = fwhm2 / 60.0
+                    fwhm_rad = np.deg2rad(fwhm_deg)
+                    bl2 = hp.gauss_beam(fwhm=fwhm_rad, lmax=2000)
+                    ell = np.arange(len(bl2))
+                    bl_rescale2 = bl2 / ell / (ell+1) * 2 * np.pi
+                    bl_rescale2[0] = 0.
+                    bpw = s.get_bandpower_windows(idx).weight.T
+                    bl_rescale2 = bpw @ bl_rescale2[: bpw.shape[-1]]
+                else:
+                    bl_rescale2 = 1
             else:
-                bl_rescale2 = 1
+                bl_rescale1 = 1.0
+                bl_rescale2 = 1.0
             lb, _ = s.get_ell_cl(data_type=dtype, tracer1=t1, tracer2=t2)
             s_out.add_ell_cl(
                 **{
@@ -190,16 +210,18 @@ def main(args):
             )
             tot_idx += list(idx)
             cal_vec.append(
-                np.full_like(idx, c1 * c2)
+                np.full_like(idx, c1 * c2, dtype=np.float64)
             )
+            print(t1, t2, c1, c2)
             bl = bl_rescale1 * bl_rescale2
             # test if bl is an array
             if isinstance(bl, np.ndarray):
                 bl_vec.append(bl)
             else:
-                bl_vec.append(np.full_like(idx, bl))
+                bl_vec.append(np.full_like(idx, bl, dtype=np.float64))
     cal_vec = np.concatenate(cal_vec)
     bl_vec = np.concatenate(bl_vec)
+
     cov_cal = (
         cov[np.ix_(tot_idx, tot_idx)]
         * np.outer(cal_vec, cal_vec)
@@ -233,6 +255,11 @@ if __name__ == "__main__":
         "--map-sets-to-fit",
         type=str,
         help="Map sets to fit for the EE calibration (default: all map sets)",
+    )
+    parser.add_argument(
+        "--no-beam-fit",
+        action="store_true",
+        help="Whether to fit for beam parameters or not",
     )
     args = parser.parse_args()
 
