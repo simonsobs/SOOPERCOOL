@@ -1,11 +1,10 @@
 from scipy.optimize import minimize
-# import matplotlib.pyplot as plt
-import pickle
+import healpy as hp
 import numpy as np
 import argparse
 import sacc
-import os
-import healpy as hp
+import time
+import json
 
 
 def main(args):
@@ -19,9 +18,6 @@ def main(args):
     to_fit = to_fit.split(",")
 
     beam_fit = not args.no_beam_fit
-
-    out_dir = "EE_cals_and_beams"
-    os.makedirs(out_dir, exist_ok=True)
 
     s = sacc.Sacc.load_fits(sacc_file)
     idx = s.indices("cl_ee", ell__gt=lmin, ell__lt=lmax)
@@ -132,13 +128,6 @@ def main(args):
     cov = s.covariance.covmat
     # idx_ref = s.indices("cl_ee", (ref, ref))
 
-    # Save calibs
-    with open(f"{out_dir}/calibrations_lmin{lmin}_lmax{lmax}.pkl", "wb") as f:
-        pickle.dump(cals, f)
-    if beam_fit:
-        with open(f"{out_dir}/beam_fwhms_lmin{lmin}_lmax{lmax}.pkl", "wb") as f: # noqa
-            pickle.dump(fwhms, f)
-
     # Save sacc file
     s_out = sacc.Sacc()
     for tracer_name, tracer in s.tracers.items():
@@ -212,7 +201,6 @@ def main(args):
             cal_vec.append(
                 np.full_like(idx, c1 * c2, dtype=np.float64)
             )
-            print(t1, t2, c1, c2)
             bl = bl_rescale1 * bl_rescale2
             # test if bl is an array
             if isinstance(bl, np.ndarray):
@@ -228,7 +216,21 @@ def main(args):
         / np.outer(bl_vec, bl_vec)
     )
     s_out.add_covariance(cov_cal)
-    fname = f"{out_dir}/cl_and_cov_sacc_calibrated_lmin{lmin}_lmax{lmax}.fits"
+
+    s_out.metadata = s.metadata
+    s_out.metadata[f"EE_cals_{int(time.time())}"] = json.dumps({
+        "calibrations": cals,
+        "beam_fwhms": fwhms if beam_fit else None,
+        "lmin_fit": lmin,
+        "lmax_fit": lmax,
+        "map_sets_ref": refs,
+        "map_sets_to_fit": to_fit,
+    })
+
+    fname = sacc_file.replace(
+        ".fits",
+        "_calibrated.fits",
+    )
     s_out.save_fits(fname)
 
 

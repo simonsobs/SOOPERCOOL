@@ -1,20 +1,16 @@
-import postproc_utils as pputils
-import sacc
 from scipy.optimize import minimize
+import postproc_utils as pputils
 import numpy as np
-import matplotlib.pyplot as plt
 import argparse
-import pickle as p
-import os
+import sacc
+import time
+import json
 
 
 def main(args):
     sacc_file = args.sacc_file
     lmin = args.lmin_fit
     lmax = args.lmax_fit
-
-    out_dir = "sacc_rotation"
-    os.makedirs(out_dir, exist_ok=True)
 
     s = sacc.Sacc.load_fits(sacc_file)
     idx = s.indices(ell__gt=lmin, ell__lt=lmax)
@@ -33,7 +29,6 @@ def main(args):
         tracer_pairs = s.get_tracer_combinations()
         ps_vec = s.mean
         cov = s.covariance.covmat
-        # alpha_EB = {tracer: p[i] for i, tracer in enumerate(tracers)}
         alpha_EB = {tracer: p[i] for i, tracer in enumerate(map_sets_to_fit)}
         for tr in tracers:
             if tr not in map_sets_to_fit:
@@ -80,55 +75,6 @@ def main(args):
     unrot_ps_vec = np.transpose(Mrot) @ ps_vec
     unrot_covariance = np.transpose(Mrot) @ cov @ Mrot
 
-    for tr1, tr2 in s.get_tracer_combinations():
-        idxEB = s.indices("cl_eb", (tr1, tr2))
-
-        lb, _ = s.get_ell_cl("cl_eb", tr1, tr2)
-        plt.figure(figsize=(8, 6))
-        plt.axhline(0, color="k", ls="--", lw=1.0)
-        plt.axvline(lmin, color="gray", ls="--", lw=1.0)
-        plt.axvline(lmax, color="gray", ls="--", lw=1.0)
-        plt.errorbar(
-            lb,
-            ps_vec[idxEB],
-            yerr=np.sqrt(cov[np.ix_(idxEB, idxEB)].diagonal()),
-            marker="o",
-            ls="None",
-            markerfacecolor="white",
-            markeredgewidth=1.2,
-            elinewidth=1.2,
-            capsize=2.5,
-            capthick=1.2,
-            color="navy",
-            label="Measured",
-        )
-        plt.errorbar(
-            lb,
-            unrot_ps_vec[idxEB],
-            yerr=np.sqrt(unrot_covariance[np.ix_(idxEB, idxEB)].diagonal()),
-            marker="o",
-            ls="None",
-            markerfacecolor="white",
-            markeredgewidth=1.2,
-            elinewidth=1.2,
-            capsize=2.5,
-            capthick=1.2,
-            color="DodgerBlue",
-            label="EB-nulled",
-        )
-        plt.ylim(-0.8, 0.8)
-        plt.xlabel(r"$\ell$", fontsize=17)
-        plt.ylabel(r"$D_\ell^{EB}$", fontsize=17)
-        plt.title(f"{tr1} x {tr2}", fontsize=13)
-        plt.legend(frameon=False, fontsize=17)
-        plt.savefig(
-            f"{out_dir}/EB_spectrum_{tr1}_{tr2}.pdf", bbox_inches="tight"
-        )
-
-    # Save EB angles
-    with open(f"{out_dir}/EB_angles.pkl", "wb") as f:
-        p.dump(alpha_EB, f)
-
     # Save sacc file
     s_out = sacc.Sacc()
     for tracer_name, tracer in s.tracers.items():
@@ -146,6 +92,7 @@ def main(args):
     for dtype in s.get_data_types():
         for t1, t2 in s.get_tracer_combinations():
             idx = s.indices(dtype, tracers=(t1, t2))
+            lb, _ = s.get_ell_cl(dtype, t1, t2)
             s_out.add_ell_cl(
                 **{
                     "data_type": dtype,
@@ -158,7 +105,18 @@ def main(args):
             )
             tot_idx += list(idx)
     s_out.add_covariance(unrot_covariance[np.ix_(tot_idx, tot_idx)])
-    fname = f"{out_dir}/cl_and_cov_sacc_rotated_lmin{lmin}_lmax{lmax}.fits"
+
+    s_out.metadata = s.metadata
+    s_out.metadata[f"EB_rot_{int(time.time())}"] = json.dumps({
+        "alpha_EB": alpha_EB,
+        "lmin_fit": lmin,
+        "lmax_fit": lmax
+    })
+
+    fname = sacc_file.replace(
+        ".fits",
+        "_rotated.fits"
+    )
     s_out.save_fits(fname)
 
 
