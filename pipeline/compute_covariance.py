@@ -43,6 +43,8 @@ def main(args):
         bb = nmt_bins.bin_cell(bl)
         beams[map_set] = bb
 
+    nmt_bins = meta.read_nmt_binning()
+
     # Load some signal theory power spectra
     signal = {}
     for ms1, ms2 in cross_ps_names:
