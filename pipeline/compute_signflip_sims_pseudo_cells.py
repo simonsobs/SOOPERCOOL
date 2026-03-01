@@ -56,25 +56,22 @@ def main(args):
         fields = {}
         for map_name in meta.maps_list:
             map_set, id_bundle = map_name.split("__")
-            sat_parts = map_set.split('_')
-            sat_parts_lower = [
-                part.lower()
-                for part in sat_parts
-                if part.startswith("SAT")
-            ]
-            sat = "_".join(sat_parts_lower)
-            non_sat_parts = [
-                p for p in sat_parts if not p.startswith('SAT')
-            ]
-            frq = non_sat_parts[0] if len(non_sat_parts) > 0 else None
-            ssplit = (
-                "_".join(non_sat_parts[2:])
-                if len(non_sat_parts) > 2
-                else ""
-            )
-            map_fname = (
-                f"{base_dir}{sat}_{frq}_{ssplit}_bundle"
-                f"{id_bundle}_{id_sim:04d}_map.fits"
+            parts = map_set.split("_")
+
+            # sat token (works for "SATP3" or "satp3")
+            sat = next((p.lower() for p in parts if p.lower().startswith("sat")), None)
+
+            # frequency token (f090, f150, ...)
+            frq = next((p for p in parts if p.lower().startswith("f")), None)
+
+            # split label: everything AFTER patch token (south/north)
+            # e.g. ... _south_science -> "science"
+            patch_idx = next((i for i, p in enumerate(parts) if p in ("south", "north")), None)
+            ssplit = "_".join(parts[patch_idx + 1:]) if patch_idx is not None and patch_idx + 1 < len(parts) else ""
+
+            map_fname = os.path.join(
+                base_dir,
+                f"{sat}_{frq}_{ssplit}_bundle{id_bundle}_{id_sim:04d}_map.fits"
             )
             print(map_fname)
 
