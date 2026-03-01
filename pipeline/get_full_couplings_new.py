@@ -2,7 +2,6 @@ import argparse
 from soopercool import BBmeta
 import numpy as np
 from soopercool import coupling_utils as cu
-import os
 
 
 def main(args):
@@ -19,22 +18,21 @@ def main(args):
 
     ps_names = meta.get_ps_names_list("all", coadd=True)
     filtering_pairs = meta.get_independent_filtering_pairs()
-    
-    if tf_settings == None:
-        #tf_dict = None
-        args.unity = True
+
+    tf_dict = {}
+
+    if filtering_pairs == [(None, None)]:
+        tf_unity = np.zeros((9, 9, nmt_bins.get_n_bands()))
+        for i in range(9):
+            tf_unity[i, i, :] = 1.0
+        tf_dict[None, None] = tf_unity
+    elif tf_settings == None:
+        tf_dict = None
     else:
         tf_dir = tf_settings["transfer_directory"]
 
-    if args.unity:
-        tf_dict = None
-    else:
-        tf_dict = {}
         for ftag1, ftag2 in filtering_pairs:
-            tf_file = f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz"
-            if not os.path.isfile(tf_file):
-                tf_file = f"{tf_dir}/transfer_function_{ftag2}_x_{ftag1}.npz"
-            tf = np.load(tf_file)
+            tf = np.load(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
             tf_dict[ftag1, ftag2] = tf["full_tf"]
 
     mcms_dict = cu.load_mcms(couplings_dir,

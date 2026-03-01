@@ -56,25 +56,23 @@ def main(args):
         fields = {}
         for map_name in meta.maps_list:
             map_set, id_bundle = map_name.split("__")
-            sat_parts = map_set.split('_')
-            sat_parts_lower = [
-                part.lower()
-                for part in sat_parts
-                if part.startswith("SAT")
-            ]
-            sat = "_".join(sat_parts_lower)
-            non_sat_parts = [
-                p for p in sat_parts if not p.startswith('SAT')
-            ]
-            frq = non_sat_parts[0] if len(non_sat_parts) > 0 else None
-            ssplit = (
-                "_".join(non_sat_parts[2:])
-                if len(non_sat_parts) > 2
-                else ""
-            )
-            map_fname = (
-                f"{base_dir}{sat}_{frq}_{ssplit}_bundle"
-                f"{id_bundle}_{id_sim:04d}_map.fits"
+
+            parts_low = [p.lower() for p in map_set.split("_")]
+
+            sat = next((p for p in parts_low if p.startswith("sat")), None)
+            frq = next((p for p in parts_low if p.startswith("f")), None)
+
+            # Build split tag(s), excluding things that are not part of filenames
+            drop = {sat, frq, "south", "north", ""}  # add more if needed
+            ssplit_parts = [p for p in parts_low if p not in drop]
+            ssplit = "_".join(ssplit_parts)
+
+            # If there's no split tag, avoid double "__" etc.
+            split_str = f"{ssplit}_" if ssplit else ""
+
+            map_fname = os.path.join(
+                base_dir,
+                f"{sat}_{frq}_{split_str}bundle{id_bundle}_{id_sim:04d}_map.fits"
             )
             print(map_fname)
 
