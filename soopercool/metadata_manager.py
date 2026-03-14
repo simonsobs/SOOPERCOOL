@@ -1,10 +1,10 @@
 import soopercool.map_utils as mu
+import soopercool.ps_utils as pu
 import soopercool.utils as su
 import yaml
 import numpy as np
 import os
 import time
-import pymaster as nmt
 
 
 class BBmeta(object):
@@ -225,31 +225,9 @@ class BBmeta(object):
         """
         Read the binning file and return the corresponding NmtBin object.
         """
-        binning = np.load(self.binning_file)
-        bin_low, bin_high = binning["bin_low"], binning["bin_high"]
-        bin_lmax = bin_high[-1]
-
-        if bin_lmax < self.lmax:
-            raise ValueError(
-                f"lmax in binning {bin_lmax} is lower than {self.lmax}."
-                " Update config file to change lmax or binning scheme."
-            )
-        else:
-            # Truncate binning
-            select = bin_low < self.lmax
-            bin_low = bin_low[select]
-            bin_high = bin_high[select]
-
-            bin_high = np.concatenate((
-                bin_high[:-1],
-                np.array([self.lmax])
-            ))
-
-        return nmt.NmtBin.from_edges(
-            bin_low,
-            bin_high + 1,
-            is_Dell=self.compute_Dl
-        )
+        return pu.read_nmt_binning(self.binning_file,
+                                   self.lmax,
+                                   self.compute_Dl)
 
     def get_n_bandpowers(self):
         """
