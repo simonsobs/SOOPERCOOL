@@ -105,7 +105,7 @@ def alm2map(alm, pix_type="hp", nside=None, car_template=None,
 
     Parameters
     ----------
-    alm: numpy.array, shape (ndim, nalm) 
+    alm: numpy.array, shape (ndim, nalm)
         Spherical harmonic coefficients. ndim must be 1 or 3 (for polarized
         input).
     pix_type: str
