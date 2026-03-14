@@ -48,9 +48,6 @@ def main(args):
     binner = np.array([nmt_bins.bin_cell(np.array([cl]))[0]
                        for cl in np.eye(nl)]).T
 
-    binner = np.array([nmt_bins.bin_cell(np.array([cl]))[0]
-                       for cl in np.eye(nl)]).T
-
     wcs = None
     if hasattr(mask, 'wcs'):
         # This is a patch. Reproject mask onto template geometry.
