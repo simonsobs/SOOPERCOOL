@@ -98,7 +98,8 @@ def map2alm(map, pix_type="hp"):
         return curvedsky.map2alm(map, lmax=lmax)
 
 
-def alm2map(alm, pix_type="hp", nside=None, car_map_template=None):
+def alm2map(alm, pix_type="hp", nside=None, car_template=None,
+            geometry=None):
     """
     Transform alms into maps of either HEALPix or CAR pixelization.
 
@@ -126,10 +127,12 @@ def alm2map(alm, pix_type="hp", nside=None, car_map_template=None):
         assert nside is not None, "nside is required"
         return hp.alm2map(alm, nside=nside)
     else:
-        if isinstance(car_map_template, str):
-            shape, wcs = enmap.read_map_geometry(car_map_template)
+        if isinstance(car_template, str):
+            shape, wcs = enmap.read_map_geometry(car_template)
+        elif car_template is None:
+            shape, wcs = geometry
         else:
-            shape, wcs = car_map_template.geometry
+            shape, wcs = car_template.geometry
         if alm.ndim == 1:
             map = enmap.zeros(shape, wcs)
         else:
