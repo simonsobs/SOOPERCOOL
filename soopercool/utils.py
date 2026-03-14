@@ -7,13 +7,16 @@ from matplotlib import cm
 import camb
 
 
-def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30):
+def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30,
+                   verbose=True):
     """
     """
-    print("\nTheory C_ells:")
+    if verbose:
+        print("\nTheory C_ells:")
     if cosmo_params is None:
-        print("\n  WARNING: "
-              "Loading Planck standard CMB parameters with r=0, AL=1\n")
+        if verbose:
+            print("  WARNING: "
+                  "Loading Planck standard CMB parameters with r=0, AL=1")
         cosmo_params = {
             "cosmomc_theta": 0.0104085,
             "As": 2.1e-9,
@@ -24,7 +27,8 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30):
             "tau": 0.0544,
             "r": 0.0,
         }
-    print(f"  Beam FWHM: {fwhm_amin} arcmin\n")
+    if verbose:
+        print(f"  Beam FWHM: {fwhm_amin} arcmin\n")
     params = camb.set_params(**cosmo_params)
     results = camb.get_results(params)
     powers = results.get_cmb_power_spectra(
@@ -540,85 +544,6 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
     plt.savefig(file_name, bbox_inches="tight")
     plt.close()
     plt.clf()
-
-
-def get_binary_mask_from_nhits(nhits_map, nside, zero_threshold=1e-3):
-    """
-    Make binary mask by smoothing, normalizing and thresholding nhits map.
-    """
-    nhits_smoothed = hp.smoothing(
-        hp.ud_grade(nhits_map, nside, power=-2, dtype=np.float64),
-        fwhm=np.pi/180)
-    nhits_smoothed[nhits_smoothed < 0] = 0
-    nhits_smoothed /= np.amax(nhits_smoothed)
-    binary_mask = np.zeros_like(nhits_smoothed)
-    binary_mask[nhits_smoothed > zero_threshold] = 1
-
-    return binary_mask
-
-
-def get_apodized_mask_from_nhits(nhits_map, nside,
-                                 galactic_mask=None,
-                                 point_source_mask=None,
-                                 zero_threshold=1e-3,
-                                 apod_radius=10.,
-                                 apod_radius_point_source=4.,
-                                 apod_type="C1"):
-    """
-    Produce an appropriately apodized mask from an nhits map as used in
-    the BB pipeline paper (https://arxiv.org/abs/2302.04276).
-
-    Procedure:
-    * Make binary mask by smoothing, normalizing and thresholding nhits map
-    * (optional) multiply binary mask by galactic mask
-    * Apodize (binary * galactic)
-    * (optional) multiply (binary * galactic) with point source mask
-    * (optional) apodize (binary * galactic * point source)
-    * Multiply everything by (smoothed) nhits map
-    """
-    import pymaster as nmt
-
-    # Smooth and normalize hits map
-    nhits_map = hp.smoothing(
-        hp.ud_grade(nhits_map, nside, power=-2, dtype=np.float64),
-        fwhm=np.pi/180)
-    nhits_map /= np.amax(nhits_map)
-
-    # Get binary mask
-    binary_mask = get_binary_mask_from_nhits(nhits_map, nside, zero_threshold)
-
-    # Multiply by Galactic mask
-    if galactic_mask is not None:
-        binary_mask *= hp.ud_grade(galactic_mask, nside)
-
-    # Apodize the binary mask
-    binary_mask = nmt.mask_apodization(binary_mask, apod_radius,
-                                       apotype=apod_type)
-
-    # Multiply with point source mask
-    if point_source_mask is not None:
-        binary_mask *= hp.ud_grade(point_source_mask, nside)
-        binary_mask = nmt.mask_apodization(binary_mask,
-                                           apod_radius_point_source,
-                                           apotype=apod_type)
-
-    return nhits_map * binary_mask
-
-
-def get_spin_derivatives(map):
-    """
-    First and second spin derivatives of a given spin-0 map.
-    """
-    nside = hp.npix2nside(np.shape(map)[-1])
-    ell = np.arange(3*nside)
-    alpha1i = np.sqrt(ell*(ell + 1.))
-    alpha2i = np.sqrt((ell - 1.)*ell*(ell + 1.)*(ell + 2.))
-    first = hp.alm2map(hp.almxfl(hp.map2alm(map), alpha1i), nside=nside)
-    second = hp.alm2map(hp.almxfl(hp.map2alm(map), alpha2i), nside=nside)
-    cmap = cm.YlOrRd
-    cmap.set_under("w")
-
-    return first, second
 
 
 def read_beam_from_file(beam_file, lmax=None):
