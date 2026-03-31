@@ -47,8 +47,7 @@ def main(args):
                         pure_type=pure_type, id_sim=id_sim
                     )
                     path = f"{map_dir}/{fname}"
-                    print(os.path.split(path)[-1])
-                    files_list.append((path, kspace_pars))
+                    files_list.append((path, kspace_pars, kspace_tag))
 
     # Every rank must have the same list order
     mpi_shared_list = comm.bcast(files_list, root=0)
@@ -56,7 +55,7 @@ def main(args):
     task_ids = mpi.distribute_tasks(size, rank, len(files_list))
     local_files_list = [mpi_shared_list[i] for i in task_ids]
 
-    for map_fname, kspace_pars in local_files_list:
+    for map_fname, kspace_pars, kspace_tag in local_files_list:
 
         m = mu.read_map(
             map_fname,
@@ -69,9 +68,10 @@ def main(args):
         # with bright pixels which makes the filtering more stable
         # Maybe using the binary + galactic mask is enough for this!
         m_filtered = sfft.kspace_filter(m, pix_type="car", **kspace_pars)
-
+        fname_out = f"{out_dir}/{os.path.split(map_fname)[-1]}"
+        fname_out = fname_out.replace(".fits", f"_kspace_{kspace_tag}")
         mu.write_map(
-            f"{out_dir}/{os.path.split(map_fname)[-1]}",
+            fname_out,
             m_filtered,
             pix_type=meta.pix_type,
             car_template=meta.car_template,
