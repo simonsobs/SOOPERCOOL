@@ -65,6 +65,9 @@ def main(args):
             fields_hp=[0, 1, 2],
         )
 
+        # TODO: need to add a step before to mask noisy edges of the map
+        # with bright pixels which makes the filtering more stable
+        # Maybe using the binary + galactic mask is enough for this!
         m_filtered = sfft.kspace_filter(m, pix_type="car", **kspace_pars)
 
         mu.write_map(
