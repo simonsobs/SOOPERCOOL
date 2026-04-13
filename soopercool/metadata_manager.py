@@ -678,10 +678,17 @@ class BBmeta(object):
     def get_filtering_tags(self):
         """
         """
-        return list(set(
-            [self.filtering_tag_from_map_set(ms)
-             for ms in self.map_sets_list]
-        ))
+        return list(
+            set(
+                [
+                    (
+                        self.filtering_tag_from_map_set(ms),
+                        self.kspace_tag_from_map_set(ms),
+                    )
+                    for ms in self.map_sets_list
+                ]
+            )
+        )
 
     def get_independent_filtering_pairs(self):
         """
@@ -691,7 +698,9 @@ class BBmeta(object):
         for ms1, ms2 in cross_ps_names:
             fp1 = self.filtering_tag_from_map_set(ms1)
             fp2 = self.filtering_tag_from_map_set(ms2)
-            filtering_pairs.append((fp1, fp2))
+            kt1 = self.kspace_tag_from_map_set(ms1)
+            kt2 = self.kspace_tag_from_map_set(ms2)
+            filtering_pairs.append(((fp1, kt1), (fp2, kt2)))
         return list(set(filtering_pairs))
 
     def get_inverse_couplings(self, return_bpwf=False):

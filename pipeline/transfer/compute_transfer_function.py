@@ -50,10 +50,12 @@ def main(args):
     )
     full_tf = {}
     for ftag1, ftag2 in filtering_pairs:
-        print(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
+        lab1 = "_".join(ftag1)
+        lab2 = "_".join(ftag2)
+        print(f"{tf_dir}/transfer_function_{lab1}_x_{lab2}.npz")
         tf = trans[ftag1, ftag2]
         np.savez(
-            f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz",
+            f"{tf_dir}/transfer_function_{lab1}_x_{lab2}.npz",
             **tf
         )
         full_tf[ftag1, ftag2] = tf["full_tf"]
@@ -64,12 +66,14 @@ def main(args):
         BBmeta.make_dir(plot_dir)
 
         for ftag1, ftag2 in filtering_pairs:
-            tf_dict = np.load(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")  # noqa
+            lab1 = "_".join(ftag1)
+            lab2 = "_".join(ftag2)
+            tf_dict = np.load(f"{tf_dir}/transfer_function_{lab1}_x_{lab2}.npz")  # noqa
 
             utils.plot_transfer_function(
                 lb, tf_dict, meta.lmin, meta.lmax,
                 ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"],
-                file_name=f"{plot_dir}/transfer_{ftag1}_x_{ftag2}.pdf"
+                file_name=f"{plot_dir}/transfer_{lab1}_x_{lab2}.pdf"
             )
         print(plot_dir)
 

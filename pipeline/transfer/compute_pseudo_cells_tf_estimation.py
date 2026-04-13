@@ -26,6 +26,8 @@ def main(args):
     pcls_tf_est_dir = f"{out_dir}/cells_tf_est"
     BBmeta.make_dir(pcls_tf_est_dir)
 
+    kspace_dir = f"{out_dir}/kspace_filtered_sims"
+
     nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
 
@@ -55,7 +57,7 @@ def main(args):
     filtering_tags = meta.get_filtering_tags()
     filtering_tag_pairs = meta.get_independent_filtering_pairs()
 
-    if None in filtering_tags and len(filtering_tags) < 1:
+    if (None, None) in filtering_tags and len(filtering_tags) < 1:
         raise ValueError("There must be at least one filter \
                           applied to the data to be able to \
                           compute a transfer function for it")
@@ -87,19 +89,30 @@ def main(args):
         for pure_type in ["pureT", "pureE", "pureB"]:
             for ftag in ftags_unique:
 
-                unfiltered_map_dir = tf_settings["unfiltered_map_dir"][ftag]
-                unfiltered_map_tmpl = tf_settings["unfiltered_map_template"][ftag] # noqa
+                preproc_ftag, kspace_tag = ftag
+
+                unfiltered_map_dir = tf_settings["unfiltered_map_dir"][preproc_ftag] # noqa
+                unfiltered_map_tmpl = tf_settings["unfiltered_map_template"][preproc_ftag] # noqa
 
                 unfiltered_map_file = unfiltered_map_tmpl.format(
                     id_sim=id_sim, pure_type=pure_type
                 )
                 unfiltered_map_file = f"{unfiltered_map_dir}/{unfiltered_map_file}" # noqa
 
-                filtered_map_dir = tf_settings["filtered_map_dir"][ftag]
-                filtered_map_tmpl = tf_settings["filtered_map_template"][ftag]
+                if kspace_tag is None:
+                    filtered_map_dir = tf_settings["filtered_map_dir"][preproc_ftag] # noqa
+                else:
+                    filtered_map_dir = kspace_dir
+
+                filtered_map_tmpl = tf_settings["filtered_map_template"][preproc_ftag] # noqa
                 filtered_map_file = filtered_map_tmpl.format(
                     id_sim=id_sim, pure_type=pure_type
                 )
+                if kspace_tag is not None:
+                    filtered_map_file = filtered_map_file.replace(
+                        ".fits", f"_kspace_{kspace_tag}.fits"
+                    )
+
                 filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}"
 
                 map = mu.read_map(
@@ -219,11 +232,16 @@ def main(args):
                 return_unbinned=True
             )
 
-        out_f = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_filtered_{id_sim:04d}.npz"  # noqa
-        out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_{id_sim:04d}.npz"  # noqa
+        preproc_ftag1, kspace_tag1 = ftag1
+        preproc_ftag2, kspace_tag2 = ftag2
+
+        lab1 = f"{preproc_ftag1}_{kspace_tag1}"
+        lab2 = f"{preproc_ftag2}_{kspace_tag2}"
+        out_f = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{lab1}_x_{lab2}_filtered_{id_sim:04d}.npz"  # noqa
+        out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{lab1}_x_{lab2}_unfiltered_{id_sim:04d}.npz"  # noqa
 
         if do_plot:
-            fplt = f"{plot_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_{id_sim:04d}.pdf"  # noqa
+            fplt = f"{plot_dir}/pcls_mat_tf_est_{lab1}_x_{lab2}_{id_sim:04d}.pdf"  # noqa
             ps_utils.plot_pcls_mat_transfer(
                 pcls_mat_unfiltered, pcls_mat_filtered, lb, fplt,
                 lmax=600
@@ -232,8 +250,8 @@ def main(args):
         np.savez(out_f, pcls_mat=pcls_mat_filtered)
         np.savez(out_unf, pcls_mat=pcls_mat_unfiltered)
 
-        out_f = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_filtered_unbinned_{id_sim:04d}.npz"  # noqa
-        out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_unbinned_{id_sim:04d}.npz"  # noqa
+        out_f = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{lab1}_x_{lab2}_filtered_unbinned_{id_sim:04d}.npz"  # noqa
+        out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{lab1}_x_{lab2}_unfiltered_unbinned_{id_sim:04d}.npz"  # noqa
         np.savez(out_f, pcls_mat=pcls_mat_filtered_unbinned)
         np.savez(out_unf, pcls_mat=pcls_mat_unfiltered_unbinned)
 

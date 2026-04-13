@@ -87,7 +87,9 @@ def read_pcls_matrices(pcls_mat_dir, filtering_pairs, Nsims, sim_id_start=0):
     for id_sim in range(sim_id_start, Nsims + sim_id_start):
         for label in ["filtered", "unfiltered"]:
             for ftag1, ftag2 in filtering_pairs:
-                suffix = f"{ftag1}_x_{ftag2}_{label}_{id_sim:04d}"
+                lab1 = "_".join(ftag1)
+                lab2 = "_".join(ftag2)
+                suffix = f"{lab1}_x_{lab2}_{label}_{id_sim:04d}"
                 pcls_mat = np.load(
                     f"{pcls_mat_dir}/pcls_mat_tf_est_{suffix}.npz")
                 pcls_mat_dict[ftag1, ftag2][label] += [pcls_mat["pcls_mat"]]
@@ -296,6 +298,8 @@ def get_couplings_dict(mcm_dict, nmt_binning,
             couplings[ms1, ms2]["inv_coupling"] = inv_coupling
 
     else:
+        # TODO: check if this is used only for validation
+        # in case it needs to be adapted.
         for ftag1, ftag2 in filtering_pairs:
             couplings[ftag1, ftag2] = {}
             mcm = mcm_dict[ftag1, ftag2]
