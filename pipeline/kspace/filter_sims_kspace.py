@@ -69,7 +69,7 @@ def main(args):
         # Maybe using the binary + galactic mask is enough for this!
         m_filtered = sfft.kspace_filter(m, pix_type="car", **kspace_pars)
         fname_out = f"{out_dir}/{os.path.split(map_fname)[-1]}"
-        fname_out = fname_out.replace(".fits", f"_kspace_{kspace_tag}")
+        fname_out = fname_out.replace(".fits", f"_kspace_{kspace_tag}.fits")
         mu.write_map(
             fname_out,
             m_filtered,
