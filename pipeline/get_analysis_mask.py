@@ -23,211 +23,218 @@ def main(args):
 
     masks_settings = meta.masks
 
-    # If a global hits file is indicated in the paramter file, use it.
-    if masks_settings["global_hits"] is not None:
-        sum_hits = mu.read_map(
-            masks_settings["global_hits"],
-            pix_type=meta.pix_type,
-            car_template=meta.car_template
-        )
-        #######
-        # ALP: If using a global hits file, it just means that
-        # we will weight the binary mask with the hits,
-        # but the binary mask will still be defined as
-        # the union of all map_sets footprints
-        #######
-        # Create binary
-        # binary = sum_hits.copy()
-        # binary[:] = 1
-        # binary[sum_hits == 0] = 0
-    else:
-        # Loop over the (map_set, id_bundles)
-        # pairs to define a common binary mask
-        hit_maps = []
-        for map_set in meta.map_sets_list:
-            n_bundles = meta.n_bundles_from_map_set(map_set)
-            for id_bundle in range(n_bundles):
-                map_dir = meta.map_dir_from_map_set(map_set)
-                map_template = meta.map_template_from_map_set(map_set)
-                map_file = map_template.replace(
-                    "{id_bundle}",
-                    str(id_bundle)
-                )
-                type_options = [
-                    f for f in re.findall(r"\{.*?\}", map_template)
-                    if "|" in f
-                ]
-                if not type_options:
-                    raise ValueError(
-                        "The map directory must contain both maps "
-                        "and hits files, indicated by a "
-                        "corresponding suffix."
+    # If weight_mask is True we want to prepare weights / hits to apply to the binary mask
+    if masks_settings["weight_mask"]:
+        # If a global hits file is indicated in the paramter file, use it.
+        if masks_settings["global_hits"] is not None:
+            sum_hits = mu.read_map(
+                masks_settings["global_hits"],
+                pix_type=meta.pix_type,
+                car_template=meta.car_template
+            )
+            #######
+            # ALP: If using a global hits file, it just means that
+            # we will weight the binary mask with the hits,
+            # but the binary mask will still be defined as
+            # the union of all map_sets footprints
+            #######
+            # Create binary
+            # binary = sum_hits.copy()
+            # binary[:] = 1
+            # binary[sum_hits == 0] = 0
+        else:
+            # Loop over the (map_set, id_bundles)
+            # pairs to define a common binary mask
+            hit_maps = []
+            for map_set in meta.map_sets_list:
+                n_bundles = meta.n_bundles_from_map_set(map_set)
+                for id_bundle in range(n_bundles):
+                    map_dir = meta.map_dir_from_map_set(map_set)
+                    map_template = meta.map_template_from_map_set(map_set)
+                    map_file = map_template.replace(
+                        "{id_bundle}",
+                        str(id_bundle)
                     )
-                else:
-                    # Select the hitmap
-                    option = type_options[0].replace("{", "")
-                    option = option.replace("}", "").split("|")[1]
+                    type_options = [
+                        f for f in re.findall(r"\{.*?\}", map_template)
+                        if "|" in f
+                    ]
+                    if not type_options and masks_settings["weight_mask"]:
+                            raise ValueError(
+                                "The map directory must contain both maps "
+                                "and hits files, indicated by a "
+                                "corresponding suffix."
+                            )
+                    else:
+                        # Select the hitmap
+                        option = type_options[0].replace("{", "")
+                        option = option.replace("}", "").split("|")[1]
 
-                    map_file = map_file.replace(
-                        type_options[0],
-                        option
-                    )
-
-                    if masks_settings["use_weights"]:
-                        # Use weights instead of hits
                         map_file = map_file.replace(
-                            "hits",
-                            "weights"
+                            type_options[0],
+                            option
                         )
 
-                print(f"Reading map for {map_set} - bundle {id_bundle}")
-                print(f"    file_name: {map_dir}/{map_file}")
-                if verbose:
+                        if masks_settings["use_weights"]:
+                            # Use weights instead of hits
+                            map_file = map_file.replace(
+                                "hits",
+                                "weights"
+                            )
+
+                    print(f"Reading map for {map_set} - bundle {id_bundle}")
                     print(f"    file_name: {map_dir}/{map_file}")
+                    if verbose:
+                        print(f"    file_name: {map_dir}/{map_file}")
 
-                # Raise an error if file does not exists
-                try:
-                    hits = mu.read_map(
-                        f"{map_dir}/{map_file}",
-                        pix_type=meta.pix_type,
-                        car_template=meta.car_template
-                    )
-                except FileNotFoundError:
-                    raise FileNotFoundError(
-                        f"File {map_dir}/{map_file} not found. "
-                        "Please check the map directory and template "
-                        "in the parameter file or provide a global hits file."
-                    )
-                hit_maps.append(hits)
+                    # Raise an error if file does not exists
+                    try:
+                        hits = mu.read_map(
+                            f"{map_dir}/{map_file}",
+                            pix_type=meta.pix_type,
+                            car_template=meta.car_template
+                        )
+                    except FileNotFoundError:
+                        raise FileNotFoundError(
+                            f"File {map_dir}/{map_file} not found. "
+                            "Please check the map directory and template "
+                            "in the parameter file or provide a global hits file."
+                        )
+                    hit_maps.append(hits)
 
-        if masks_settings["use_weights"]:
-            sum_hits = hit_maps[0][1].copy() * 0.
-            for h in hit_maps:
-                sum_hits += np.sqrt(h[1]**2 + h[2]**2)
-            threshold = np.median(sum_hits[sum_hits > 0])
-            sum_hits[sum_hits < threshold] = 0
-        else:
-            sum_hits = hit_maps[0].copy() * 0.
-            for h in hit_maps:
-                sum_hits += h
+            if masks_settings["use_weights"]:
+                sum_hits = hit_maps[0][1].copy() * 0.
+                for h in hit_maps:
+                    sum_hits += np.sqrt(h[1]**2 + h[2]**2)
+                threshold = np.median(sum_hits[sum_hits > 0])
+                sum_hits[sum_hits < threshold] = 0
+            else:
+                sum_hits = hit_maps[0].copy() * 0.
+                for h in hit_maps:
+                    sum_hits += h
     #####
     # ALP: Now we need to define the binary mask. In case we
     # don't provide any hits/weights, the binary mask has to be
     # read from maps footprints
     #####
-    binary = sum_hits.copy()
-    binary[:] = 1
+    binary = None
 
     for map_set in meta.map_sets_list:
         n_bundles = meta.n_bundles_from_map_set(map_set)
         for id_bundle in range(n_bundles):
             map_dir = meta.map_dir_from_map_set(map_set)
             map_template = meta.map_template_from_map_set(map_set)
-            map_file = map_template.replace(
-                "{id_bundle}",
-                str(id_bundle)
-            )
+            map_file = map_template.replace("{id_bundle}", str(id_bundle))
+
             type_options = [
                 f for f in re.findall(r"\{.*?\}", map_template)
                 if "|" in f
             ]
-            if not type_options:
+
+            if type_options:
+                # Select the map
+                option = type_options[0].replace("{", "")
+                option = option.replace("}", "").split("|")[0]
+                map_file = map_file.replace(type_options[0], option)
+
+            elif masks_settings["weight_mask"] and not masks_settings["global_hits"]:
                 raise ValueError(
                     "The map directory must contain both maps "
                     "and hits files, indicated by a "
                     "corresponding suffix."
                 )
-            else:
-                # Select the map
-                option = type_options[0].replace("{", "")
-                option = option.replace("}", "").split("|")[0]
+            # If weight_mask is False and there is no {map|hits} placeholder,
+            # leave map_file unchanged.
 
-                map_file = map_file.replace(
-                    type_options[0],
-                    option
-                )
-
-                print(f"Reading map for {map_set} - bundle {id_bundle}")
+            print(f"Reading map for {map_set} - bundle {id_bundle}")
+            print(f"    file_name: {map_dir}/{map_file}")
+            if verbose:
                 print(f"    file_name: {map_dir}/{map_file}")
-                if verbose:
-                    print(f"    file_name: {map_dir}/{map_file}")
 
-                # Raise an error if file does not exists
-                try:
-                    map = mu.read_map(
-                        f"{map_dir}/{map_file}",
-                        pix_type=meta.pix_type,
-                        car_template=meta.car_template
-                    )
-                except FileNotFoundError:
-                    raise FileNotFoundError(
-                        f"File {map_dir}/{map_file} not found. "
-                        "Please check the map directory and template "
-                        "in the parameter file."
-                    )
+            try:
+                map = mu.read_map(
+                    f"{map_dir}/{map_file}",
+                    pix_type=meta.pix_type,
+                    car_template=meta.car_template
+                )
+            except FileNotFoundError:
+                raise FileNotFoundError(
+                    f"File {map_dir}/{map_file} not found. "
+                    "Please check the map directory and template "
+                    "in the parameter file."
+                )
             # Select only the pixels that are observed
             # in this map_set and bundle
+            if binary is None:
+                binary = map[1].copy()
+                binary[:] = 1
             binary[map[1] == 0] = 0
 
     if masks_settings["box_mask"] is not None:
         from pixell import enmap
         box = np.deg2rad(masks_settings["box_mask"])
-        decs, ras = sum_hits.posmap()
-        mask_box = enmap.zeros(shape=sum_hits.shape, wcs=sum_hits.wcs,
+        decs, ras = binary.posmap()
+        mask_box = enmap.zeros(shape=binary.shape, wcs=binary.wcs,
                                dtype=float)
         mask_box[(box[0][0] < decs)
                  & (decs < box[1][0])
                  & (box[0][1] < ras) & (ras < box[1][1])] = 1.
         binary *= mask_box
-        sum_hits *= mask_box
+        if masks_settings["weight_mask"]:
+            sum_hits *= mask_box
 
     # Normalize hitmaps
-    if not masks_settings["global_hits"] and masks_settings["use_weights"]:
-        # Set boundaries at 0-1
-        sum_hits = (sum_hits - np.amin(sum_hits))
-        sum_hits /= (np.amax(sum_hits) - np.amin(sum_hits))
-        print("sum_hits", np.amin(sum_hits), np.amax(sum_hits))
-    else:
-        sum_hits /= np.amax(sum_hits)
+    if masks_settings["weight_mask"]:
+        if not masks_settings["global_hits"] and masks_settings["use_weights"]:
+            # Set boundaries at 0-1
+            sum_hits = (sum_hits - np.amin(sum_hits))
+            sum_hits /= (np.amax(sum_hits) - np.amin(sum_hits))
+            print("sum_hits", np.amin(sum_hits), np.amax(sum_hits))
+        else:
+            sum_hits /= np.amax(sum_hits)
 
-    #####
-    # ALP: This does not work with CAR, functions exist for this
-    #####
-    # # Calculate and print the fraction of the sky covered by the mask
-    # fsky = np.mean(sum_hits)
-    # print(f"Fraction of the sky covered by the mask (fsky): {fsky}")
+        #####
+        # ALP: This does not work with CAR, functions exist for this
+        #####
+        # # Calculate and print the fraction of the sky covered by the mask
+        # fsky = np.mean(sum_hits)
+        # print(f"Fraction of the sky covered by the mask (fsky): {fsky}")
 
-    # Save products
-    mu.write_map(
-        f"{masks_dir}/binary_mask.fits",
-        binary,
-        dtype=np.int32,
-        pix_type=meta.pix_type
-    )
-    mu.write_map(
-        f"{masks_dir}/normalized_hits.fits",
-        sum_hits,
-        dtype=np.float32,
-        pix_type=meta.pix_type
-    )
-
-    if do_plots:
-        print("np.shape(binary)", np.shape(binary))
-        mu.plot_map(
-            binary,
-            title="Binary mask",
-            file_name=f"{plot_dir}/binary_mask",
-            pix_type=meta.pix_type,
-            lims=[-binary.max(), binary.max()]
+        # Save products
+        mu.write_map(
+            f"{masks_dir}/normalized_hits.fits",
+            sum_hits,
+            dtype=np.float32,
+            pix_type=meta.pix_type
         )
 
-        mu.plot_map(
+        if do_plots:
+            mu.plot_map(
             sum_hits,
             title="Normalized hits",
             file_name=f"{plot_dir}/normalized_hits",
             pix_type=meta.pix_type,
             lims=[-1, 1]
         )
+
+    mu.write_map(
+            f"{masks_dir}/binary_mask.fits",
+            binary,
+            dtype=np.int32,
+            pix_type=meta.pix_type
+        )
+
+    if do_plots:
+        mask_label = "binary"
+        print("np.shape(binary)", np.shape(binary))
+        mu.plot_map(
+            binary,
+            title="Binary mask",
+            file_name=f"{plot_dir}/{mask_label}_mask",
+            pix_type=meta.pix_type,
+            lims=[-binary.max(), binary.max()]
+        )
+
 
     analysis_mask = binary.copy()
 
@@ -249,10 +256,11 @@ def main(args):
             )
         analysis_mask *= gal_mask
         if do_plots:
+            mask_label += "_galactic"
             mu.plot_map(
                 analysis_mask,
                 title="Analysis mask after galactic mask",
-                file_name=f"{plot_dir}/binary_galactic_mask",
+                file_name=f"{plot_dir}/{mask_label}_mask",
                 pix_type=meta.pix_type,
                 lims=[-analysis_mask.max(), analysis_mask.max()]
             )
@@ -274,10 +282,11 @@ def main(args):
             )
         analysis_mask *= ext_mask
         if do_plots:
+            mask_label += "_external"
             mu.plot_map(
                 analysis_mask,
                 title="Analysis mask after external mask",
-                file_name=f"{plot_dir}/binary_external_mask",
+                file_name=f"{plot_dir}/{mask_label}_mask",
                 pix_type=meta.pix_type,
                 lims=[-analysis_mask.max(), analysis_mask.max()]
             )
@@ -313,10 +322,11 @@ def main(args):
         pix_type=meta.pix_type
     )
     if do_plots:
+        mask_label += "_cropped"
         mu.plot_map(
             analysis_mask,
             title="Analysis mask after cropping borders",
-            file_name=f"{plot_dir}/binary_galactic_cropped_mask",
+            file_name=f"{plot_dir}/{mask_label}_mask",
             pix_type=meta.pix_type,
             lims=[-analysis_mask.max(), analysis_mask.max()]
         )
@@ -328,10 +338,11 @@ def main(args):
         pix_type=meta.pix_type
     )
     if do_plots:
+        mask_label += "_apodized"
         mu.plot_map(
             analysis_mask,
             title="Analysis mask after apodization",
-            file_name=f"{plot_dir}/binary_galactic_cropped_apodized_mask",
+            file_name=f"{plot_dir}/{mask_label}_mask",
             pix_type=meta.pix_type,
             lims=[-analysis_mask.max(), analysis_mask.max()]
         )
@@ -360,16 +371,19 @@ def main(args):
 
         analysis_mask *= ps_mask
         if do_plots:
+            mask_label += "_ps_mask"
             mu.plot_map(
                 analysis_mask,
                 title="Analysis mask after point source mask",
-                file_name=f"{plot_dir}/binary_galactic_cropped_apodized_ps_mask", # noqa
+                file_name=f"{plot_dir}/{mask_label}_mask", # noqa
                 pix_type=meta.pix_type,
                 lims=[-analysis_mask.max(), analysis_mask.max()]
             )
 
     # Weight with hitmap
-    analysis_mask *= sum_hits
+    if masks_settings["weight_mask"]:
+        analysis_mask *= sum_hits
+
     mu.write_map(
         f"{masks_dir}/analysis_mask.fits",
         analysis_mask,

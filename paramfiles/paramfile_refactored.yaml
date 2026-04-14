@@ -14,8 +14,15 @@ map_sets:
 ####################
 # Masking metadata #
 ####################
-masks:
-  analysis_mask: !path [*out_dir, masks/analysis_mask.fits]
+  masks:
+  ## To build the analysis mask
+  # Specify coordinates if using a rectangular mask
+  box_mask: null
+  # if False no weights nor hits are applied 
+  weight_mask: True
+  # Set to True if mask is calculated from the weights,
+  # otherwise set to False to use the hits
+  use_weights: False
   # When specifying this file, the mapset/bundle-specific hits files will
   # be ignored and instead a global hits file will be used (testing puroposes)
   global_hits_file_overwrite: /home/wolz/bbdev/SOOPERCOOL/outputs/masks/hits_1year_200dets_sat_beams.fits
@@ -30,6 +37,9 @@ masks:
   apod_radius: 10.0
   apod_radius_point_source: 1.0
   apod_type: "C1"
+
+  ## Where the analysis mask is saved to be used by following steps 
+  analysis_mask: !path [*out_dir, masks/analysis_mask.fits]
 
 ####################################
 # Metadata related to the analysis #
