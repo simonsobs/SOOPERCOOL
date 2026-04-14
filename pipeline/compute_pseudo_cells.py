@@ -1,6 +1,7 @@
 from soopercool import BBmeta
 from soopercool import ps_utils as pu
 from soopercool import map_utils as mu
+from soopercool import fft_utils as sfft
 import argparse
 import numpy as np
 import pymaster as nmt
@@ -81,6 +82,16 @@ def main(args):
                         fields_hp=[0, 1, 2],
                         car_template=meta.car_template,
                         convert_K_to_muK=False)
+
+        kspace_tag = meta.kspace_tag_from_map_set(map_set)
+        if kspace_tag:
+            kspace_settings = meta.transfer_settings["kspace_pars"]
+            m = sfft.kspace_filter(
+                m,
+                pix_type=meta.pix_type,
+                **kspace_settings[kspace_tag]
+            )
+
         if do_plots:
             fname = f"{map_plot_dir}/map_{map_set}_bundle{id_bundle}"
             lims = [[-5000, 5000], [-300, 300], [-300, 300]]
