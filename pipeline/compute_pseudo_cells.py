@@ -86,6 +86,9 @@ def main(args):
         kspace_tag = meta.kspace_tag_from_map_set(map_set)
         if kspace_tag:
             kspace_settings = meta.transfer_settings["kspace_pars"]
+            # TODO: The map should be multiplied by the binary mask
+            # before this step to avoid instabilities due to bright
+            # pixels at the edges of the survey.
             m = sfft.kspace_filter(
                 m,
                 pix_type=meta.pix_type,
