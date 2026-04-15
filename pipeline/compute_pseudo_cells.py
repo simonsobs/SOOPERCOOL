@@ -164,7 +164,7 @@ def main(args):
                     fiducial_dust.format(nu1=nu1, nu2=nu2)
                 )[:, :lmax_bins+1]
                 dust_clb = nmt_bins.bin_cell(dust_cl)[:, lb_msk]
-                if clb_th:
+                if clb_th is not None:
                     clb_th += dust_clb
                 else:
                     clb_th = dust_clb
@@ -173,7 +173,7 @@ def main(args):
                     fiducial_synch.format(nu1=nu1, nu2=nu2)
                 )[:, :lmax_bins+1]
                 synch_clb = nmt_bins.bin_cell(synch_cl)[:, lb_msk]
-                if clb_th:
+                if clb_th is not None:
                     clb_th += synch_clb
                 else:
                     clb_th = synch_clb

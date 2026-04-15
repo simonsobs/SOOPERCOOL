@@ -9,7 +9,6 @@ import numpy as np
 def main(args):
     """
     """
-    print("hello")
     meta = BBmeta(args.globals)
     do_plots = not args.no_plots
     verbose = args.verbose
