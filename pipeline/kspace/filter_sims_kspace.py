@@ -16,6 +16,14 @@ def main(args):
     out_dir = f"{meta.output_directory}/kspace_filtered_sims"
     meta.make_dir(out_dir)
 
+    masks_dir = "/".join(meta.masks["analysis_mask"].split("/")[:-1])
+    mask = mu.read_map(
+        f"{masks_dir}/binary_galactic_cropped.fits",
+        pix_type=meta.pix_type,
+        car_template=meta.car_template,
+        fields_hp=[0, 1, 2],
+    )
+
     tf_settings = meta.transfer_settings
     id_start, n_sims = (
         tf_settings["sim_id_start"],
@@ -23,31 +31,31 @@ def main(args):
     )
     pure_types = [f"pure{f}" for f in "TEB"]
 
-    if rank == 0:
-        files_list = []
-        for map_set in meta.map_sets:
-            print(f"Processing map set: {map_set}")
+    
+    files_list = []
+    for map_set in meta.map_sets:
+        print(f"Processing map set: {map_set}")
 
-            kspace_tag = meta.kspace_tag_from_map_set(map_set)
-            ftag = meta.filtering_tag_from_map_set(map_set)
-            if kspace_tag is not None:
-                print(f"  Applying k-space filter: {kspace_tag}")
-                kspace_pars = tf_settings["kspace_pars"][kspace_tag]
-                print(f"  k-space filter parameters: {kspace_pars}")
+        kspace_tag = meta.kspace_tag_from_map_set(map_set)
+        ftag = meta.filtering_tag_from_map_set(map_set)
+        if kspace_tag is not None:
+            print(f"  Applying k-space filter: {kspace_tag}")
+            kspace_pars = tf_settings["kspace_pars"][kspace_tag]
+            print(f"  k-space filter parameters: {kspace_pars}")
 
-            else:
-                print(
-                    f"  No k-space filter to be applied to map set {map_set}. Skipping." # noqa
+        else:
+            print(
+                f"  No k-space filter to be applied to map set {map_set}. Skipping." # noqa
+            )
+
+        map_dir = tf_settings["filtered_map_dir"][ftag]
+        for id_sim in range(id_start, id_start + n_sims):
+            for pure_type in pure_types:
+                fname = tf_settings["filtered_map_template"][ftag].format(
+                    pure_type=pure_type, id_sim=id_sim
                 )
-
-            map_dir = tf_settings["filtered_map_dir"][ftag]
-            for id_sim in range(id_start, id_start + n_sims):
-                for pure_type in pure_types:
-                    fname = tf_settings["filtered_map_template"][ftag].format(
-                        pure_type=pure_type, id_sim=id_sim
-                    )
-                    path = f"{map_dir}/{fname}"
-                    files_list.append((path, kspace_pars, kspace_tag))
+                path = f"{map_dir}/{fname}"
+                files_list.append((path, kspace_pars, kspace_tag))
 
     # Every rank must have the same list order
     mpi_shared_list = comm.bcast(files_list, root=0)
@@ -63,6 +71,7 @@ def main(args):
             car_template=meta.car_template,
             fields_hp=[0, 1, 2],
         )
+        m *= mask
 
         # TODO: need to add a step before to mask noisy edges of the map
         # with bright pixels which makes the filtering more stable
@@ -76,9 +85,8 @@ def main(args):
         fname_out = fname_out.replace(".fits", f"_kspace_{kspace_tag}.fits")
         mu.write_map(
             fname_out,
-            m_filtered,
+            m_filtered * mask,
             pix_type=meta.pix_type,
-            car_template=meta.car_template,
         )
 
 
