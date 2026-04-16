@@ -19,7 +19,7 @@ def kspace_filter(m, dkx=0, dky=0, type="sharp", pix_type="car"):
         Modes with |ky| < dky will be filtered out.
         Default is 0 (no filtering).
     type : str, optional
-        The type of filter to apply. 
+        The type of filter to apply.
         Options are "sharp" (default) for a hard cutoff
         and "cosine" for a smooth cosine taper.
     """

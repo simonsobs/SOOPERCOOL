@@ -31,7 +31,6 @@ def main(args):
     )
     pure_types = [f"pure{f}" for f in "TEB"]
 
-    
     files_list = []
     for map_set in meta.map_sets:
         print(f"Processing map set: {map_set}")
