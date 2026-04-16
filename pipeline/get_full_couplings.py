@@ -33,8 +33,8 @@ def main(args):
         tf_dir = tf_settings["transfer_directory"]
 
         for ftag1, ftag2 in filtering_pairs:
-            lab1 = "_".join(ftag1)
-            lab2 = "_".join(ftag2)
+            lab1 = f"{ftag1[0]}_{ftag1[1]}"
+            lab2 = f"{ftag2[0]}_{ftag2[1]}"
             tf = np.load(f"{tf_dir}/transfer_function_{lab1}_x_{lab2}.npz")
             tf_dict[ftag1, ftag2] = tf["full_tf"]
 
