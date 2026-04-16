@@ -41,7 +41,7 @@ def kspace_filter(m, dkx=0, dky=0, type="sharp", pix_type="car"):
             w_x = cosine_taper(np.abs(kx), 0, dkx)
             w_y = cosine_taper(np.abs(ky), 0, dky)
             mf *= w_x * w_y
-        mf_back = enmap.ifft(mf)
+        mf_back = enmap.ifft(mf).real
         return mf_back
 
 
