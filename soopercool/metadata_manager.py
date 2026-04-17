@@ -221,7 +221,7 @@ class BBmeta(object):
             os.path.join(self.mask_directory, self.masks["nhits_map"]),
             map, dtype=np.float32, pix_type=self.pix_type)
 
-    def read_nmt_binning(self):
+    def read_nmt_binning(self, force_cl=False):
         """
         Read the binning file and return the corresponding NmtBin object.
         """
@@ -248,7 +248,7 @@ class BBmeta(object):
         return nmt.NmtBin.from_edges(
             bin_low,
             bin_high + 1,
-            is_Dell=self.compute_Dl
+            is_Dell=self.compute_Dl if not force_cl else False
         )
 
     def get_n_bandpowers(self):

@@ -38,8 +38,12 @@ def main(args):
             f"{beam_dir}/{beam_file}",
             lmax=nmt_bins.lmax
         )
+
+        nmt_bins = meta.read_nmt_binning(force_cl=True)
         bb = nmt_bins.bin_cell(bl)
         beams[map_set] = bb
+
+    nmt_bins = meta.read_nmt_binning()
 
     # Load some signal theory power spectra
     signal = {}
@@ -83,7 +87,9 @@ def main(args):
             cov_names.append((ms1, ms2, ms3, ms4))
 
     wsp = cov.load_workspace(cov_dir)
-    cwsp = cov.load_covariance_workspace(cov_dir)
+    hits = {}
+    for map_set in meta.map_sets_list:
+        hits[map_set] = meta.map_sets[map_set]["hits_tag"]
 
     # Load transfer functions
     tf_settings = meta.transfer_settings
@@ -108,6 +114,11 @@ def main(args):
     for ms1, ms2, ms3, ms4 in local_cov_names:
 
         print(f"Computing covariance for {ms1} x {ms2}, {ms3} x {ms4}")
+        cwsp = cov.load_covariance_workspace(
+            cov_dir,
+            [(ms1, ms2, ms3, ms4)],
+            hits
+        )
         # Compute each covariance blocks
         cov_dict = cov.compute_covariance_block(
             ms1, ms2, ms3, ms4,
@@ -118,7 +129,8 @@ def main(args):
             wsp, cwsp,
             signal, noise_interp,
             nmt_bins,
-            n_bundles=n_bundles
+            n_bundles=n_bundles,
+            hits=hits
         )
         beam12 = beams[ms1] * beams[ms2]
         beam34 = beams[ms3] * beams[ms4]
