@@ -5,6 +5,7 @@ import tkinter as tk
 import numpy as np
 import matplotlib
 import sacc
+import camb
 
 matplotlib.rcParams["text.color"] = "white"
 matplotlib.rcParams["xtick.color"] = "white"
@@ -27,6 +28,30 @@ matplotlib.rcParams["font.serif"] = "Computer Modern Roman"
 matplotlib.rcParams["text.usetex"] = True
 matplotlib.rcParams["xtick.direction"] = "in"
 matplotlib.rcParams["ytick.direction"] = "in"
+
+
+def get_theory_cls(cosmo_params):
+    """ """
+    params = camb.set_params(**cosmo_params)
+    params.set_for_lmax(2000, lens_potential_accuracy=2, lens_margin=500)
+    results = camb.get_results(params)
+    powers = results.get_cmb_power_spectra(
+        params, CMB_unit="muK", raw_cl=False
+    )
+    lth = np.arange(powers["total"].shape[0])
+
+    cl_th = {
+        "TT": powers["total"][:, 0],
+        "EE": powers["total"][:, 1],
+        "TE": powers["total"][:, 3],
+        "ET": powers["total"][:, 3],
+        "BB": powers["total"][:, 2],
+    }
+    for spec in ["EB", "TB", "BE", "BT"]:
+        cl_th[spec] = np.zeros_like(lth)
+
+    return lth, cl_th
+
 
 st.set_page_config(page_title="SOOPERpower", layout="wide")
 
@@ -58,6 +83,23 @@ if st.session_state.clicked:
         s = sacc.Sacc.load_fits(st.session_state.file_path)
         st.session_state.loaded_path = st.session_state.file_path
         st.session_state.data = s
+
+    # Compute theory
+    @st.cache_data
+    def compute_theory(r=0.0):
+        cosmo = {
+            "cosmomc_theta": 0.0104073,
+            "As": np.exp(3.056) * 1e-10,
+            "ombh2": 0.02250,
+            "omch2": 0.1193,
+            "ns": 0.9709,
+            "Alens": 1.0,
+            "tau": 0.0603,
+            "r": r,
+        }
+        lth, cl_th = get_theory_cls(cosmo)
+        st.session_state.lth = lth
+        st.session_state.cl_th = cl_th
 
     def clear_ylims():
         st.session_state["ymin"] = None
@@ -100,6 +142,8 @@ if st.session_state.clicked:
     )
     fp = field_pair.replace("T", "0").lower()
 
+    compute_theory(r=0.)
+
     # X-axis
     logscale_xaxis = st.sidebar.checkbox("Log scale x-axis", value=False)
     # Y-axis
@@ -111,6 +155,11 @@ if st.session_state.clicked:
     fig = plt.figure(figsize=(9, 7), facecolor=stcolor)
     if fp in ["eb", "be", "0b", "b0"]:
         plt.axhline(0., color="white", ls="--")
+    plt.plot(
+        st.session_state.lth,
+        st.session_state.cl_th[fp.upper().replace("0", "T")],
+        color="white",
+    )
 
     plt.xlabel(r"$\ell$")
     plt.ylabel(r"$D_\ell^{%s}$" % field_pair)
@@ -130,8 +179,8 @@ if st.session_state.clicked:
 
         plt.errorbar(
             lb[mask] + offset,
-            cl[mask],
-            yerr=err[mask],
+            cl[mask] * 1e12,
+            yerr=err[mask] * 1e12,
             marker="o",
             label=f"{ms1} x {ms2}",
             markerfacecolor="white",
