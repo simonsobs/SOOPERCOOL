@@ -135,10 +135,10 @@ def main(args):
                     **{
                         "quantity": qty,
                         "spin": spin,
-                        "nu": [f-1., f, f+1],  
+                        "nu": [f-1., f, f+1],
                         # Delta bandpasses. TODO: generalize
                         "ell": lb,
-                        "beam": np.ones_like(lb),  
+                        "beam": np.ones_like(lb),
                         # Unit beam. TODO: generalize
                         "bandpass": [0., 1., 0.]  # Deltas. TODO: generalize
                     }
@@ -152,10 +152,7 @@ def main(args):
             bbl = np.load(
                 f"{couplings_dir}/couplings_{ms1}_{ms2}.npz"
             )["bp_win"]
-            # s_wins = sacc.BandpowerWindow(
-            #     np.arange(bbl.shape[-1]),
-            #     bbl.T
-            # )
+
             for fp in field_pairs:
 
                 f1, f2 = fp
