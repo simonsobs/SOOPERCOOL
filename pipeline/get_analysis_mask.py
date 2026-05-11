@@ -228,10 +228,11 @@ def main(args):
     )
 
     if do_plots:
+        mask_label = "binary"
         mu.plot_map(
             binary,
             title="Binary mask",
-            file_name=f"{plot_dir}/binary_mask",
+            file_name=f"{plot_dir}/{mask_label}_mask",
             pix_type=meta.pix_type,
             lims=[-binary.max(), binary.max()]
         )
@@ -266,10 +267,11 @@ def main(args):
             )
         analysis_mask *= gal_mask
         if do_plots:
+            mask_label += "_galactic"
             mu.plot_map(
                 analysis_mask,
                 title="Analysis mask after galactic mask",
-                file_name=f"{plot_dir}/binary_galactic_mask",
+                file_name=f"{plot_dir}/{mask_label}_mask",
                 pix_type=meta.pix_type,
                 lims=[-analysis_mask.max(), analysis_mask.max()]
             )
@@ -291,10 +293,11 @@ def main(args):
             )
         analysis_mask *= ext_mask
         if do_plots:
+            mask_label += "_external"
             mu.plot_map(
                 analysis_mask,
                 title="Analysis mask after external mask",
-                file_name=f"{plot_dir}/binary_external_mask",
+                file_name=f"{plot_dir}/{mask_label}_mask",
                 pix_type=meta.pix_type,
                 lims=[-analysis_mask.max(), analysis_mask.max()]
             )
@@ -307,10 +310,11 @@ def main(args):
         pix_type=meta.pix_type
     )
     if do_plots:
+        mask_label += "_cropped"
         mu.plot_map(
             analysis_mask,
             title="Analysis mask after cropping borders",
-            file_name=f"{plot_dir}/binary_galactic_cropped_mask",
+            file_name=f"{plot_dir}/{mask_label}_mask",
             pix_type=meta.pix_type,
             lims=[-analysis_mask.max(), analysis_mask.max()]
         )
@@ -327,10 +331,11 @@ def main(args):
         pix_type=meta.pix_type
     )
     if do_plots:
+        mask_label += "_apodized"
         mu.plot_map(
             analysis_mask,
             title="Analysis mask after apodization",
-            file_name=f"{plot_dir}/binary_galactic_cropped_apodized_mask",
+            file_name=f"{plot_dir}/{mask_label}_mask",
             pix_type=meta.pix_type,
             lims=[-analysis_mask.max(), analysis_mask.max()]
         )
@@ -362,10 +367,11 @@ def main(args):
 
         analysis_mask *= ps_mask
         if do_plots:
+            mask_label += "_ps"
             mu.plot_map(
                 analysis_mask,
                 title="Analysis mask after point source mask",
-                file_name=f"{plot_dir}/binary_galactic_cropped_apodized_ps_mask", # noqa
+                file_name=f"{plot_dir}/{mask_label}_mask", # noqa
                 pix_type=meta.pix_type,
                 lims=[-analysis_mask.max(), analysis_mask.max()]
             )
