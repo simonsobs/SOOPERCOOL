@@ -100,7 +100,7 @@ def main(args):
         ftag2 = meta.filtering_tag_from_map_set(ms2)
         ktag1 = meta.kspace_tag_from_map_set(ms1)
         ktag2 = meta.kspace_tag_from_map_set(ms2)
-        tf = np.load(f"{tf_dir}/transfer_function_{ftag1}_{ktag1}_x_{ftag2}_{ktag2}.npz")
+        tf = np.load(f"{tf_dir}/transfer_function_{ftag1}_{ktag1}_x_{ftag2}_{ktag2}.npz") # noqa
         tf_dict[ms1, ms2] = tf
 
     # Load number of bundles
