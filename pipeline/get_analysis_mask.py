@@ -315,10 +315,9 @@ def main(args):
             lims=[-analysis_mask.max(), analysis_mask.max()]
         )
 
-    # Smooth and apodize analysis mask
-    analysis_mask = mu.smooth_map(
+    mu.write_map(
+        f"{masks_dir}/binary_galactic_cropped.fits",
         analysis_mask,
-        fwhm_deg=masks_settings['smoothing_radius'],
         pix_type=meta.pix_type
     )
     analysis_mask = mu.apodize_mask(
