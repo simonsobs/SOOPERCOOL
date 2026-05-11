@@ -137,7 +137,7 @@ def main(args):
     #############
     # BINARY MASK
     #############
-    # NOTE: In case we don't provide any global hits map, the binary mask is
+    # NOTE: The binary mask is
     # generated from the sum of the per-(map_set, bundle) hits.
     binary = sum_hits.copy()
     binary[:] = 1
