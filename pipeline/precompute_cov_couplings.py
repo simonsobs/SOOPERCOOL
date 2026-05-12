@@ -67,7 +67,7 @@ def main(args):
 
     for hits_tag, hit in hits.items():
 
-        if len(hit.shape) == 3 and hit.shape[0] == 3:
+        if hit.shape[0] == 3:
             hit = (hit[1]**2 + hit[2]**2) ** 0.5
         sigma = hit.copy()
         sigma[hit > 0] = 1 / np.sqrt(hit[hit > 0])
