@@ -65,7 +65,6 @@ def main(args):
         lmax=meta.lmax
     )
 
-    # for map_set in meta.map_sets:
     for hits_tag, hit in hits.items():
 
         if len(hit.shape) == 3 and hit.shape[0] == 3:
@@ -133,8 +132,6 @@ def main(args):
         len(spin_and_map_sets)
     )
     local_spin_and_map_sets = [spin_and_map_sets[i] for i in task_ids]
-    # task_ids = mpi.distribute_tasks(size, rank, len(spin_combos))
-    # local_spin_combos = [spin_combos[i] for i in task_ids]
 
     t0 = time.time()
     wsp = {}
@@ -154,12 +151,8 @@ def main(args):
         f"[{rank}] Time to compute workspaces: {time.time() - t0:.2f}s"
     )
 
-    # for s0, s1, s2, s3 in local_spin_combos:
     for (s0, s1, s2, s3), (h0, h1, h2, h3) in local_spin_and_map_sets:
-        # h0 = meta.map_sets[ms0]["hits_tag"]
-        # h1 = meta.map_sets[ms1]["hits_tag"]
-        # h2 = meta.map_sets[ms2]["hits_tag"]
-        # h3 = meta.map_sets[ms3]["hits_tag"]
+
         # signal-signal
         t0 = time.time()
         fname_cwsp = f"{cov_dir}/cwsp_{s0}_{s1}_{s2}_{s3}"
@@ -177,7 +170,7 @@ def main(args):
 
         # signal-noise
         t0 = time.time()
-        # fname_cwsp = f"{cov_dir}/cwsp_snsn_{s0}_{s1}_{s2}_{s3}"
+
         fname_cwsp = f"{cov_dir}/cwsp_snsn_{s0}_{h1}_{s1}_{s2}_{h3}_{s3}"
         if not os.path.exists(fname_cwsp):
             cwsp = nmt.NmtCovarianceWorkspace(
@@ -192,7 +185,7 @@ def main(args):
         )
 
         t0 = time.time()
-        # fname_cwsp = f"{cov_dir}/cwsp_snns_{s0}_{s1}_{s2}_{s3}"
+
         fname_cwsp = f"{cov_dir}/cwsp_snns_{s0}_{h1}_{s1}_{h2}_{s2}_{s3}"
         if not os.path.exists(fname_cwsp):
             cwsp = nmt.NmtCovarianceWorkspace(
@@ -205,7 +198,7 @@ def main(args):
         logger.info(f"[{rank}] snns cwsp computed in {time.time() - t0:.2f} s")
 
         t0 = time.time()
-        # fname_cwsp = f"{cov_dir}/cwsp_nssn_{s0}_{s1}_{s2}_{s3}"
+
         fname_cwsp = f"{cov_dir}/cwsp_nssn_{h0}_{s0}_{s1}_{s2}_{h3}_{s3}"
         if not os.path.exists(fname_cwsp):
             cwsp = nmt.NmtCovarianceWorkspace(
@@ -218,7 +211,7 @@ def main(args):
         logger.info(f"[{rank}] nssn cwsp computed in {time.time() - t0:.2f} s")
 
         t0 = time.time()
-        # fname_cwsp = f"{cov_dir}/cwsp_nsns_{s0}_{s1}_{s2}_{s3}"
+
         fname_cwsp = f"{cov_dir}/cwsp_nsns_{h0}_{s0}_{s1}_{h2}_{s2}_{s3}"
         if not os.path.exists(fname_cwsp):
             cwsp = nmt.NmtCovarianceWorkspace(
