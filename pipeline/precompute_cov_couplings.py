@@ -112,7 +112,8 @@ def main(args):
         type="all",
         coadd=True
     )
-    map_sets_for_cov = []
+
+    hit_maps_for_cov = []
     for i, (ms0, ms1) in enumerate(map_set_pairs):
         for j, (ms2, ms3) in enumerate(map_set_pairs):
             if i > j:
@@ -121,17 +122,18 @@ def main(args):
             h1 = meta.map_sets[ms1]["hits_tag"]
             h2 = meta.map_sets[ms2]["hits_tag"]
             h3 = meta.map_sets[ms3]["hits_tag"]
-            if not (h0, h1, h2, h3) in map_sets_for_cov:
-                map_sets_for_cov.append((h0, h1, h2, h3))
 
-    spin_and_map_sets = list(product(spin_combos, map_sets_for_cov))
+            if not (h0, h1, h2, h3) in hit_maps_for_cov:
+                hit_maps_for_cov.append((h0, h1, h2, h3))
+
+    spin_and_hit_maps = list(product(spin_combos, hit_maps_for_cov))
 
     task_ids = mpi.distribute_tasks(
         size,
         rank,
-        len(spin_and_map_sets)
+        len(spin_and_hit_maps)
     )
-    local_spin_and_map_sets = [spin_and_map_sets[i] for i in task_ids]
+    local_spin_and_hit_maps = [spin_and_hit_maps[i] for i in task_ids]
 
     t0 = time.time()
     wsp = {}
@@ -151,7 +153,7 @@ def main(args):
         f"[{rank}] Time to compute workspaces: {time.time() - t0:.2f}s"
     )
 
-    for (s0, s1, s2, s3), (h0, h1, h2, h3) in local_spin_and_map_sets:
+    for (s0, s1, s2, s3), (h0, h1, h2, h3) in local_spin_and_hit_maps:
 
         # signal-signal
         t0 = time.time()
