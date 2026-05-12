@@ -49,8 +49,29 @@ class BBmeta(object):
         self.map_sets_list = self._get_map_sets_list()
         self.maps_list = self._get_map_list()
 
+        self._check_required_settings()
+
         # Initialize a timer
         self.timer = Timer()
+
+    def _check_required_settings(self):
+        """
+        Check that all required settings are present in the configuration
+        file `map_sets` section. If not, raises an error.
+        """
+        required_keys = [
+            "kspace_tag",
+            "hits_tag"
+        ]
+        for map_set in self.map_sets:
+            for key in required_keys:
+                if key not in self.map_sets[map_set]:
+                    raise KeyError(
+                        f"Missing required key {key} in map_sets"
+                        f" section for map_set {map_set}. Older"
+                        " versions of parameter files might be"
+                        " missing these keys, make sure to update them."
+                    )
 
     def _yaml_loader(self, config):
         """
