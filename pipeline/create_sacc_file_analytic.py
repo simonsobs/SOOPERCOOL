@@ -38,12 +38,9 @@ def main(args):
     verbose = args.verbose
 
     out_dir = meta.output_directory
-    # sacc_dir = f"/scratch/gpfs/SIMONSOBS/users/al5147/v4_covs/saccs"
     sacc_dir = f"{out_dir}/saccs"
     BBmeta.make_dir(sacc_dir)
 
-    # cov_dir = f"/scratch/gpfs/SIMONSOBS/users/al5147/v4_covs/covariances"
-    # couplings_dir = f"/scratch/gpfs/SIMONSOBS/users/al5147/v4_covs/couplings"
     cov_dir = f"{out_dir}/covariances"
     couplings_dir = f"{out_dir}/couplings"
 
@@ -62,11 +59,9 @@ def main(args):
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
 
     if args.data:
-        # cl_dir = f"/scratch/gpfs/SIMONSOBS/users/al5147/v4_covs/cells"
         cl_dir = f"{out_dir}/cells"
         Nsims = 1
     elif args.sims:
-        # cl_dir = f"/scratch/gpfs/SIMONSOBS/users/al5147/v4_covs/cells_sims"
         cl_dir = f"{out_dir}/cells_sims"
         Nsims = meta.covariance["cov_num_sims"]
 
@@ -84,7 +79,6 @@ def main(args):
                 f"{cov_dir}/analytic_cov_{ms1}_x_{ms2}_{ms3}_x_{ms4}.npz"
             )
 
-            # cov_size = len(field_pairs)*len(lb)
             cov = cov_dict["cov"]
 
             covs[ms1, ms2, ms3, ms4] = thin_covariance(
