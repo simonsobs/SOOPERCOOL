@@ -19,6 +19,19 @@ streamlit run sacc_viewer/sat_spectra_viewer.py
 ```
 which will open a local session in your default browser (don't forget to use tunelling to view it if you're on a cluster). You can then select the `sacc` file you want to visualize through an (ugly) GUI interface. This will open a web interface to visualize spectra for different `map_set` pairs as well as an additional tab to show power spectra residuals, computing $\chi^2$ and PTEs on the fly.
 
+Otherwise you can run it on a cluster (eg tiger3) without relying on the file dialog window with (pass as many sacc files as you wish and you can label them with the `:label` syntax):
+```
+streamlit run sacc_viewer/sat_spectra_viewer.py cl_and_cov_sacc1.fits:label_for_sacc1 cl_and_cov_sacc2.fits:label_for_sacc2  --server.headless true  --server.port 8501  --server.address 0.0.0.0
+```
+Then on local terminal, do:
+```
+ssh -L 8501:localhost:8501 USER@tiger3.princeton.edu
+```
+On an interactive node change the last one with:
+```
+ssh -L 8501:tiger-your_running_node:8501 ar3186@tiger3.princeton.edu
+```
+
 ### EB angles fit and rotation of spectra
 We provide a post-processing python script to fit for EB mixing angles for each of the `map_sets` defined in the `sacc` file provided. It then write down a new `sacc` file where polarization has been rotated back using the best fit angles.
 

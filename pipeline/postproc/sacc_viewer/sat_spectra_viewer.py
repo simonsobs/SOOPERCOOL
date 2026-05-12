@@ -1,11 +1,11 @@
 import matplotlib.pyplot as plt
 from tkinter import filedialog
 import streamlit as st
-import tkinter as tk
 import numpy as np
 import matplotlib
 import sacc
 import camb
+import os
 
 matplotlib.rcParams["text.color"] = "white"
 matplotlib.rcParams["xtick.color"] = "white"
@@ -25,7 +25,7 @@ matplotlib.rcParams["xtick.labelsize"] = 15
 matplotlib.rcParams["ytick.labelsize"] = 15
 matplotlib.rcParams["font.family"] = "serif"
 matplotlib.rcParams["font.serif"] = "Computer Modern Roman"
-matplotlib.rcParams["text.usetex"] = True
+matplotlib.rcParams["text.usetex"] = False
 matplotlib.rcParams["xtick.direction"] = "in"
 matplotlib.rcParams["ytick.direction"] = "in"
 
@@ -56,33 +56,88 @@ def get_theory_cls(cosmo_params):
 st.set_page_config(page_title="SOOPERpower", layout="wide")
 
 
+def open_file_dialog():
+    paths = filedialog.askopenfilenames()
+
+    file_info = []
+    for path in paths:
+        label = os.path.basename(path)
+        file_info.append((path, label))
+
+    if file_info:
+        st.session_state.file_info = file_info
+        st.session_state.clicked = True
+
+def parse_cli_files():
+    import sys
+    file_info = []
+
+    for arg in sys.argv[1:]:
+        if arg.startswith("-"):
+            continue
+
+        if ":" in arg:
+            path, label = arg.split(":", 1)
+        else:
+            path = arg
+            label = os.path.basename(path)
+
+        if os.path.exists(path):
+            file_info.append((path, label))
+        else:
+            st.warning(f"File does not exist and will be skipped: `{path}`")
+
+    return file_info
+
+
 if "clicked" not in st.session_state:
     st.session_state.clicked = False
 
+if "file_info" not in st.session_state:
+    st.session_state.file_info = []
 
-def open_file_dialog():
-    root = tk.Tk()
-    # root.withdraw()
-    # root.mainloop()
-    file_path = filedialog.askopenfilename()
-    root.destroy()
-    st.session_state.file_path = file_path
+if "data" not in st.session_state:
+    st.session_state.data = None
+
+if "loaded_info" not in st.session_state:
+    st.session_state.loaded_info = []
+
+# Initialize from CLI arguments if files were provided
+cli_file_info = parse_cli_files()
+
+if len(cli_file_info) > 0 and len(st.session_state.file_info) == 0:
+    st.session_state.file_info = cli_file_info
     st.session_state.clicked = True
 
+# Sidebar: file input
+st.sidebar.text("Select sacc file(s)")
 
-st.sidebar.text("Select a sacc file")
-st.sidebar.button("Browse", on_click=open_file_dialog)
+if len(cli_file_info) == 0:
+    st.sidebar.button("Browse", on_click=open_file_dialog)
+else:
+    st.sidebar.text("Using command-line files")
+
 st.sidebar.markdown(
-    "Selected file: `%s`" % st.session_state.get("file_path", "None")
+    "Selected files:\n" + "\n".join(
+        [
+            f"- `{label}` ({path})"
+            for path, label in st.session_state.get("file_info", [])
+        ]
+    )
 )
+
 if st.session_state.clicked:
 
     # Load data
-    # @st.cache_data
     def load_data():
-        s = sacc.Sacc.load_fits(st.session_state.file_path)
-        st.session_state.loaded_path = st.session_state.file_path
-        st.session_state.data = s
+        datasets = []
+
+        for path, label in st.session_state.file_info:
+            s = sacc.Sacc.load_fits(path)
+            datasets.append((label, s))
+
+        st.session_state.loaded_info = st.session_state.file_info.copy()
+        st.session_state.data = datasets
 
     # Compute theory
     @st.cache_data
@@ -97,23 +152,22 @@ if st.session_state.clicked:
             "tau": 0.0603,
             "r": r,
         }
-        lth, cl_th = get_theory_cls(cosmo)
-        st.session_state.lth = lth
-        st.session_state.cl_th = cl_th
+        return get_theory_cls(cosmo)
 
     def clear_ylims():
         st.session_state["ymin"] = None
         st.session_state["ymax"] = None
 
-    if "data" not in st.session_state:
+    if st.session_state.data is None:
         load_data()
+
     if (
-        "loaded_path" in st.session_state
-        and st.session_state.loaded_path != st.session_state.file_path
+        "loaded_info" in st.session_state
+        and st.session_state.loaded_info != st.session_state.file_info
     ):
         load_data()
-    s = st.session_state.data
-    tracer_pairs = s.get_tracer_combinations()
+
+    datasets = st.session_state.data
     st.title("SOOPERpower")
     st.html(
         """
@@ -125,14 +179,21 @@ if st.session_state.clicked:
         """
     )
 
-    ms1_unique = np.unique([x[0] for x in tracer_pairs])
-    ms2_unique = np.unique([x[1] for x in tracer_pairs])
+    # Per-file tracer selection
+    file_pairs = []
 
-    ms1ms2 = [f"{x[0]} x {x[1]}" for x in tracer_pairs]
+    for i, (label, s) in enumerate(datasets):
+        tracer_pairs = s.get_tracer_combinations()
+        ms1ms2 = [f"{x[0]} x {x[1]}" for x in tracer_pairs]
 
-    pairs_to_display = st.sidebar.multiselect(
-        "Which map set pairs", ms1ms2, default=ms1ms2[0]
-    )
+        pairs_to_display = st.sidebar.multiselect(
+            f"{label} pairs",
+            ms1ms2,
+            default=ms1ms2[0],
+            key=f"pairs_{i}",
+        )
+
+        file_pairs.append((label, s, pairs_to_display))
 
     field_pair = st.sidebar.pills(
         "Field pair",
@@ -142,7 +203,7 @@ if st.session_state.clicked:
     )
     fp = field_pair.replace("T", "0").lower()
 
-    compute_theory(r=0.)
+    lth, cl_th = compute_theory(r=0.)
 
     # X-axis
     logscale_xaxis = st.sidebar.checkbox("Log scale x-axis", value=False)
@@ -156,40 +217,76 @@ if st.session_state.clicked:
     if fp in ["eb", "be", "0b", "b0"]:
         plt.axhline(0., color="white", ls="--")
     plt.plot(
-        st.session_state.lth,
-        st.session_state.cl_th[fp.upper().replace("0", "T")],
-        color="white",
+    lth,
+    cl_th[fp.upper().replace("0", "T")],
+    color="white",
     )
 
     plt.xlabel(r"$\ell$")
     plt.ylabel(r"$D_\ell^{%s}$" % field_pair)
 
-    for id12, ms1ms2 in enumerate(pairs_to_display):
-        ms1, ms2 = ms1ms2.split(" x ")
-        lb, cl, cov = s.get_ell_cl(f"cl_{fp}", ms1, ms2, return_cov=True)
-        err = np.sqrt(cov.diagonal())
+    n_files = len(file_pairs)
 
-        offset = (
-            (id12 - len(pairs_to_display) / 2 + 0.5)
-            * (range_x[1] - range_x[0])
-            * 0.002
-        )
+    for file_id, (label, s, pairs_to_display) in enumerate(file_pairs):
+        for id12, ms1ms2 in enumerate(pairs_to_display):
+            ms1, ms2 = ms1ms2.split(" x ")
 
-        mask = (lb >= range_x[0]) & (lb <= range_x[1])
+            try:
+                lb, cl, cov = s.get_ell_cl(
+                    f"cl_{fp}", ms1, ms2, return_cov=True
+                )
+                err = np.sqrt(cov.diagonal())
+                has_cov = True
+                return_cov = True
 
-        plt.errorbar(
-            lb[mask] + offset,
-            cl[mask] * 1e12,
-            yerr=err[mask] * 1e12,
-            marker="o",
-            label=f"{ms1} x {ms2}",
-            markerfacecolor="white",
-            markeredgewidth=1.0,
-            markersize=4,
-            elinewidth=1.0,
-            capsize=2.0,
-            ls="None",
-        )
+            except Exception:
+                try:
+                    lb, cl = s.get_ell_cl(
+                        f"cl_{fp}", ms1, ms2, return_cov=False
+                    )
+                    err = None
+                    has_cov = False
+                    return_cov = False
+
+                except Exception:
+                    continue
+
+            offset = (
+                (
+                    id12 - len(pairs_to_display) / 2 + 0.5
+                    + file_id - n_files / 2 + 0.5
+                )
+                * (range_x[1] - range_x[0])
+                * 0.002
+            )
+
+            mask = (lb >= range_x[0]) & (lb <= range_x[1])
+
+            if return_cov:
+                plt.errorbar(
+                    lb[mask] + offset,
+                    cl[mask],
+                    yerr=err[mask],
+                    marker="o",
+                    label=f"{label} | {ms1} x {ms2}",
+                    markerfacecolor="white",
+                    markeredgewidth=1.0,
+                    markersize=4,
+                    elinewidth=1.0,
+                    capsize=2.0,
+                    ls="None",
+                )
+            else:
+                plt.plot(
+                    lb[mask],
+                    cl[mask],
+                    marker="o",
+                    label=f"{label} | {ms1} x {ms2}",
+                    markerfacecolor="white",
+                    markeredgewidth=1.0,
+                    markersize=4,
+                    ls="-",
+                )
 
     if logscale_xaxis:
         plt.xscale("log")
