@@ -68,6 +68,7 @@ def open_file_dialog():
         st.session_state.file_info = file_info
         st.session_state.clicked = True
 
+
 def parse_cli_files():
     import sys
     file_info = []
@@ -210,6 +211,14 @@ if st.session_state.clicked:
     # Y-axis
     logscale_yaxis = st.sidebar.checkbox("Log scale y-axis", value=False)
 
+    # Rescale theory
+    rescale_th = st.sidebar.number_input(
+        "Theory rescaling factor",
+        value=1e-12,
+        format="%.2E",
+        key="th_rescale"
+    )
+
     range_x = st.sidebar.slider("X-axis range", 0, 1000, (40, 600), step=10)
 
     stcolor = "#0e1117"
@@ -217,9 +226,9 @@ if st.session_state.clicked:
     if fp in ["eb", "be", "0b", "b0"]:
         plt.axhline(0., color="white", ls="--")
     plt.plot(
-    lth,
-    cl_th[fp.upper().replace("0", "T")],
-    color="white",
+        lth,
+        cl_th[fp.upper().replace("0", "T")] * rescale_th,
+        color="white",
     )
 
     plt.xlabel(r"$\ell$")
