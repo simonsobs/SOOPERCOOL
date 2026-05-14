@@ -15,13 +15,13 @@ sudo apt-get install python3-tk
 ```
 if not provided in your default python install. You can then run the app with
 ```
-streamlit run sacc_viewer/sat_spectra_viewer.py
+streamlit run sacc_viewer/SOOPERpower.py
 ```
 which will open a local session in your default browser (don't forget to use tunelling to view it if you're on a cluster). You can then select the `sacc` file you want to visualize through an (ugly) GUI interface. This will open a web interface to visualize spectra for different `map_set` pairs as well as an additional tab to show power spectra residuals, computing $\chi^2$ and PTEs on the fly.
 
 Otherwise you can run it on a cluster (eg tiger3) without relying on the file dialog window with (pass as many sacc files as you wish and you can label them with the `:label` syntax):
 ```
-streamlit run sacc_viewer/sat_spectra_viewer.py cl_and_cov_sacc1.fits:label_for_sacc1 cl_and_cov_sacc2.fits:label_for_sacc2  --server.headless true  --server.port 8501  --server.address 0.0.0.0
+streamlit run sacc_viewer/SOOPERpower.py cl_and_cov_sacc1.fits:label_for_sacc1 cl_and_cov_sacc2.fits:label_for_sacc2  --server.headless true  --server.port 8501  --server.address 0.0.0.0
 ```
 Then on local terminal, do:
 ```
