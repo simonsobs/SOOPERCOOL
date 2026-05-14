@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib
 import sacc
 import scipy.stats
+import os
 
 matplotlib.rcParams["text.color"] = "white"
 matplotlib.rcParams["xtick.color"] = "white"
@@ -25,15 +26,33 @@ matplotlib.rcParams["xtick.labelsize"] = 15
 matplotlib.rcParams["ytick.labelsize"] = 15
 matplotlib.rcParams["font.family"] = "serif"
 matplotlib.rcParams["font.serif"] = "Computer Modern Roman"
-matplotlib.rcParams["text.usetex"] = True
+matplotlib.rcParams["text.usetex"] = False
 matplotlib.rcParams["xtick.direction"] = "in"
 matplotlib.rcParams["ytick.direction"] = "in"
 
 st.set_page_config(page_title="SOOPERpower", layout="wide")
 
 
-if "clicked" not in st.session_state:
-    st.session_state.clicked = False
+def parse_cli_files():
+    import sys
+    file_info = []
+
+    for arg in sys.argv[1:]:
+        if arg.startswith("-"):
+            continue
+
+        if ":" in arg:
+            path, label = arg.split(":", 1)
+        else:
+            path = arg
+            label = os.path.basename(path)
+
+        if os.path.exists(path):
+            file_info.append((path, label))
+        else:
+            st.warning(f"File does not exist and will be skipped: `{path}`")
+
+    return file_info
 
 
 def open_file_dialog():
@@ -46,34 +65,77 @@ def open_file_dialog():
     st.session_state.clicked = True
 
 
+if "clicked" not in st.session_state:
+    st.session_state.clicked = False
+
+if "file_info" not in st.session_state:
+    st.session_state.file_info = []
+
+if "data" not in st.session_state:
+    st.session_state.data = None
+
+if "loaded_info" not in st.session_state:
+    st.session_state.loaded_info = []
+
+# Initialize from CLI arguments if files were provided
+cli_file_info = parse_cli_files()
+
+if len(cli_file_info) > 0 and len(st.session_state.file_info) == 0:
+    st.session_state.file_info = cli_file_info
+    st.session_state.clicked = True
+
 st.sidebar.text("Select a sacc file")
-st.sidebar.button("Browse", on_click=open_file_dialog)
+
+if len(cli_file_info) == 0:
+    st.sidebar.button("Browse", on_click=open_file_dialog)
+else:
+    st.sidebar.text("Using command-line files")
+
 st.sidebar.markdown(
-    "Selected file: `%s`" % st.session_state.get("file_path", "None")
+    "Selected files:\n" + "\n".join(
+        [
+            f"- `{label}` ({path})"
+            for path, label in st.session_state.get("file_info", [])
+        ]
+    )
 )
+
 if st.session_state.clicked:
 
+    which_file_lab = st.sidebar.selectbox(
+        "Which file?", options=[
+            label for _, label in st.session_state.file_info
+        ]
+    )
+
     # Load data
-    # @st.cache_data
     def load_data():
-        s = sacc.Sacc.load_fits(st.session_state.file_path)
-        st.session_state.loaded_path = st.session_state.file_path
-        st.session_state.data = s
+        datasets = []
+
+        for path, label in st.session_state.file_info:
+            if label == which_file_lab:
+                s = sacc.Sacc.load_fits(path)
+                datasets.append((label, s))
+
+        st.session_state.loaded_info = which_file_lab
+        st.session_state.data = datasets
 
     def clear_ylims():
         st.session_state["ymin"] = None
         st.session_state["ymax"] = None
 
-    if "data" not in st.session_state:
+    if st.session_state.data is None:
         load_data()
+
     if (
-        "loaded_path" in st.session_state
-        and st.session_state.loaded_path != st.session_state.file_path
+        "loaded_info" in st.session_state
+        and st.session_state.loaded_info != which_file_lab
     ):
         load_data()
-    s = st.session_state.data
+
+    _, s = st.session_state.data[0]
     tracer_pairs = s.get_tracer_combinations()
-    st.title("SAT null viewer")
+    st.title("SOOPERnull")
     st.html(
         """
         <style>
