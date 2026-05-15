@@ -40,6 +40,9 @@ def main(args):
         for tr1, tr2 in tracer_pairs:
             idx = s.indices("cl_eb", (tr1, tr2))
             inds.append(idx)
+            if tr1 != tr2:
+                idx = s.indices("cl_be", (tr1, tr2))
+                inds.append(idx)
         inds = np.concatenate(inds)
 
         # After rotation, EB power should be close to zero
