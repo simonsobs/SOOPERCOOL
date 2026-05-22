@@ -756,7 +756,7 @@ def get_spin_derivatives(map):
 
     def almtomap(alm):
         return alm2map(alm, pix_type=pix_type, nside=nside,
-                       car_map_template=temp)
+                       car_template=temp)
 
     def maptoalm(map):
         return map2alm(map, pix_type=pix_type)

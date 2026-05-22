@@ -90,7 +90,7 @@ def main(args):
                         pix_type=meta.pix_type,
                         fields_hp=[0, 1, 2],
                         car_template=meta.car_template,
-                        convert_K_to_muK=False)
+                        convert_K_to_muK=True)
 
         kspace_tag = meta.kspace_tag_from_map_set(map_set)
         if kspace_tag:
