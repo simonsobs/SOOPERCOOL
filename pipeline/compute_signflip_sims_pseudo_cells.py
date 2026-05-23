@@ -108,6 +108,12 @@ def main(args):
                     pix_type=meta.pix_type,
                     car_template=template_for_this_run
                 )
+                mask_dir = "/".join(meta.masks["analysis_mask"].split("/")[:-1])
+                binary = mu.read_map(
+                    f"{mask_dir}/binary_galactic_cropped.fits",
+                    pix_type=meta.pix_type,
+                    car_template=meta.car_template
+                )
             # Add kspace filtering if required
             kspace_tag = meta.kspace_tag_from_map_set(map_set)
             if kspace_tag:
