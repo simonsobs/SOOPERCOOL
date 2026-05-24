@@ -34,7 +34,19 @@ def gp_fit(x, y, noise_std, xpred):
 
 def bin_data(x, y, bins):
     """
+    Bin y(x), dropping hardcoded bin edges beyond the available ell range.
     """
+    bins = np.asarray(bins, dtype=float)
+
+    # x is np.arange(nl), so the final valid upper edge is nl = x.max() + 1
+    final_edge = np.max(x) + 1
+
+    bins = bins[bins <= final_edge]
+    if bins[-1] < final_edge:
+        bins = np.append(bins, final_edge)
+
+    bins = np.unique(bins)
+
     mu, edges, _ = binned_statistic(
         x, y,
         statistic="mean",
@@ -51,6 +63,7 @@ def bin_data(x, y, bins):
             bins=bins
         )[0]
     )
+
     return (edges[1:] + edges[:-1]) / 2, mu, std
 
 

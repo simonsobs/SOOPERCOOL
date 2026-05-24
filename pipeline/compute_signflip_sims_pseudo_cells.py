@@ -56,22 +56,33 @@ def main(args):
         fields = {}
         for map_name in meta.maps_list:
             map_set, id_bundle = map_name.split("__")
-            sat_parts = map_set.split('_')
-            sat_parts_lower = [
+            map_parts = map_set.split("_")
+
+            sat_parts = [
                 part.lower()
-                for part in sat_parts
-                if part.startswith("SAT")
+                for part in map_parts
+                if part.lower().startswith("sat")
             ]
-            sat = "_".join(sat_parts_lower)
+            sat = "_".join(sat_parts)
+
             non_sat_parts = [
-                p for p in sat_parts if not p.startswith('SAT')
+                part
+                for part in map_parts
+                if not part.lower().startswith("sat")
             ]
-            frq = non_sat_parts[0] if len(non_sat_parts) > 0 else None
-            ssplit = (
-                "_".join(non_sat_parts[2:])
-                if len(non_sat_parts) > 2
-                else ""
+
+            frq = next(
+                (part for part in non_sat_parts if part.lower().startswith("f")),
+                None,
             )
+
+            split_parts = [
+                part
+                for part in non_sat_parts
+                if part != frq and part.lower() not in ["south", "north"]
+            ]
+            ssplit = "_".join(split_parts)
+
             map_fname = (
                 f"{base_dir}{sat}_{frq}_{ssplit}_bundle"
                 f"{id_bundle}_{id_sim:04d}_map.fits"

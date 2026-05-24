@@ -80,7 +80,7 @@ def main(args):
                         pix_type=meta.pix_type,
                         fields_hp=[0, 1, 2],
                         car_template=meta.car_template,
-                        convert_K_to_muK=False)
+                        convert_K_to_muK=True)
         if do_plots:
             fname = f"{map_plot_dir}/map_{map_set}_bundle{id_bundle}"
             lims = [[-5000, 5000], [-300, 300], [-300, 300]]
