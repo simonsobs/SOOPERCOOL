@@ -21,7 +21,10 @@ def main(args):
 
     tf_dict = {}
 
-    if filtering_pairs == [(None, None)]:
+    if filtering_pairs == [((None, None), (None, None))]:
+        # No filtering has been applied, so we don't need to load
+        # any transfer function. It accounts for both preprocessing
+        # filtering and k-space filtering.
         tf_unity = np.zeros((9, 9, nmt_bins.get_n_bands()))
         for i in range(9):
             tf_unity[i, i, :] = 1.0
@@ -30,7 +33,9 @@ def main(args):
         tf_dir = tf_settings["transfer_directory"]
 
         for ftag1, ftag2 in filtering_pairs:
-            tf = np.load(f"{tf_dir}/transfer_function_{ftag1}_x_{ftag2}.npz")
+            lab1 = f"{ftag1[0]}_{ftag1[1]}"
+            lab2 = f"{ftag2[0]}_{ftag2[1]}"
+            tf = np.load(f"{tf_dir}/transfer_function_{lab1}_x_{lab2}.npz")
             tf_dict[ftag1, ftag2] = tf["full_tf"]
 
     mcms_dict = cu.load_mcms(couplings_dir,
@@ -38,8 +43,16 @@ def main(args):
 
     # First for the data (i.e. including beams, tf, and mcm)
     ps_names_and_ftags = {
-        (ms1, ms2): (meta.filtering_tag_from_map_set(ms1),
-                     meta.filtering_tag_from_map_set(ms2))
+        (ms1, ms2): (
+            (
+                meta.filtering_tag_from_map_set(ms1),
+                meta.kspace_tag_from_map_set(ms1)
+            ),
+            (
+                meta.filtering_tag_from_map_set(ms2),
+                meta.kspace_tag_from_map_set(ms2)
+            )
+        )
         for ms1, ms2 in ps_names
     }
 

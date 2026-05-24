@@ -281,6 +281,37 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None,
     return pcls_mat
 
 
+def read_nmt_binning(binning_file, lmax, compute_Dl, force_cl=False):
+    """
+    Read the binning file and return the corresponding NmtBin object.
+    """
+    binning = np.load(binning_file)
+    bin_low, bin_high = binning["bin_low"], binning["bin_high"]
+    bin_lmax = bin_high[-1]
+
+    if bin_lmax < lmax:
+        raise ValueError(
+            f"lmax in binning {bin_lmax} is lower than {lmax}."
+            " Update config file to change lmax or binning scheme."
+        )
+    else:
+        # Truncate binning
+        select = bin_low < lmax
+        bin_low = bin_low[select]
+        bin_high = bin_high[select]
+
+        bin_high = np.concatenate((
+            bin_high[:-1],
+            np.array([lmax])
+        ))
+
+    return nmt.NmtBin.from_edges(
+        bin_low,
+        bin_high + 1,
+        is_Dell=compute_Dl if not force_cl else False
+    )
+
+
 def bin_theory_cls(cls, bpwf):
     """
     """
