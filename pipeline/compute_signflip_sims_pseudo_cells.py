@@ -108,7 +108,9 @@ def main(args):
                     pix_type=meta.pix_type,
                     car_template=template_for_this_run
                 )
-                mask_dir = "/".join(meta.masks["analysis_mask"].split("/")[:-1])
+                mask_dir = "/".join(
+                    meta.masks["analysis_mask"].split("/")[:-1]
+                )
                 binary = mu.read_map(
                     f"{mask_dir}/binary_galactic_cropped.fits",
                     pix_type=meta.pix_type,
@@ -167,7 +169,10 @@ def main(args):
             ftag1 = meta.filtering_tag_from_map_set(map_set1)
             ftag2 = meta.filtering_tag_from_map_set(map_set2)
             if verbose:
-                print(f"  Computing ({map_set1}, {ftag1}) x ({map_set2}, {ftag2})")
+                print(
+                    f"  Computing ({map_set1}, {ftag1}) "
+                    f"x ({map_set2}, {ftag2})"
+                )
             ofile = (
                 f"{cells_dir}/decoupled_pcls_{map_name1}_x_"
                 f"{map_name2}_{id_sim:04d}.npz"
