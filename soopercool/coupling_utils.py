@@ -87,7 +87,9 @@ def read_pcls_matrices(pcls_mat_dir, filtering_pairs, Nsims, sim_id_start=0):
     for id_sim in range(sim_id_start, Nsims + sim_id_start):
         for label in ["filtered", "unfiltered"]:
             for ftag1, ftag2 in filtering_pairs:
-                suffix = f"{ftag1}_x_{ftag2}_{label}_{id_sim:04d}"
+                lab1 = f"{ftag1[0]}_{ftag1[1]}"
+                lab2 = f"{ftag2[0]}_{ftag2[1]}"
+                suffix = f"{lab1}_x_{lab2}_{label}_{id_sim:04d}"
                 pcls_mat = np.load(
                     f"{pcls_mat_dir}/pcls_mat_tf_est_{suffix}.npz")
                 pcls_mat_dict[ftag1, ftag2][label] += [pcls_mat["pcls_mat"]]
@@ -244,7 +246,6 @@ def compute_couplings(mcm, nmt_binning, transfer=None, compute_Dl=False):
 def get_couplings_dict(mcm_dict, nmt_binning,
                        transfer_dict=None,
                        ps_names_and_ftags=None,
-                       filtering_pairs=None,
                        compute_Dl=False):
     """
     Compute couplings from pre-computed mode-coupling
@@ -269,9 +270,6 @@ def get_couplings_dict(mcm_dict, nmt_binning,
         Dictionary with keys as (map_set1, map_set2) and
         values as (ftag1, ftag2).
         If provided, couplings will be computed for these pairs.
-    filtering_pairs : list of tuples, optional
-        List of (ftag1, ftag2) tuples. If provided, couplings
-        will be computed for these pairs.
     compute_Dl : bool, optional
         If True, applies the Dl conversion when computing the binned MCM.
         The code will then output power spectra in Dl units.
@@ -296,18 +294,9 @@ def get_couplings_dict(mcm_dict, nmt_binning,
             couplings[ms1, ms2]["inv_coupling"] = inv_coupling
 
     else:
-        for ftag1, ftag2 in filtering_pairs:
-            couplings[ftag1, ftag2] = {}
-            mcm = mcm_dict[ftag1, ftag2]
-            if transfer_dict is not None:
-                transfer = transfer_dict[ftag1, ftag2]
-            else:
-                transfer = None
-
-            bpw_win, inv_coupling = compute_couplings(
-                mcm, nmt_binning, transfer, compute_Dl=compute_Dl
-            )
-            couplings[ftag1, ftag2]["bp_win"] = bpw_win
-            couplings[ftag1, ftag2]["inv_coupling"] = inv_coupling
+        raise ValueError(
+            "Nothing computed. "
+            "Should provide a ps_names_and_ftags argument."
+        )
 
     return couplings

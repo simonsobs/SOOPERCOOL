@@ -1,10 +1,10 @@
 import soopercool.map_utils as mu
+import soopercool.ps_utils as pu
 import soopercool.utils as su
 import yaml
 import numpy as np
 import os
 import time
-import pymaster as nmt
 
 
 class BBmeta(object):
@@ -49,8 +49,29 @@ class BBmeta(object):
         self.map_sets_list = self._get_map_sets_list()
         self.maps_list = self._get_map_list()
 
+        self._check_required_settings()
+
         # Initialize a timer
         self.timer = Timer()
+
+    def _check_required_settings(self):
+        """
+        Check that all required settings are present in the configuration
+        file `map_sets` section. If not, raises an error.
+        """
+        required_keys = [
+            "kspace_tag",
+            "hits_tag"
+        ]
+        for map_set in self.map_sets:
+            for key in required_keys:
+                if key not in self.map_sets[map_set]:
+                    raise KeyError(
+                        f"Missing required key {key} in map_sets"
+                        f" section for map_set {map_set}. Older"
+                        " versions of parameter files might be"
+                        " missing these keys, make sure to update them."
+                    )
 
     def _yaml_loader(self, config):
         """
@@ -221,35 +242,14 @@ class BBmeta(object):
             os.path.join(self.mask_directory, self.masks["nhits_map"]),
             map, dtype=np.float32, pix_type=self.pix_type)
 
-    def read_nmt_binning(self):
+    def read_nmt_binning(self, force_cl=False):
         """
         Read the binning file and return the corresponding NmtBin object.
         """
-        binning = np.load(self.binning_file)
-        bin_low, bin_high = binning["bin_low"], binning["bin_high"]
-        bin_lmax = bin_high[-1]
-
-        if bin_lmax < self.lmax:
-            raise ValueError(
-                f"lmax in binning {bin_lmax} is lower than {self.lmax}."
-                " Update config file to change lmax or binning scheme."
-            )
-        else:
-            # Truncate binning
-            select = bin_low < self.lmax
-            bin_low = bin_low[select]
-            bin_high = bin_high[select]
-
-            bin_high = np.concatenate((
-                bin_high[:-1],
-                np.array([self.lmax])
-            ))
-
-        return nmt.NmtBin.from_edges(
-            bin_low,
-            bin_high + 1,
-            is_Dell=self.compute_Dl
-        )
+        return pu.read_nmt_binning(self.binning_file,
+                                   self.lmax,
+                                   self.compute_Dl,
+                                   force_cl=force_cl)
 
     def get_n_bandpowers(self):
         """
@@ -678,10 +678,17 @@ class BBmeta(object):
     def get_filtering_tags(self):
         """
         """
-        return list(set(
-            [self.filtering_tag_from_map_set(ms)
-             for ms in self.map_sets_list]
-        ))
+        return list(
+            set(
+                [
+                    (
+                        self.filtering_tag_from_map_set(ms),
+                        self.kspace_tag_from_map_set(ms),
+                    )
+                    for ms in self.map_sets_list
+                ]
+            )
+        )
 
     def get_independent_filtering_pairs(self):
         """
@@ -691,7 +698,9 @@ class BBmeta(object):
         for ms1, ms2 in cross_ps_names:
             fp1 = self.filtering_tag_from_map_set(ms1)
             fp2 = self.filtering_tag_from_map_set(ms2)
-            filtering_pairs.append((fp1, fp2))
+            kt1 = self.kspace_tag_from_map_set(ms1)
+            kt2 = self.kspace_tag_from_map_set(ms2)
+            filtering_pairs.append(((fp1, kt1), (fp2, kt2)))
         return list(set(filtering_pairs))
 
     def get_inverse_couplings(self, return_bpwf=False):

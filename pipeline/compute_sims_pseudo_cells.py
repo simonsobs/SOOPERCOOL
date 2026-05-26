@@ -2,6 +2,7 @@ from soopercool import BBmeta
 from soopercool import ps_utils as pu
 from soopercool import map_utils as mu
 from soopercool import mpi_utils as mpi
+from soopercool import fft_utils as sfft
 import os
 import argparse
 import numpy as np
@@ -170,6 +171,15 @@ def main(args):
                     m = noise_map.copy()
                     mu.add_map(signal, m, meta.pix_type)
                 mu.multiply_map(binary, m, meta.pix_type)
+
+                kspace_tag = meta.kspace_tag_from_map_set(ms)
+                if kspace_tag:
+                    kspace_settings = meta.transfer_settings["kspace_pars"]
+                    m = sfft.kspace_filter(
+                        m,
+                        pix_type=meta.pix_type,
+                        **kspace_settings[kspace_tag]
+                    )
 
                 wcs = None
                 if meta.pix_type == "car":

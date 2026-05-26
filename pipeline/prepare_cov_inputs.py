@@ -142,6 +142,8 @@ def main(args):
         # already been generated for transfer function estimation
         ftag1 = meta.filtering_tag_from_map_set(map_set1)
         ftag2 = meta.filtering_tag_from_map_set(map_set2)
+        ktag1 = meta.kspace_tag_from_map_set(map_set1)
+        ktag2 = meta.kspace_tag_from_map_set(map_set2)
 
         sim_ids = range(
             tf_settings["sim_id_start"],
@@ -153,12 +155,12 @@ def main(args):
         for sim_id in sim_ids:
             ps_mat_filtered.append(
                 np.load(
-                    f"{cells_tf_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_filtered_unbinned_{sim_id:04d}.npz" # noqa
+                    f"{cells_tf_dir}/pcls_mat_tf_est_{ftag1}_{ktag1}_x_{ftag2}_{ktag2}_filtered_unbinned_{sim_id:04d}.npz" # noqa
                 )["pcls_mat"]
             )
             ps_mat_unfiltered.append(
                 np.load(
-                    f"{cells_tf_dir}/pcls_mat_tf_est_{ftag1}_x_{ftag2}_unfiltered_unbinned_{sim_id:04d}.npz" # noqa
+                    f"{cells_tf_dir}/pcls_mat_tf_est_{ftag1}_{ktag1}_x_{ftag2}_{ktag2}_unfiltered_unbinned_{sim_id:04d}.npz" # noqa
                 )["pcls_mat"]
             )
 
@@ -197,7 +199,7 @@ def main(args):
                 x,
                 y,
                 [0, 2, 6, 10, 30, 50, 70, 90, 100, 200,
-                 300, 400, 500, 600, 700, 800, 900, nl]
+                 300, 400, 500, 600, 700, nl]  # TODO: fix this
             )
             msk_fit = (x >= 2) & (x <= 650)
             corr = gp_fit(

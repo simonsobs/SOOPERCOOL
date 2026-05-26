@@ -1,6 +1,7 @@
 from soopercool import BBmeta
 from soopercool import ps_utils as pu
 from soopercool import map_utils as mu
+from soopercool import fft_utils as sfft
 import argparse
 import numpy as np
 import pymaster as nmt
@@ -18,9 +19,18 @@ def main(args):
 
     BBmeta.make_dir(cells_dir)
 
-    mask = mu.read_map(meta.masks["analysis_mask"],
-                       pix_type=meta.pix_type,
-                       car_template=meta.car_template)
+    mask = mu.read_map(
+        meta.masks["analysis_mask"],
+        pix_type=meta.pix_type,
+        car_template=meta.car_template
+    )
+
+    mask_dir = "/".join(meta.masks["analysis_mask"].split("/")[:-1])
+    binary = mu.read_map(
+        f"{mask_dir}/binary_galactic_cropped.fits",
+        pix_type=meta.pix_type,
+        car_template=meta.car_template
+    )
 
     lmax = mu.lmax_from_map(
         meta.masks["analysis_mask"],
@@ -80,7 +90,24 @@ def main(args):
                         pix_type=meta.pix_type,
                         fields_hp=[0, 1, 2],
                         car_template=meta.car_template,
-                        convert_K_to_muK=False)
+                        convert_K_to_muK=True)
+
+        kspace_tag = meta.kspace_tag_from_map_set(map_set)
+        if kspace_tag:
+            print(
+                f"  Applying k-space filter to map "
+                f"set {map_set} with tag {kspace_tag}"
+            )
+            kspace_settings = meta.transfer_settings["kspace_pars"]
+            # TODO: The map should be multiplied by the binary mask
+            # before this step to avoid instabilities due to bright
+            # pixels at the edges of the survey.
+            m = sfft.kspace_filter(
+                m * binary,
+                pix_type=meta.pix_type,
+                **kspace_settings[kspace_tag]
+            )
+
         if do_plots:
             fname = f"{map_plot_dir}/map_{map_set}_bundle{id_bundle}"
             lims = [[-5000, 5000], [-300, 300], [-300, 300]]

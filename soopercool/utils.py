@@ -7,13 +7,16 @@ from matplotlib import cm
 import camb
 
 
-def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30):
+def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30,
+                   verbose=True):
     """
     """
-    print("\nTheory C_ells:")
+    if verbose:
+        print("\nTheory C_ells:")
     if cosmo_params is None:
-        print("\n  WARNING: "
-              "Loading Planck standard CMB parameters with r=0, AL=1\n")
+        if verbose:
+            print("  WARNING: "
+                  "Loading Planck standard CMB parameters with r=0, AL=1")
         cosmo_params = {
             "cosmomc_theta": 0.0104085,
             "As": 2.1e-9,
@@ -24,7 +27,8 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30):
             "tau": 0.0544,
             "r": 0.0,
         }
-    print(f"  Beam FWHM: {fwhm_amin} arcmin\n")
+    if verbose:
+        print(f"  Beam FWHM: {fwhm_amin} arcmin\n")
     params = camb.set_params(**cosmo_params)
     results = camb.get_results(params)
     powers = results.get_cmb_power_spectra(
@@ -505,7 +509,8 @@ def bin_validation_power_spectra(cls_dict, nmt_binning,
     return cls_binned_dict
 
 
-def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
+def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
+                           file_name=None):
     """
     Plot the transfer function given an input dictionary.
     """
@@ -513,112 +518,38 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs, file_name):
     plt.figure(figsize=(25*npan/9, 25*npan/9))
     grid = plt.GridSpec(npan, npan, hspace=0.3, wspace=0.3)
 
-    for id1, f1 in enumerate(field_pairs):
-        for id2, f2 in enumerate(field_pairs):
-            ax = plt.subplot(grid[id1, id2])
-            expected = 1. if f1 == f2 else 0.
-            ylims = [0, 1.05] if f1 == f2 else [-0.01, 0.01]
+    for label, tf in tf_dict.items():
+        for id1, f1 in enumerate(field_pairs):
+            for id2, f2 in enumerate(field_pairs):
+                ax = plt.subplot(grid[id1, id2])
+                expected = 1. if f1 == f2 else 0.
+                ylims = [0, 1.05] if f1 == f2 else [-0.01, 0.01]
 
-            ax.axhline(expected, color="k", ls="--", zorder=6)
-            # We need to understand the offdigonal TF panels in the presence of
-            # NaMaster purification - we don't have a clear interpretation.
-            ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
-            ax.plot(lb, tf_dict[f"{f1}_to_{f2}"], color="navy")
+                ax.axhline(expected, color="k", ls="--", zorder=6)
+                # We need to understand the offdigonal TF panels in the
+                # presence of NaMaster purification - we don't have a clear
+                # interpretation.
+                ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
+                ax.plot(lb, tf[f"{f1}_to_{f2}"], label=label)
 
             if id1 == npan-1:
                 ax.set_xlabel(r"$\ell$", fontsize=14)
             else:
                 ax.set_xticks([])
 
-            if f1 != f2:
-                ax.ticklabel_format(axis="y", style="scientific",
-                                    scilimits=(0, 0), useMathText=True)
+                if f1 != f2:
+                    ax.ticklabel_format(axis="y", style="scientific",
+                                        scilimits=(0, 0), useMathText=True)
 
-            ax.set_xlim(lmin, lmax)
-            ax.set_ylim(ylims[0], ylims[1])
+                ax.set_xlim(lmin, lmax)
+                ax.set_ylim(ylims[0], ylims[1])
+                if label is not None and id1 == 0 and id2 == npan - 1:
+                    ax.legend(fontsize=10, bbox_to_anchor=[1, 1],
+                              loc="upper left")
 
     plt.savefig(file_name, bbox_inches="tight")
     plt.close()
     plt.clf()
-
-
-def get_binary_mask_from_nhits(nhits_map, nside, zero_threshold=1e-3):
-    """
-    Make binary mask by smoothing, normalizing and thresholding nhits map.
-    """
-    nhits_smoothed = hp.smoothing(
-        hp.ud_grade(nhits_map, nside, power=-2, dtype=np.float64),
-        fwhm=np.pi/180)
-    nhits_smoothed[nhits_smoothed < 0] = 0
-    nhits_smoothed /= np.amax(nhits_smoothed)
-    binary_mask = np.zeros_like(nhits_smoothed)
-    binary_mask[nhits_smoothed > zero_threshold] = 1
-
-    return binary_mask
-
-
-def get_apodized_mask_from_nhits(nhits_map, nside,
-                                 galactic_mask=None,
-                                 point_source_mask=None,
-                                 zero_threshold=1e-3,
-                                 apod_radius=10.,
-                                 apod_radius_point_source=4.,
-                                 apod_type="C1"):
-    """
-    Produce an appropriately apodized mask from an nhits map as used in
-    the BB pipeline paper (https://arxiv.org/abs/2302.04276).
-
-    Procedure:
-    * Make binary mask by smoothing, normalizing and thresholding nhits map
-    * (optional) multiply binary mask by galactic mask
-    * Apodize (binary * galactic)
-    * (optional) multiply (binary * galactic) with point source mask
-    * (optional) apodize (binary * galactic * point source)
-    * Multiply everything by (smoothed) nhits map
-    """
-    import pymaster as nmt
-
-    # Smooth and normalize hits map
-    nhits_map = hp.smoothing(
-        hp.ud_grade(nhits_map, nside, power=-2, dtype=np.float64),
-        fwhm=np.pi/180)
-    nhits_map /= np.amax(nhits_map)
-
-    # Get binary mask
-    binary_mask = get_binary_mask_from_nhits(nhits_map, nside, zero_threshold)
-
-    # Multiply by Galactic mask
-    if galactic_mask is not None:
-        binary_mask *= hp.ud_grade(galactic_mask, nside)
-
-    # Apodize the binary mask
-    binary_mask = nmt.mask_apodization(binary_mask, apod_radius,
-                                       apotype=apod_type)
-
-    # Multiply with point source mask
-    if point_source_mask is not None:
-        binary_mask *= hp.ud_grade(point_source_mask, nside)
-        binary_mask = nmt.mask_apodization(binary_mask,
-                                           apod_radius_point_source,
-                                           apotype=apod_type)
-
-    return nhits_map * binary_mask
-
-
-def get_spin_derivatives(map):
-    """
-    First and second spin derivatives of a given spin-0 map.
-    """
-    nside = hp.npix2nside(np.shape(map)[-1])
-    ell = np.arange(3*nside)
-    alpha1i = np.sqrt(ell*(ell + 1.))
-    alpha2i = np.sqrt((ell - 1.)*ell*(ell + 1.)*(ell + 2.))
-    first = hp.alm2map(hp.almxfl(hp.map2alm(map), alpha1i), nside=nside)
-    second = hp.alm2map(hp.almxfl(hp.map2alm(map), alpha2i), nside=nside)
-    cmap = cm.YlOrRd
-    cmap.set_under("w")
-
-    return first, second
 
 
 def read_beam_from_file(beam_file, lmax=None):

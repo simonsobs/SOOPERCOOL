@@ -1,6 +1,7 @@
 from soopercool import BBmeta
 from soopercool import ps_utils as pu
 from soopercool import map_utils as mu
+from soopercool import fft_utils as sfft
 from pixell import enmap
 from soopercool import mpi_utils as mpi
 import argparse
@@ -33,6 +34,16 @@ def main(args):
     #                   pix_type=meta.pix_type)
     # Defer reading mask until we know a valid template (first map if needed)
     mask = None
+
+    lmax = mu.lmax_from_map(
+        meta.masks["analysis_mask"],
+        pix_type=meta.pix_type
+    )
+    if meta.lmax > lmax:
+        raise ValueError(
+            f"Specified lmax {meta.lmax} is larger than "
+            f"the maximum lmax from map resolution {lmax}"
+        )
 
     nmt_bins = meta.read_nmt_binning()
     n_bins = nmt_bins.get_n_bands()
@@ -97,6 +108,30 @@ def main(args):
                     pix_type=meta.pix_type,
                     car_template=template_for_this_run
                 )
+                mask_dir = "/".join(
+                    meta.masks["analysis_mask"].split("/")[:-1]
+                )
+                binary = mu.read_map(
+                    f"{mask_dir}/binary_galactic_cropped.fits",
+                    pix_type=meta.pix_type,
+                    car_template=meta.car_template
+                )
+            # Add kspace filtering if required
+            kspace_tag = meta.kspace_tag_from_map_set(map_set)
+            if kspace_tag:
+                print(
+                    f"  Applying k-space filter to map "
+                    f"set {map_set} with tag {kspace_tag}"
+                )
+                kspace_settings = meta.transfer_settings["kspace_pars"]
+                # TODO: The map should be multiplied by the binary mask
+                # before this step to avoid instabilities due to bright
+                # pixels at the edges of the survey.
+                m = sfft.kspace_filter(
+                    m * binary,
+                    pix_type=meta.pix_type,
+                    **kspace_settings[kspace_tag]
+                )
 
             wcs = None
             # Align to a common CAR footprint if available
@@ -131,7 +166,13 @@ def main(args):
                                                            coadd=False):
             map_set1, id_split1 = map_name1.split("__")
             map_set2, id_split2 = map_name2.split("__")
-
+            ftag1 = meta.filtering_tag_from_map_set(map_set1)
+            ftag2 = meta.filtering_tag_from_map_set(map_set2)
+            if verbose:
+                print(
+                    f"  Computing ({map_set1}, {ftag1}) "
+                    f"x ({map_set2}, {ftag2})"
+                )
             ofile = (
                 f"{cells_dir}/decoupled_pcls_{map_name1}_x_"
                 f"{map_name2}_{id_sim:04d}.npz"
