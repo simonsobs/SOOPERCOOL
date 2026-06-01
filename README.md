@@ -9,7 +9,7 @@ pip install -e .
 `-e` option will install local src with [development/editable mode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
 
 
-# Dive-in the config file structure
+# Dive-in the config file basic structure
 All SOOPERCOOL scripts will interact with a YAML configuration file. The most important section defines what we call a `map_set`. This defines a collection of maps (bundles), with independent noise realizations to build our cross-bundle power spectrum estimator. 
 
 Let's have a quick look at this block structure
@@ -77,4 +77,20 @@ transfer_settings:
 Below we give detailed instructions on how to run the SOOPERCOOL pipeline sequentially from maps to power spectra and covariances compiled in a `SACC` file.
 
 ## Mask
-The first step is to create a mask from data provided through the configuration file.
+The first step is to create a mask from data provided through the configuration file. The relevant config file section is `masks` with inputs provided as below
+```yaml
+masks:
+  analysis_mask: /path/to/mask.fits # Which mask to use. Useful for reruns.
+  galactic_mask: /path/to/mask.fits # Galactic mask (binary)
+  point_source_mask: /path/to/mask.fits # PS mask (binary)
+  external_mask: /path/to/mask.fits # Any other binary mask
+  box_mask: null # you can provide box coordinates to restrict the binary mask
+  use_weights: bool # weight binary with hits/weights
+  apod_radius: 10.0 # Apodization radius (degrees)
+  apod_radius_point_source: 1.0 # Apodization radius (degrees)
+  apod_type: "C1" # Pick an apo_type
+```
+You can then create a mask running the following 
+```bash
+python pipeline/get_analysis_mask.fits --globals config_file.yaml
+```
