@@ -151,7 +151,7 @@ def main(args):
     inv_couplings_beamed = {}
     for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
         transfer = cu.load_transfer_function(
-            meta.transfer_settings["transfer_dir"],
+            meta.transfer_settings["transfer_directory"],
             ms1, ms2,
             meta.filtering_tag_from_map_set,
             meta.kspace_tag_from_map_set,
