@@ -2,6 +2,7 @@ from soopercool import BBmeta
 from soopercool import ps_utils as pu
 from soopercool import map_utils as mu
 from soopercool import fft_utils as sfft
+from soopercool import coupling_utils as cu
 import argparse
 import numpy as np
 import pymaster as nmt
@@ -139,13 +140,36 @@ def main(args):
             "spin0": field_spin0,
             "spin2": field_spin2
         }
-
+    # Load MCMs, transfer functions
+    # and compute the coupling matrices
+    # This avoid saving all products to disk
+    # and save disk space.
+    mcm = cu.read_mcm(
+        f"{couplings_dir}/mcm.npz",
+        full_mcm=True
+    )
     inv_couplings_beamed = {}
-
     for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
-        inv_couplings_beamed[ms1, ms2] = np.load(
-            f"{couplings_dir}/couplings_{ms1}_{ms2}.npz"
-        )["inv_coupling"].reshape([n_bins*9, n_bins*9])
+        transfer = cu.load_transfer_function(
+            meta.transfer_settings["transfer_dir"],
+            ms1, ms2,
+            meta.filtering_tag_from_map_set,
+            meta.kspace_tag_from_map_set,
+            nmt_bins
+        )
+        bpwin, inv_couplings = cu.compute_couplings(
+            mcm,
+            nmt_bins,
+            transfer=transfer,
+            compute_Dl=meta.compute_Dl,
+            beam=None
+        )
+        inv_couplings = inv_couplings.reshape([n_bins*9, n_bins*9])
+        inv_couplings_beamed[ms1, ms2] = inv_couplings
+        np.savez(
+            f"{couplings_dir}/bp_win_{ms1}_x_{ms2}.npz",
+            bp_win=bpwin
+        )
 
     for map_name1, map_name2 in meta.get_ps_names_list(type="all",
                                                        coadd=False):

@@ -1,20 +1,19 @@
-import argparse
-from soopercool import BBmeta
 from soopercool import map_utils as mu
+from soopercool import BBmeta
+from pixell import enmap
 import pymaster as nmt
 import numpy as np
-import soopercool.utils as su
-
-from pixell import enmap
+import argparse
 
 
 def main(args):
     """
-    ...
+    Compute and save the mode coupling matrix
+    from a given analysis_mask specified
+    in the paramfile.
     """
     meta = BBmeta(args.globals)
     do_plots = not args.no_plots
-    # verbose = args.verbose
 
     out_dir = meta.output_directory
 
@@ -27,7 +26,6 @@ def main(args):
     nspec = 7
 
     nmt_bins = meta.read_nmt_binning()
-    n_bins = nmt_bins.get_n_bands()
 
     mask_file = meta.masks["analysis_mask"]
     if mask_file is not None:
@@ -45,8 +43,10 @@ def main(args):
         )
     nl = meta.lmax + 1
 
-    binner = np.array([nmt_bins.bin_cell(np.array([cl]))[0]
-                       for cl in np.eye(nl)]).T
+    binner = np.array([
+        nmt_bins.bin_cell(np.array([cl]))[0]
+        for cl in np.eye(nl)
+    ]).T
 
     wcs = None
     if hasattr(mask, 'wcs'):
@@ -73,61 +73,24 @@ def main(args):
     )
 
     # Alright, compute and reshape coupling matrix.
-    print("Computing MCM")
+    print("Computing MCM...")
     w = nmt.NmtWorkspace()
     w.compute_coupling_matrix(field_spin0, field_spin2, nmt_bins, is_teb=True)
 
-    mcm = np.transpose(w.get_coupling_matrix().reshape([nl, nspec, nl, nspec]),
-                       axes=[1, 0, 3, 2])
-    mcm_binned = np.einsum('ij,kjlm->kilm', binner, mcm)
-
-    # Load beams to correct the mode coupling matrix
-    beams = {}
-    for map_set in meta.map_sets_list:
-        beam_dir = meta.beam_dir_from_map_set(map_set)
-        beam_file = meta.beam_file_from_map_set(map_set)
-
-        _, bl = su.read_beam_from_file(
-            f"{beam_dir}/{beam_file}",
-            lmax=meta.lmax
-        )
-        beams[map_set] = bl
-
-    # Beam-correct the mode coupling matrix
-    beamed_mcm = {}
-    for map_set1, map_set2 in meta.get_ps_names_list("all", coadd=True):
-        beamed_mcm[map_set1, map_set2] = mcm * \
-            np.outer(beams[map_set1],
-                     beams[map_set2])[np.newaxis, :, np.newaxis, :]
+    mcm = np.transpose(
+        w.get_coupling_matrix().reshape([nl, nspec, nl, nspec]),
+        axes=[1, 0, 3, 2]
+    )
 
     # Save files
-    # Starting with the un-beamed non-purified MCM
+    print(f"Saving MCM to {mcm_dir}/mcm.npz...")
     np.savez(
         f"{mcm_dir}/mcm.npz",
         binner=binner,
         spin0xspin0=mcm[0, :, 0, :].reshape([1, nl, 1, nl]),
         spin0xspin2=mcm[1:3, :, 1:3, :],
-        spin2xspin2=mcm[3:, :, 3:, :],
-        spin0xspin0_binned=mcm_binned[0, :, 0, :].reshape([1, n_bins, 1, nl]),
-        spin0xspin2_binned=mcm_binned[1:3, :, 1:3, :],
-        spin2xspin2_binned=mcm_binned[3:, :, 3:, :]
+        spin2xspin2=mcm[3:, :, 3:, :]
     )
-
-    # Then the beamed MCM
-    for map_set1, map_set2 in meta.get_ps_names_list("all", coadd=True):
-        m = beamed_mcm[map_set1, map_set2]
-        mcm_binned = np.einsum('ij,kjlm->kilm', binner, m)
-        np.savez(
-            f"{mcm_dir}/mcm_{map_set1}_{map_set2}.npz",
-            binner=binner,
-            spin0xspin0=m[0, :, 0, :].reshape([1, nl, 1, nl]),
-            spin0xspin2=m[1:3, :, 1:3, :],
-            spin2xspin2=m[3:, :, 3:, :],
-            spin0xspin0_binned=mcm_binned[0, :, 0, :].reshape([1, n_bins,
-                                                               1, nl]),
-            spin0xspin2_binned=mcm_binned[1:3, :, 1:3, :],
-            spin2xspin2_binned=mcm_binned[3:, :, 3:, :]
-        )
 
 
 if __name__ == "__main__":

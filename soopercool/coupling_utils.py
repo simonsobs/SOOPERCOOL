@@ -126,25 +126,45 @@ def load_mcms(coupling_dir, ps_names=None, full_mcm=False):
         return mcms_dict
 
 
-def read_mcm(mcm_file, binned=False, full_mcm=False):
+def read_mcm(mcm_file, full_mcm=False):
     """
     """
     mcm = np.load(mcm_file)
-    suffix = "_binned" if binned else ""
-    _, n_bins, _, nl = mcm[f"spin0xspin0{suffix}"].shape
+    _, nl, _, nl = mcm["spin0xspin0"].shape
     if full_mcm:
-        full_mcm = np.zeros((9, n_bins, 9, nl))
-        full_mcm[0, :, 0, :] = mcm[f"spin0xspin0{suffix}"][0, :, 0, :]
-        full_mcm[1:3, :, 1:3, :] = mcm[f"spin0xspin2{suffix}"]
-        full_mcm[3:5, :, 3:5, :] = mcm[f"spin0xspin2{suffix}"]
-        full_mcm[5:, :, 5:, :] = mcm[f"spin2xspin2{suffix}"]
+        full_mcm = np.zeros((9, nl, 9, nl))
+        full_mcm[0, :, 0, :] = mcm["spin0xspin0"][0, :, 0, :]
+        full_mcm[1:3, :, 1:3, :] = mcm["spin0xspin2"]
+        full_mcm[3:5, :, 3:5, :] = mcm["spin0xspin2"]
+        full_mcm[5:, :, 5:, :] = mcm["spin2xspin2"]
         return full_mcm
     else:
         return {
-            "spin0xspin0": mcm[f"spin0xspin0{suffix}"],
-            "spin0xspin2": mcm[f"spin0xspin2{suffix}"],
-            "spin2xspin2": mcm[f"spin2xspin2{suffix}"]
+            "spin0xspin0": mcm["spin0xspin0"],
+            "spin0xspin2": mcm["spin0xspin2"],
+            "spin2xspin2": mcm["spin2xspin2"]
         }
+
+
+# def read_mcm(mcm_file, binned=False, full_mcm=False):
+#     """
+#     """
+#     mcm = np.load(mcm_file)
+#     suffix = "_binned" if binned else ""
+#     _, n_bins, _, nl = mcm[f"spin0xspin0{suffix}"].shape
+#     if full_mcm:
+#         full_mcm = np.zeros((9, n_bins, 9, nl))
+#         full_mcm[0, :, 0, :] = mcm[f"spin0xspin0{suffix}"][0, :, 0, :]
+#         full_mcm[1:3, :, 1:3, :] = mcm[f"spin0xspin2{suffix}"]
+#         full_mcm[3:5, :, 3:5, :] = mcm[f"spin0xspin2{suffix}"]
+#         full_mcm[5:, :, 5:, :] = mcm[f"spin2xspin2{suffix}"]
+#         return full_mcm
+#     else:
+#         return {
+#             "spin0xspin0": mcm[f"spin0xspin0{suffix}"],
+#             "spin0xspin2": mcm[f"spin0xspin2{suffix}"],
+#             "spin2xspin2": mcm[f"spin2xspin2{suffix}"]
+#         }
 
 
 def average_pcls_matrices(pcls_mat_dict, filtering_pairs,
@@ -162,7 +182,52 @@ def average_pcls_matrices(pcls_mat_dict, filtering_pairs,
     return pcls_mat_mean
 
 
-def compute_couplings(mcm, nmt_binning, transfer=None, compute_Dl=False):
+def load_transfer_function(transfer_dir, ms1, ms2,
+                           ftag_from_map_set,
+                           ktag_from_map_set,
+                           nmt_bins):
+    """
+    Load the transfer function for a given pair of map sets.
+
+    Parameters
+    ----------
+    transfer_dir : str
+        Directory where the transfer function files are stored.
+    ms1, ms2 : str
+        Map set names
+    ftag_from_map_set : function
+        Function that takes a map set name and returns the corresponding
+        filtering tag.
+    ktag_from_map_set : function
+        Function that takes a map set name and returns the corresponding
+        k-space filtering tag.
+    nmt_bins : NmtBin object
+        Namaster binning scheme used to define the bandpowers.
+    """
+    ftag1 = ftag_from_map_set(ms1)
+    ftag2 = ftag_from_map_set(ms2)
+    ktag1 = ktag_from_map_set(ms1)
+    ktag2 = ktag_from_map_set(ms2)
+
+    # If no filtering, no need to complicate our
+    # lives with transfer function-related steps.
+    if ftag1 is None and ftag2 is None:
+        if ktag1 is None or ktag2 is None:
+            tf_unity = np.zeros((9, 9, nmt_bins.get_n_bands()))
+            for i in range(9):
+                tf_unity[i, i, :] = 1.0
+            return tf_unity
+    else:
+        lab1 = f"{ftag1}_{ktag1}"
+        lab2 = f"{ftag2}_{ktag2}"
+        tf_fname = f"{transfer_dir}/transfer_function_{lab1}_x_{lab2}.npz"
+        return np.load(tf_fname)["full_tf"]
+
+
+def compute_couplings(mcm, nmt_binning,
+                      transfer=None,
+                      compute_Dl=False,
+                      beam=None):
     """
     Compute couplings from pre-computed mode-coupling
     matrices `mcm` and optional transfer functions.
@@ -177,10 +242,13 @@ def compute_couplings(mcm, nmt_binning, transfer=None, compute_Dl=False):
     nmt_binning : NmtBin object
         Namaster binning scheme used to define the bandpowers.
     transfer : ndarray, optional
-        Transfer function of shape (size, n_bins, n_bins) to apply to the MCM.
+        Transfer function of shape (size, size, n_bins) to apply to the MCM.
     compute_Dl : bool, optional
         If True, applies the Dl conversion when computing the binned MCM.
         The code will then output power spectra in Dl units.
+    beam: ndarray, optional
+        Beam function (squared or two maps) of shape (nl, nl)
+        to apply to the MCM.
 
     Returns
     -------
@@ -190,6 +258,18 @@ def compute_couplings(mcm, nmt_binning, transfer=None, compute_Dl=False):
         Inverse binned mode-coupling matrix
         of shape (size, n_bins, size, n_bins).
     """
+    # Beam the MCM if a beam is provided.
+    if beam is not None:
+        mcm *= beam[np.newaxis, :, np.newaxis, :]
+    # Bin the MCM on one side
+    nl = mcm.shape[-1]
+    binner = np.array([
+        nmt_binning.bin_cell(np.array([cl]))[0]
+        for cl in np.eye(nl)
+    ]).T
+    # Resulting MCM will be (size, n_bins, size, nl)
+    mcm = np.einsum('ij,kjlm->kilm', binner, mcm)
+
     size, n_bins, _, nl = mcm.shape
     if transfer is not None:
         n_bins_nmt = nmt_binning.get_n_bands()
