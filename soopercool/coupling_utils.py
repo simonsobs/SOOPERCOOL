@@ -172,35 +172,6 @@ def read_pcls_matrices(pcls_mat_dir, filtering_pairs, Nsims, sim_id_start=0):
     return pcls_mat_dict
 
 
-def load_mcms(coupling_dir, ps_names=None, full_mcm=False):
-    """
-    """
-    file_root = "mcm"
-    mcms_dict = {}
-
-    if ps_names is None:
-        mcm_file = f"{coupling_dir}/{file_root}.npz"
-        mcm = read_mcm(mcm_file, binned=True, full_mcm=full_mcm)
-        return mcm
-    else:
-        for ms1, ms2 in ps_names:
-            mcm_file = f"{coupling_dir}/{file_root}_{ms1}_{ms2}.npz"
-            mcm_file_swap = f"{coupling_dir}/{file_root}_{ms2}_{ms1}.npz"
-            if not os.path.isfile(mcm_file):
-                if os.path.isfile(mcm_file_swap):
-                    raise FileNotFoundError(
-                        f"It seems the order of map sets ({ms1}, {ms2}) was "
-                        "for the MCMs was swapped. Please recompute the "
-                        "correct couplings.")
-                else:
-                    raise FileNotFoundError(
-                        f"Mode coupling doesn't exist: {mcm_file}"
-                    )
-            mcm = read_mcm(mcm_file, binned=True, full_mcm=full_mcm)
-            mcms_dict[ms1, ms2] = mcm
-        return mcms_dict
-
-
 def read_mcm(mcm_file, full_mcm=False):
     """
     """
