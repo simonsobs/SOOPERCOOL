@@ -6,6 +6,37 @@ def get_transfer_with_error(mean_pcls_mat_filt,
                             mean_pcls_mat_unfilt,
                             pcls_mat_filt):
     """
+    Given two matrices filled with filtered
+    and unfiltered pseudo-cls averaged
+    over several realizations, compute the
+    transfer function. The associated statistical
+    error is computed from the scatter measured
+    accross realizations.
+
+    N_pure_pairs = len(["pureTxpureT", "pureTxpureE", ...])
+    N_field_pairs = len(["TT", "TE", ...])
+    N_bins = number of bandpower bins
+
+    Parameters
+    ----------
+    mean_pcls_mat_filt : ndarray
+        Matrix of shape (N_pure_pairs, N_field_pairs, N_bins)
+        containing the mean pseudo-cls for the filtered simulations.
+    mean_pcls_mat_unfilt : ndarray
+        Matrix of shape (N_pure_pairs, N_field_pairs, N_bins)
+        containing the mean pseudo-cls for the unfiltered simulations.
+    pcls_mat_filt : ndarray
+        Matrix of shape (N_sims, N_pure_pairs, N_field_pairs, N_bins)
+        containing the pseudo-cls for the filtered simulations.
+
+    Returns
+    -------
+    tf : ndarray
+        Matrix of shape (N_field_pairs, N_field_pairs, N_bins)
+        containing the transfer function for each field pair and bin.
+    tferr : ndarray
+        Matrix of shape (N_field_pairs, N_field_pairs, N_bins)
+        containing statistical errors on the TF.
     """
     cct_inv = np.transpose(
         np.linalg.inv(
@@ -47,6 +78,29 @@ def get_transfer_dict(mean_pcls_mat_filt_dict,
                       pcls_mat_dict,
                       filtering_pairs):
     """
+    This is just a wrapper to loop over the filtering_pairs
+    provided and compute the transfer function for each pair
+    using the `get_transfer_with_error` function.
+
+    Parameters
+    ----------
+    mean_pcls_mat_filt_dict : dict
+        Dictionary with keys as (ftag1, ftag2) and values as the mean
+        pseudo-cl matrices for the filtered simulations.
+    mean_pcls_mat_unfilt_dict : dict
+        Dictionary with keys as (ftag1, ftag2) and values as the mean
+        pseudo-cl matrices for the unfiltered simulations.
+    pcls_mat_dict : dict
+        Dictionary with keys as (ftag1, ftag2) and values as the pseudo-cl
+        matrices for the filtered simulations for each realizations.
+    filtering_pairs : list of tuples
+        List of filtering tag pairs (ftag1, ftag2) for which to compute
+
+    Returns
+    -------
+    tf_dict : dict
+        Dictionary with keys as (ftag1, ftag2) and values as another dict
+        containing the transfer function and its error.
     """
     tf_dict = {(ftag1, ftag2): {} for ftag1, ftag2 in filtering_pairs}
     for ftag1, ftag2 in filtering_pairs:
@@ -74,6 +128,27 @@ def get_transfer_dict(mean_pcls_mat_filt_dict,
 
 def read_pcls_matrices(pcls_mat_dir, filtering_pairs, Nsims, sim_id_start=0):
     """
+    Utility function to read pseudo cls matrices from disk and organize
+    them in a dictionary for easy access.
+
+    Parameters
+    ----------
+    pcls_mat_dir : str
+        Directory where the pseudo-cl matrices are stored.
+    filtering_pairs : list of tuples
+        List of filtering tag pairs (ftag1, ftag2) for which to
+        read the pseudo-cl matrices.
+    Nsims : int
+        Number of simulations for which to read the pseudo-cl matrices.
+    sim_id_start : int, optional
+        Starting index for the simulation IDs. Default is 0.
+
+    Returns
+    -------
+    pcls_mat_dict : dict
+        Dictionary with keys as (ftag1, ftag2) and values as another dict
+        containing the pseudo-cl matrices for the filtered and unfiltered
+        simulations.
     """
     pcls_mat_dict = {
         (ftag1, ftag2): {
