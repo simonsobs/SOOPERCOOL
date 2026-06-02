@@ -261,16 +261,20 @@ def compute_couplings(mcm, nmt_binning,
     # Beam the MCM if a beam is provided.
     if beam is not None:
         mcm *= beam[np.newaxis, :, np.newaxis, :]
+
     # Bin the MCM on one side
     nl = mcm.shape[-1]
     binner = np.array([
         nmt_binning.bin_cell(np.array([cl]))[0]
         for cl in np.eye(nl)
     ]).T
+
     # Resulting MCM will be (size, n_bins, size, nl)
     mcm = np.einsum('ij,kjlm->kilm', binner, mcm)
-
     size, n_bins, _, nl = mcm.shape
+
+    # If there is a transfer function,
+    # apply it to the MCM on the left
     if transfer is not None:
         n_bins_nmt = nmt_binning.get_n_bands()
         nl_nmt = nmt_binning.lmax + 1
@@ -287,6 +291,8 @@ def compute_couplings(mcm, nmt_binning,
     else:
         tmcm = mcm
 
+    # We then bin the TFxMCM on the right
+    # side to get the binned MCM
     ells_per_bin = [
         nmt_binning.get_ell_list(i)
         for i in range(n_bins)
