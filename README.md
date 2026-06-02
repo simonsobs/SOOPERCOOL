@@ -132,3 +132,11 @@ Once you've computed the pure T/E/B spectra, you can estimate the power suppress
 ```bash
 python pipeline/transfer/compute_transfer_function.py --globals config_file.yaml
 ```
+
+## Power spectra
+From this point, getting power spectra is quite straightforward, just run sequentially
+```bash
+python pipeline/compute_pseudo_cells.py --globals config_file.yaml
+python pipeline/coadd_pseudo_cells.py --globals config_file.yaml
+```
+This will compute all cross-bundle pairs, and coadd them into cross, noise and auto spectra. These will be corrected for the mask mode-coupling and transfer function.
