@@ -217,11 +217,11 @@ def load_transfer_function(transfer_dir, ms1, ms2,
             for i in range(9):
                 tf_unity[i, i, :] = 1.0
             return tf_unity
-    else:
-        lab1 = f"{ftag1}_{ktag1}"
-        lab2 = f"{ftag2}_{ktag2}"
-        tf_fname = f"{transfer_dir}/transfer_function_{lab1}_x_{lab2}.npz"
-        return np.load(tf_fname)["full_tf"]
+
+    lab1 = f"{ftag1}_{ktag1}"
+    lab2 = f"{ftag2}_{ktag2}"
+    tf_fname = f"{transfer_dir}/transfer_function_{lab1}_x_{lab2}.npz"
+    return np.load(tf_fname)["full_tf"]
 
 
 def compute_couplings(mcm, nmt_binning,
