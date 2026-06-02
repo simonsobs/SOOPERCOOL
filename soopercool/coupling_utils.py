@@ -174,6 +174,20 @@ def read_pcls_matrices(pcls_mat_dir, filtering_pairs, Nsims, sim_id_start=0):
 
 def read_mcm(mcm_file, full_mcm=False):
     """
+    Utility function to read the mode-coupling matrix
+    from disk and organize it in a dictionary for easy access.
+    Alternatively, if `full_mcm` is True, returns the full
+    MCM as a single array with shape (9, nl, 9, nl)
+
+    Parameters
+    ----------
+    mcm_file : str
+        Path to the .npz file containing the MCM.
+    full_mcm : bool, optional
+        If True, returns the full MCM as a single array of shape
+        (9, nl, 9, nl). If False, returns a dictionary with keys
+        "spin0xspin0", "spin0xspin2", "spin2xspin2" and values
+        as the corresponding MCM blocks. Default is False.
     """
     mcm = np.load(mcm_file)
     _, nl, _, nl = mcm["spin0xspin0"].shape
@@ -190,27 +204,6 @@ def read_mcm(mcm_file, full_mcm=False):
             "spin0xspin2": mcm["spin0xspin2"],
             "spin2xspin2": mcm["spin2xspin2"]
         }
-
-
-# def read_mcm(mcm_file, binned=False, full_mcm=False):
-#     """
-#     """
-#     mcm = np.load(mcm_file)
-#     suffix = "_binned" if binned else ""
-#     _, n_bins, _, nl = mcm[f"spin0xspin0{suffix}"].shape
-#     if full_mcm:
-#         full_mcm = np.zeros((9, n_bins, 9, nl))
-#         full_mcm[0, :, 0, :] = mcm[f"spin0xspin0{suffix}"][0, :, 0, :]
-#         full_mcm[1:3, :, 1:3, :] = mcm[f"spin0xspin2{suffix}"]
-#         full_mcm[3:5, :, 3:5, :] = mcm[f"spin0xspin2{suffix}"]
-#         full_mcm[5:, :, 5:, :] = mcm[f"spin2xspin2{suffix}"]
-#         return full_mcm
-#     else:
-#         return {
-#             "spin0xspin0": mcm[f"spin0xspin0{suffix}"],
-#             "spin0xspin2": mcm[f"spin0xspin2{suffix}"],
-#             "spin2xspin2": mcm[f"spin2xspin2{suffix}"]
-#         }
 
 
 def average_pcls_matrices(pcls_mat_dict, filtering_pairs,
