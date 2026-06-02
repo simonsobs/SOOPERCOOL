@@ -94,3 +94,41 @@ You can then create a mask running the following
 ```bash
 python pipeline/get_analysis_mask.fits --globals config_file.yaml
 ```
+Be aware that this will create mask products in the SOOPERCOOL output directory, check that you are using the correct analysis mask in the configuration file before running the pipeline.
+
+## Mode-coupling matrices
+Once you generated a mask you can then pre-compute and save the NaMaster mode coupling matrices with
+```bash
+python pipeline/get_mode_coupling.py --globals config_file.yaml
+```
+
+## Transfer functions
+This is one of the key element of the SOOPERCOOL pipeline. Transfer functions depend on the type of filtering through `filtering_tag` and `kspace_tag` as described above. Once you defined these tags and pointed to the associated pure T/E/B filtered simulations, you can run the following to compute the power spectra required for TF estimation. This can be done in parallel to speed it up. The instruction below was used to run 20 pure T/E/B simulations on 1 tiger node.
+```bash
+srun -n 10 -c 10 --cpu_bind=cores python pipeline/transfer/compute_pseudo_cells_tf_estimation.py --globals config_file.yaml
+```
+___
+**IF RUNNING WITH FOURIER SPACE FILTERING**
+If you want to apply a Fourier-space filter on the maps, you'll also need to compute the associated transfer function. In this case, you'll first need to apply this $k$-space filter on simulations. This can be done running
+```bash
+srun -n 10 -c 10 --cpu_bind=cores python pipeline/kspace/filter_sims_kspace.py --globals config_file.yaml
+```
+For each seed, this will load simulations in `{filtered_map_dir}/{filtered_map_template}` as defined in the configuration file, and apply them a Fourier-space filter. If this is the only filter applied (i.e. if all filtering tags are set to `null`), then the easiest solution is to write under the `transfer_settings` section
+```yaml
+transfer_settings:
+   ...  
+  unfiltered_map_dir:
+    null: /path/to/unfiltered/maps
+  unfiltered_map_template:
+    null: unfiltered_map_{pure_type}(...){id_sim:04d}
+  filtered_map_dir:
+    null: /path/to/unfiltered/maps
+  filtered_map_template:
+    null: unfiltered_map_{pure_type}(...){id_sim:04d}
+```
+This is a small workaround to define "no-filtering" with unity transfer function before applying any map-space filters.
+___
+Once you've computed the pure T/E/B spectra, you can estimate the power suppression induced by your set of filters (i.e. the transfer function)
+```bash
+python pipeline/transfer/compute_transfer_function.py --globals config_file.yaml
+```
