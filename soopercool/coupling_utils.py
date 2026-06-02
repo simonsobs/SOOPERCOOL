@@ -209,6 +209,27 @@ def read_mcm(mcm_file, full_mcm=False):
 def average_pcls_matrices(pcls_mat_dict, filtering_pairs,
                           filtered):
     """
+    Utility function to average the pseudo-cl matrices over simulations
+    for each pair of filtering tags.
+
+    Parameters
+    ----------
+    pcls_mat_dict : dict
+        Dictionary with keys as (ftag1, ftag2) and values as another dict
+        containing the pseudo-cl matrices for the filtered and unfiltered
+        simulations.
+    filtering_pairs : list of tuples
+        List of filtering tag pairs (ftag1, ftag2) for which to
+        average the pseudo-cl matrices.
+    filtered : bool
+        If True, averages the filtered pseudo-cl matrices. If False, averages
+        the unfiltered pseudo-cl matrices.
+
+    Returns
+    -------
+    pcls_mat_mean : dict
+        Dictionary with keys as (ftag1, ftag2) and values as the averaged
+        pseudo-cl matrices.
     """
     label = "filtered" if filtered else "unfiltered"
     pcls_mat_mean = {
