@@ -140,10 +140,8 @@ def main(args):
             "spin0": field_spin0,
             "spin2": field_spin2
         }
-    # Load MCMs, transfer functions
-    # and compute the coupling matrices
-    # This avoid saving all products to disk
-    # and save disk space.
+    # Load MCMs, transfer functions and compute coupling matrices
+    # This avoid saving all products to disk and save disk space.
     mcm = cu.read_mcm(
         f"{couplings_dir}/mcm.npz",
         full_mcm=True
