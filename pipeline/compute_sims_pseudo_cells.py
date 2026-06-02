@@ -3,6 +3,8 @@ from soopercool import ps_utils as pu
 from soopercool import map_utils as mu
 from soopercool import mpi_utils as mpi
 from soopercool import fft_utils as sfft
+from soopercool import coupling_utils as cu
+import soopercool.utils as su
 import os
 import argparse
 import numpy as np
@@ -95,14 +97,47 @@ def main(args):
     n_bins = nmt_bins.get_n_bands()
     ps_pairs = meta.get_ps_names_list(type="all", coadd=False)
 
+    # Load MCMs, transfer functions and compute coupling matrices
+    # This avoid saving all products to disk and save disk space.
+    mcm = cu.read_mcm(
+        f"{couplings_dir}/mcm.npz",
+        full_mcm=True
+    )
     inv_couplings_beamed = {}
-
     for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
-        cname = f"{couplings_dir}/couplings_{ms1}_{ms2}.npz"
-        if not os.path.isfile(cname):
-            cname = f"{couplings_dir}/couplings_{ms2}_{ms1}.npz"
 
-        inv_couplings_beamed[ms1, ms2] = np.load(cname)["inv_coupling"][:, :n_bins, :, :n_bins].reshape([n_bins*9, n_bins*9])  # noqa
+        _, bl1 = su.read_beam_from_file(
+            "/".join([
+                meta.beam_dir_from_map_set(ms1),
+                meta.beam_file_from_map_set(ms1)
+            ]),
+            lmax=meta.lmax
+        )
+        _, bl2 = su.read_beam_from_file(
+            "/".join([
+                meta.beam_dir_from_map_set(ms2),
+                meta.beam_file_from_map_set(ms2)
+            ]),
+            lmax=meta.lmax
+        )
+        beam = np.outer(bl1, bl2)
+
+        transfer = cu.load_transfer_function(
+            meta.transfer_settings["transfer_directory"],
+            ms1, ms2,
+            meta.filtering_tag_from_map_set,
+            meta.kspace_tag_from_map_set,
+            nmt_bins
+        )
+        _, inv_couplings = cu.compute_couplings(
+            mcm,
+            nmt_bins,
+            transfer=transfer,
+            compute_Dl=meta.compute_Dl,
+            beam=beam
+        )
+        inv_couplings = inv_couplings.reshape([n_bins*9, n_bins*9])
+        inv_couplings_beamed[ms1, ms2] = inv_couplings
 
     decoupled_pcls = {
         ps: [] for ps in meta.get_ps_names_list(type="all", coadd=False)
