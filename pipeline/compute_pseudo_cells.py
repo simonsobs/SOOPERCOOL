@@ -151,17 +151,17 @@ def main(args):
     for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
 
         _, bl1 = su.read_beam_from_file(
-            "/".join(
+            "/".join([
                 meta.beam_dir_from_map_set(ms1),
                 meta.beam_file_from_map_set(ms1)
-            ),
+            ]),
             lmax=meta.lmax
         )
         _, bl2 = su.read_beam_from_file(
-            "/".join(
+            "/".join([
                 meta.beam_dir_from_map_set(ms2),
                 meta.beam_file_from_map_set(ms2)
-            ),
+            ]),
             lmax=meta.lmax
         )
         beam = np.outer(bl1, bl2)
