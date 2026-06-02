@@ -1,5 +1,4 @@
 import numpy as np
-import os
 
 
 def get_transfer_with_error(mean_pcls_mat_filt,
