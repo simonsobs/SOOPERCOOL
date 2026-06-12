@@ -575,21 +575,21 @@ def read_beam_from_file(beam_file, lmax=None, return_cov=False):
     """
     data = np.loadtxt(beam_file).T
     if return_cov:
-        l, bl, bl_eig = data[0], data[1], data[2:]
+        ell, bl, bl_eig = data[0], data[1], data[2:]
     else:
-        l, bl = data[0], data[1]
+        ell, bl = data[0], data[1]
         bl_eig = None
 
     if lmax is not None:
-        l = l[:lmax+1]
+        ell = ell[:lmax+1]
         bl = bl[:lmax+1]
         if return_cov:
             bl_cov = bl_eig.T @ bl_eig
             bl_cov = bl_cov[:lmax+1, :lmax+1]
 
     if return_cov:
-        return l, bl, bl_cov
-    return l, bl
+        return ell, bl, bl_cov
+    return ell, bl
 
 
 def multipole_min_from_tf(tf_file, field_pairs, snr_cut=3.):
