@@ -552,12 +552,43 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
     plt.clf()
 
 
-def read_beam_from_file(beam_file, lmax=None):
+def read_beam_from_file(beam_file, lmax=None, return_cov=False):
     """
+    Read a beam window function from file.
+    If `return_cov` is True, also return
+    the associated ell-by-ell covariance
+    matrix, reconstructed from eigenvectors
+    stored in the same file.
+
+    Parameters
+    ----------
+        beam_file: str
+            Path to the beam file. The file is expected to be a text file
+            with columns: ell, bl, and optionally eigenvectors of the
+            covariance matrix as additional columns
+        lmax: int (optional)
+            If not None, truncate the beam and covariance to this maximum ell.
+        return_cov: bool (optional)
+            If True, return the covariance matrix reconstructed from the
+            eigenvectors stored in the file. If False, only return l, bl
+
     """
-    l, bl = np.loadtxt(beam_file, unpack=True)
+    data = np.loadtxt(beam_file).T
+    if return_cov:
+        l, bl, bl_eig = data[0], data[1], data[2:]
+    else:
+        l, bl = data[0], data[1]
+        bl_eig = None
+
     if lmax is not None:
-        return l[:lmax+1], bl[:lmax+1]
+        l = l[:lmax+1]
+        bl = bl[:lmax+1]
+        if return_cov:
+            bl_cov = bl_eig.T @ bl_eig
+            bl_cov = bl_cov[:lmax+1, :lmax+1]
+
+    if return_cov:
+        return l, bl, bl_cov
     return l, bl
 
 
