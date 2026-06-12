@@ -4,6 +4,7 @@ from soopercool import mpi_utils as mpi
 import sacc
 from itertools import product
 import numpy as np
+import os
 
 
 def multi_eye(size, k_list):
@@ -42,6 +43,7 @@ def main(args):
     BBmeta.make_dir(sacc_dir)
 
     cov_dir = f"{out_dir}/covariances"
+    beam_cov_dir = f"{out_dir}/beam_covariances"
     couplings_dir = f"{out_dir}/couplings"
 
     nmt_binning = meta.read_nmt_binning()
@@ -75,11 +77,22 @@ def main(args):
 
             if i > j:
                 continue
-            cov_dict = np.load(
-                f"{cov_dir}/analytic_cov_{ms1}_x_{ms2}_{ms3}_x_{ms4}.npz"
-            )
 
+            pair12 = f"{ms1}_x_{ms2}"
+            pair34 = f"{ms3}_x_{ms4}"
+            suffix = f"cov_{pair12}_{pair34}.npz"
+            cov_dict = np.load(
+                f"{cov_dir}/analytic_{suffix}"
+            )
             cov = cov_dict["cov"]
+
+            if os.path.exists(
+                f"{beam_cov_dir}/beam_{suffix}"
+            ):
+                beam_cov_dict = np.load(
+                    f"{beam_cov_dir}/beam_{suffix}"
+                )
+                cov += beam_cov_dict["cov"]
 
             covs[ms1, ms2, ms3, ms4] = thin_covariance(
                 cov, len(lb), len(field_pairs), order=None
