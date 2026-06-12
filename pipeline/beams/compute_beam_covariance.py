@@ -10,7 +10,7 @@ def main(args):
     of spectra (ms1, ms2) x (ms3, ms4) and
     saves them to disk. Beam covariance blocks
     can be then linearly combined
-    to correct mc/analytic covariances when compiling 
+    to correct mc/analytic covariances when compiling
     data in the final SACC archive.
 
     Command line arguments are
@@ -22,13 +22,9 @@ def main(args):
     out_dir = meta.output_directory
 
     cells_dir = f"{out_dir}/cells"
-    couplings_dir = f"{out_dir}/couplings"
 
     beam_cov_dir = f"{out_dir}/beam_covariances"
     meta.make_dir(beam_cov_dir)
-
-    mcm = np.load(f"{couplings_dir}/mcm.npz")
-    binner = mcm["binner"]
 
     nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
@@ -37,7 +33,6 @@ def main(args):
     field_pairs = [f"{m1}{m2}" for m1 in "TEB" for m2 in "TEB"]
     cross_ps_names = meta.get_ps_names_list(type="all", coadd=True)
 
-    beams = {}
     beam_covs = {}
     for ms in meta.map_sets_list:
         beam_dir = meta.beam_dir_from_map_set(ms)
@@ -48,7 +43,7 @@ def main(args):
             lmax=nmt_bins.lmax,
             return_cov=True
         )
-        # Build & normalize the covariance matrix
+        # Normalize the covariance matrix
         bl_cov = bl_cov / np.outer(bl, bl)
 
         # Bin the covariance matrix
@@ -63,8 +58,6 @@ def main(args):
                 idx_jj = nmt_bins.get_ell_list(jj)
                 binned_cov[ii, jj] = np.mean(bl_cov[np.ix_(idx_ii, idx_jj)])
         bl_cov = binned_cov
-
-        beams[ms] = binner @ bl
         beam_covs[ms] = bl_cov
 
     for i, (ms1, ms2) in enumerate(cross_ps_names):
