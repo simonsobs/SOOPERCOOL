@@ -107,9 +107,9 @@ def main(args):
         comma separated string as
         "ws0,ws1,ws2,ws3,ws4,ws5,ws6"
     --wafer-weights:
-        Path to the wafer weights file. Should be
-        a comma separated string of weights corresponding
-        to the wafers. If not provided, will assume equal weights.
+        Should be a comma separated string of
+        weights corresponding to the wafers.
+        If not provided, will assume equal weights.
     """
     beam_dir = args.beam_dir
     beam_tmpl = args.beam_tmpl
