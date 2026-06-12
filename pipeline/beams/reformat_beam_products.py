@@ -8,6 +8,11 @@ import os
 
 def read_beam_product(beam_fname):
     """
+    Read beam products from a npz file.
+    The npz file need to have keys
+        Bl, omega, anayltic_cov_Bl,
+        theta1_cov_Bl, lmax_cov_Bl,
+        fwhm.
     """
     data = np.load(beam_fname)
 
@@ -28,6 +33,7 @@ def read_beam_product(beam_fname):
 
 def plot_beam(bl, cov, fwhm=None, title="", save_fname=None):
     """
+    Utility to plot beam window functions
     """
     plt.figure(figsize=(8, 6))
     l, = plt.plot(np.arange(len(bl)), bl)
@@ -57,6 +63,7 @@ def plot_beam(bl, cov, fwhm=None, title="", save_fname=None):
 
 def plot_corr(cov, title="", save_fname=None):
     """
+    Utility to plot correlation matrices
     """
     plt.figure(figsize=(8, 8))
     plt.imshow(
