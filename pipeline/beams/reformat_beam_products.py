@@ -143,7 +143,13 @@ def main(args):
                     band=band,
                     wafer=wafer
                 )
-                bl, cov, fwhm = read_beam_product(f"{beam_dir}/{beam_fname}")
+                try:
+                    bl, cov, fwhm = read_beam_product(
+                        f"{beam_dir}/{beam_fname}"
+                    )
+                except FileNotFoundError:
+                    print(f"File {beam_dir}/{beam_fname} not found. Skipping.")
+                    continue
                 bl_coadd += weight * bl
                 cov_coadd += weight**2 * cov
 
