@@ -140,3 +140,26 @@ python pipeline/compute_pseudo_cells.py --globals config_file.yaml
 python pipeline/coadd_pseudo_cells.py --globals config_file.yaml
 ```
 This will compute all cross-bundle pairs, and coadd them into cross, noise and auto spectra. These will be corrected for the mask mode-coupling and transfer function.
+
+## Covariances
+From this point we only need to estimate covariances. To pre-compute and save data products required for analytic covariances you can run
+```bash
+python pipeline/prepare_cov_inputs.py --globals config_file.yaml
+srun -n 12 -c 8 --cpu_bind=cores python pipeline/precompute_cov_couplings.py --globals config_file.yaml
+```
+The second script will save a large amount of covariance couplings (for signal and noise cross terms) and therefore we advice to restrict the analysis lmax and to make sure you have enough disk space. These files can be deleted after computing covariances.
+
+Running covariance is then straightforward
+```bash
+srun -n 12 -c 8 --cpu_bind=cores python pipeline/compute_covariance.py --globals config_file.yaml
+```
+and will save all covariance blocks.
+
+Instructions for montecarlo covariances will be updated soon as these scripts need to be refurbished.
+
+## How to create a SACC file
+Compile all spectra and covariances you computed in a `SACC` file used as an input to the likelihood by running
+```bash
+srun -n 12 -c 8 --cpu-bind=cores python pipeline/create_sacc_file_analytic.py --globals config_file.yaml --data
+```
+A similar recipe to do it with either MC/analytic covariance will be described soon, these scripts also need a small refactoring.
