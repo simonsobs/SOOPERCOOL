@@ -576,15 +576,15 @@ def read_beam_from_file(beam_file, lmax=None, return_cov=False):
     data = np.loadtxt(beam_file).T
     if return_cov:
         ell, bl, bl_eig = data[0], data[1], data[2:]
+        bl_cov = bl_eig.T @ bl_eig
     else:
         ell, bl = data[0], data[1]
-        bl_eig = None
+        bl_cov = None
 
     if lmax is not None:
         ell = ell[:lmax+1]
         bl = bl[:lmax+1]
-        if return_cov:
-            bl_cov = bl_eig.T @ bl_eig
+        if bl_cov is not None:
             bl_cov = bl_cov[:lmax+1, :lmax+1]
 
     if return_cov:
