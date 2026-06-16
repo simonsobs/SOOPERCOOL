@@ -74,6 +74,7 @@ def main(args):
 
             # Compute the beam covariance block for the spectra pair
             # (ms1, ms2) x (ms3, ms4)
+            # For explicit math, see Eq. (4) of 2503.14452
             beam_cov = ((ms1 == ms3) + (ms1 == ms4)) * beam_covs[ms1]
             beam_cov += ((ms2 == ms3) + (ms2 == ms4)) * beam_covs[ms2]
 
