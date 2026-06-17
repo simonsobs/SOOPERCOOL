@@ -30,7 +30,13 @@ map_sets:
     # Any two map_sets with the same exp_tag are assumed to
     # have correlated noise and auto-bundle spectra
     # are discarded in the estimator.
-    exp_tag: exp_tag 
+    exp_tag: exp_tag
+    # Any tag to identify the hit/weight map
+    # to be use to weight the mask when
+    # accounting for inhomogeneous noise
+    # in the covariance. These are defined later on
+    # in the covariance block under `hits_files`
+    hits_tag: hits_tag
     filtering_tag: ftag # Tag to match map_set and filtering type
     kspace_tag:  ktag # Tag to match map_set and Fourier filtering type
     # You can also set any of the two tags above to `null`
