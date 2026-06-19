@@ -98,7 +98,7 @@ masks:
 ```
 You can then create a mask running the following 
 ```bash
-python pipeline/get_analysis_mask.fits --globals config_file.yaml
+python pipeline/get_analysis_mask.py --globals config_file.yaml
 ```
 Be aware that this will create mask products in the SOOPERCOOL output directory, check that you are using the correct analysis mask in the configuration file before running the pipeline.
 
