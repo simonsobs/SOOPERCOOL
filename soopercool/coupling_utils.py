@@ -317,6 +317,8 @@ def compute_couplings(mcm, nmt_binning,
         Inverse binned mode-coupling matrix
         of shape (size, n_bins, size, n_bins).
     """
+    mcm = mcm.copy()  # Avoid modifying the input array in place
+
     # Beam the MCM if a beam is provided.
     if beam is not None:
         mcm *= beam[np.newaxis, :, np.newaxis, :]
