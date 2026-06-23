@@ -157,7 +157,7 @@ def main(args):
             cells = np.load(cl_file)
 
             bbl = np.load(
-                f"{couplings_dir}/bp_win_{ms1}_{ms2}.npz"
+                f"{couplings_dir}/bp_win_{ms1}_x_{ms2}.npz"
             )["bp_win"]
 
             for fp in field_pairs:
