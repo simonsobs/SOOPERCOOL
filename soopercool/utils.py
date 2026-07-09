@@ -518,6 +518,11 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
     plt.figure(figsize=(25*npan/9, 25*npan/9))
     grid = plt.GridSpec(npan, npan, hspace=0.3, wspace=0.3)
 
+    # tf_dict could contain several versions of a TF to compare.
+    # If TF_dict contains only a single TF, this ensures compatibility.
+    if "TT_to_TT" in tf_dict.keys():
+        tf_dict = {"TF": tf_dict}
+
     for label, tf in tf_dict.items():
         for id1, f1 in enumerate(field_pairs):
             for id2, f2 in enumerate(field_pairs):
@@ -532,14 +537,14 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
                 ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
                 ax.plot(lb, tf[f"{f1}_to_{f2}"], label=label)
 
-            if id1 == npan-1:
-                ax.set_xlabel(r"$\ell$", fontsize=14)
-            else:
-                ax.set_xticks([])
+                if id1 == npan-1:
+                    ax.set_xlabel(r"$\ell$", fontsize=14)
+                else:
+                    ax.set_xticks([])
 
-                if f1 != f2:
-                    ax.ticklabel_format(axis="y", style="scientific",
-                                        scilimits=(0, 0), useMathText=True)
+                    if f1 != f2:
+                        ax.ticklabel_format(axis="y", style="scientific",
+                                            scilimits=(0, 0), useMathText=True)
 
                 ax.set_xlim(lmin, lmax)
                 ax.set_ylim(ylims[0], ylims[1])
