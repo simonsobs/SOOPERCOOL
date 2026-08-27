@@ -3,52 +3,103 @@ import numpy as np
 from soopercool import BBmeta
 import matplotlib.pyplot as plt
 from soopercool import ps_utils as pu
-
-# TODO:
-# Read in beam for validation and correct C_ell estimator by it. Currently we
-# assume a bean FWHM of 30 arcmin by default.
-
-
-def read_transfer(transfer_file):
-    """
-    """
-    tfd = np.load(transfer_file)
-
-    tf_dict = {}
-    spin_pairs = {
-        "spin0xspin0": ["TT"],
-        "spin0xspin2": ["TE", "TB"],
-        "spin2xspin2": ["EE", "EB", "BE", "BB"]
-    }
-    for spin_pair, fields in spin_pairs.items():
-        for id1, f1 in enumerate(fields):
-            for id2, f2 in enumerate(fields):
-                tf_dict[f1, f2] = tfd[f"tf_{spin_pair}"][id1, id2]
-                tf_dict[f1, f2, "std"] = tfd[f"tf_std_{spin_pair}"][id1, id2]
-    return tf_dict
+from soopercool import coupling_utils as cu
+import soopercool.utils as su
+import os
 
 
 def main(args):
     """
-    Compare decoupled spectra (including deconvolved form the TF)
-    to the unfiltered spectra (deconvolved from mode coupling only)
-    Compare coupled spectra (with TF + MCM)
+    This script compares (TF*MCM)-decoupled power spectra from filtered
+    simulations with MCM-decoupled power spectra from unfiltered simulations. 
+    
+    The paths to read from must be given in the yaml under
+    transfer['validation']. Both filtered and unfiltered sims must exist on
+    disk. This supports any type of filtered simulations.
+
+    If you don't have access to a set of validation simulations, consider
+    running `validate_transfer_function_kspace.py` for a quick and simple,
+    k-space-only validation. This might be useful e.g. to explore interactions
+    between kspace filtering (and associated large-scale mode loss) and
+    specific sky masking choices.
     """
     meta = BBmeta(args.globals)
 
-    nmt_binning = meta.read_nmt_binning()
-    lb = nmt_binning.get_effective_ells()
+    if not "validation" in meta.transfer_settings:
+        raise KeyError(
+            "SOOPERCOOL config yaml must point to existing TF validation"
+            "sims under transfer['validation']."
+        )
+
+    nmt_bins = meta.read_nmt_binning()
+    lb = nmt_bins.get_effective_ells()
     lb_msk = lb < meta.lmax
     cb2db = lb*(lb+1)/2/np.pi
 
     nsims = meta.transfer_settings["tf_val_num_sims"]
 
     out_dir = meta.output_directory
+    couplings_dir = f"{out_dir}/couplings"
     plot_dir = f"{out_dir}/plots/cells_tf_val"
     BBmeta.make_dir(plot_dir)
 
     ps_pairs = meta.get_ps_names_list(type="all", coadd=True)
     fields = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
+
+    # Load MCMs, transfer functions and compute coupling matrices
+    # This avoid saving all products to disk and save disk space.
+    mcm = cu.read_mcm(
+        f"{couplings_dir}/mcm.npz",
+        full_mcm=True
+    )
+    bpwins = {"filtered": {}, "unfiltered": {}}
+    tfs = {}
+   
+    for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
+
+        bpwin_fn = f"{couplings_dir}/bp_win_{ms1}_x_{ms2}.npz"
+        if os.path.isfile(bpwin_fn):
+            bpwins[ms1, ms2] = np.load(bpwin_fn)["bp_win"]
+            continue
+
+        _, bl1 = su.read_beam_from_file(
+            "/".join([
+                meta.beam_dir_from_map_set(ms1),
+                meta.beam_file_from_map_set(ms1)
+            ]),
+            lmax=meta.lmax
+        )
+        _, bl2 = su.read_beam_from_file(
+            "/".join([
+                meta.beam_dir_from_map_set(ms2),
+                meta.beam_file_from_map_set(ms2)
+            ]),
+            lmax=meta.lmax
+        )
+        beam = np.outer(bl1, bl2)
+
+        transfer = cu.load_transfer_function(
+            meta.transfer_settings["transfer_directory"],
+            ms1, ms2,
+            meta.filtering_tag_from_map_set,
+            meta.kspace_tag_from_map_set,
+            nmt_bins
+        )
+        tfs[ms1, ms2] = transfer
+        bpwins["filtered"][ms1, ms2], _ = cu.compute_couplings(
+            mcm,
+            nmt_bins,
+            transfer=transfer,
+            compute_Dl=meta.compute_Dl,
+            beam=beam
+        )
+        bpwins["unfiltered"][ms1, ms2], _ = cu.compute_couplings(
+            mcm,
+            nmt_bins,
+            transfer=None,
+            compute_Dl=meta.compute_Dl,
+            beam=beam
+        )
 
     # Then we read the decoupled spectra
     # both for the filtered and unfiltered cases
@@ -64,8 +115,12 @@ def main(args):
 
     for ftype in ftypes:
         for ms1, ms2 in ps_pairs:
+            preproc_ftag1 = meta.filtering_tag_from_map_set(ms1)
+            kspace_tag1 = meta.kspace_tag_from_map_set(ms1)
+            preproc_ftag2 = meta.filtering_tag_from_map_set(ms2)
+            kspace_tag2 = meta.kspace_tag_from_map_set(ms2)
             for id_sim in range(nsims):
-                cls = np.load(f"{cl_dir}/cls_tf_val_{ms1}_x_{ms2}_{ftype}_{id_sim:04d}.npz")  # noqa
+                cls = np.load(f"{cl_dir}/cls_tf_val_{preproc_ftag1}_{kspace_tag1}_x_{preproc_ftag2}_{kspace_tag2}_{ftype}_{id_sim:04d}.npz")  # noqa
                 for fp in fields:
                     cls_dict[ftype, ms1, ms2, fp] += [cls[fp]]
 
@@ -84,29 +139,24 @@ def main(args):
         for fp in fields
         for ms1, ms2 in ps_pairs
     }
+
+    # Compute the bandpower-convolved theory spectra for (un)filtered sims.
     cls_theory = meta.load_fiducial_cl()
-
     cls_theory_binned = {"filtered": {}, "unfiltered": {}}
-    _, bpwf = meta.get_inverse_couplings(return_bpwf=True)
 
-    for type in ["filtered", "unfiltered"]:
+    for ftype in ["filtered", "unfiltered"]:
         for ms1, ms2 in ps_pairs:
-            ftag1 = meta.filtering_tag_from_map_set(ms1)
-            ftag2 = meta.filtering_tag_from_map_set(ms2)
-            cls_theory_binned[type][ms1, ms2] = pu.bin_theory_cls(
-                cls_theory[ms1, ms2], bpwf[type][ftag1, ftag2]
+            cls_theory_binned[ftype][ms1, ms2] = pu.bin_theory_cls(
+                cls_theory[ms1, ms2], bpwins[ftype][ms1, ms2]
             )
 
+    # Make plots
     for ms1, ms2 in ps_pairs:
-        ftag1 = meta.filtering_tag_from_map_set(ms1)
-        ftag2 = meta.filtering_tag_from_map_set(ms2)
-
         plt.figure(figsize=(16, 16))
         grid = plt.GridSpec(9, 3, hspace=0.3, wspace=0.3)
 
         for id1, f1 in enumerate("TEB"):
             for id2, f2 in enumerate("TEB"):
-                # Define subplots
                 main = plt.subplot(grid[3*id1:3*(id1+1)-1, id2])
                 sub = plt.subplot(grid[3*(id1+1)-1, id2])
 
@@ -116,14 +166,16 @@ def main(args):
                 main.plot(
                     lb[lb_msk],
                     cb2db[lb_msk]*cls_theory_binned["unfiltered"][ms1, ms2][spec][lb_msk],  # noqa
-                    color="k", ls="--", label="theory"
+                    color="darkorange", ls="--", alpha=0.6
                 )
                 main.plot(
                     lb[lb_msk],
                     cb2db[lb_msk]*cls_theory_binned["filtered"][ms1, ms2][spec][lb_msk],  # noqa
-                    color="k", ls="--", alpha=0.3
+                    color="navy", ls="--", alpha=0.6
                 )
-                offset = 0.5
+                main.plot([], [], "k.", label="Simulations")
+                main.plot([], [], "k--", alpha=0.6, label="Theory")
+                offset = 2
 
                 # Plot filtered & unfiltered (decoupled)
                 main.errorbar(
@@ -164,10 +216,12 @@ def main(args):
 
                 sub.axhline(0, color="k")
                 sub.plot(
-                    lb[lb_msk]-offset, res_unf[lb_msk], c="navy", ls="-"
+                    lb[lb_msk]-offset, res_unf[lb_msk], c="navy", ls="",
+                    marker="."
                 )
                 sub.plot(
-                    lb[lb_msk]+offset, res_f[lb_msk], c="darkorange", ls="-"
+                    lb[lb_msk]+offset, res_f[lb_msk], c="darkorange", ls="",
+                    marker="."
                 )
 
                 # Multipole range
@@ -175,12 +229,57 @@ def main(args):
                 sub.set_xlim(*main.get_xlim())
 
                 # Suplot y range
-                sub.set_ylim((-5, 5))
+                ymin = -5
+                ymax = 5
+                sub.set_ylim((ymin, ymax))
+
+                # Mark points whose central value is outside the visible range
+                for color, res, offset in zip(["navy", "darkorange"],
+                                              [res_unf, res_f],
+                                              [-5, 5]):
+                    for xi, yi in zip(lb[lb_msk]+offset, res[lb_msk]):
+                        if yi > ymax:
+                            sub.annotate(
+                                f'{yi:.1f}',
+                                xy=(xi, ymax),  # arrow tip at top boundary
+                                xytext=(xi, ymax - 1),  # text inside plot
+                                ha='center',
+                                va='top',
+                                color=color,
+                                fontsize=8,
+                                arrowprops=dict(
+                                    arrowstyle='->',
+                                    lw=1.5,
+                                    color=color,
+                                )
+                            )
+
+                        elif yi < ymin:
+                            sub.annotate(
+                                f'{yi:.1f}',
+                                xy=(xi, ymin),
+                                xytext=(xi, ymin + 1),
+                                ha='center',
+                                va='bottom',
+                                color=color,
+                                fontsize=8,
+                                arrowprops=dict(
+                                    arrowstyle='->',
+                                    lw=1.5,
+                                    color=color,
+                                )
+                            )
+
+                # TF range
+                transfer = tfs[ms1, ms2][fields.index(f1+f2), fields.index(f1+f2), :]
+                lmin = (lb[transfer < 0.2][-1] + lb[transfer > 0.2][0])/2. 
+                main.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.3)
+                sub.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.3)
 
                 # Cosmetix
                 main.set_title(f1+f2, fontsize=14)
                 if spec == "TT":
-                    main.legend(fontsize=13)
+                    main.legend(fontsize=12, frameon=False)
                 main.set_xticklabels([])
                 if id1 != 2:
                     sub.set_xticklabels([])
@@ -193,9 +292,8 @@ def main(args):
                         r"$\Delta C_\ell / (\sigma/\sqrt{N_\mathrm{sims}})$",
                         fontsize=13
                     )
-
-            plt.savefig(f"{plot_dir}/cls_{ms1}_x_{ms2}.pdf",
-                        bbox_inches="tight")
+        plt.savefig(f"{plot_dir}/cls_{ms1}_x_{ms2}.pdf", bbox_inches="tight")
+    print(f"Validation plots saved at {plot_dir}.")
 
 
 if __name__ == "__main__":
