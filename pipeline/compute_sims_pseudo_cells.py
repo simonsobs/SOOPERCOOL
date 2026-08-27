@@ -234,11 +234,21 @@ def main(args):
                                                     wcs)
                         mask = enmap.insert(flat_template.copy()[0], mask)
                         m = enmap.insert(flat_template.copy(), m)
-                field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs,
-                                           lmax=meta.lmax)
-                field_spin2 = nmt.NmtField(mask, m[1:], wcs=wcs,
-                                           lmax=meta.lmax,
-                                           purify_b=meta.pure_B)
+                field_spin0 = nmt.NmtField(
+                    mask,
+                    m[:1],
+                    wcs=wcs,
+                    lmax=meta.lmax,
+                    lmax_mask=meta.lmax
+                )
+                field_spin2 = nmt.NmtField(
+                    mask,
+                    m[1:],
+                    wcs=wcs,
+                    lmax=meta.lmax,
+                    lmax_mask=meta.lmax,
+                    purify_b=meta.pure_B
+                )
                 fields[ms, id_bundle] = {
                     "spin0": field_spin0,
                     "spin2": field_spin2
