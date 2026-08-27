@@ -634,6 +634,30 @@ def template_from_map(map, ncomp, pix_type="hp"):
         return enmap.zeros(new_shape, wcs)
 
 
+def geometry_from_template_or_nside(nside=None, template_file=None):
+    """
+    Return the map geometry (shape, wcs). If nside is given, assume HEALPix.
+    If template_file is given, assume CAR. Returns None for wcs if pix_type is
+    "hp". Shape does not include the predimensions (e.g. 3 for TQU map).
+    Parameters
+    ----------
+    nside: int
+        NSIDE parameter for HEALPIX maps
+    template_file: str
+        File name of the geometry template of CAR maps.
+    Returns
+    -------
+    tuple
+        shape, wcs
+    """
+    if nside is not None:
+        return hp.nside2npix(nside), None
+    elif template_file is not None:
+        return enmap.read_map_geometry(template_file)
+    else:
+        raise ValueError("Must provide either nside or template_file.")
+
+
 def sky_average(map, pix_type="hp"):
     """
     Compute the sky average of a map
@@ -716,6 +740,33 @@ def binary_mask_from_map(map, pix_type="hp", geometry=None):
     binary[hits_proxy > 0.1] = 1.
 
     return binary
+
+
+def binarize_mask(mask, pix_type="hp", threshold=0.):
+    """
+    Make a binary mask out of a nonbinary mask,
+    including optional thresholding at > 0.
+
+    Parameters
+    ----------
+    mask: np.ndarray or enmap.ndmap
+        Input mask.
+    pix_type : str, optional
+        Pixelization type.
+    threshold: float
+        Threshold below which pixels in th enonbinary mask are cut.
+    
+    Returns
+    -------
+    mask_out: np.ndarray or enmap.ndmap
+        Output mask.
+    """
+    _check_pix_type(pix_type)
+    mask_out = (mask > threshold).astype(np.float64)
+    if pix_type == "hp":
+        return mask_out
+    else:
+        return enmap.ndmap(mask_out, wcs=mask.wcs)
 
 
 def get_spin_derivatives(map):

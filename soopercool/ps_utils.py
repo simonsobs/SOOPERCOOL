@@ -156,7 +156,7 @@ def get_weighted_pcls(pcls, mask, pix_type="car"):
         weights = np.mean(mask ** 2)
     elif pix_type == "car":
         shape, wcs = mask.geometry
-        pixsizemap = enmap.pixsizemap(shape, wcs)  # sterradians
+        pixsizemap = enmap.pixsizemap(shape, wcs)  # steradians
         weights = np.sum(mask ** 2 * pixsizemap) / (4*np.pi)
 
     for k in pcls_dict:
@@ -218,10 +218,11 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None,
         pcls_mat_unbinned = np.zeros((9, 9, nmt_binning.lmax+1))
         tmp_pcls_unbinned = {}
 
-    index = 0
-    cases = ["pureT", "pureE", "pureB"]
+    field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
     tmp_pcls = {}
-    for index, (pure_type1, pure_type2) in enumerate(product(cases, cases)):
+    for field_pair in field_pairs:
+        pure_type1 = f"pure{field_pair[0]}"
+        pure_type2 = f"pure{field_pair[1]}"
         pcls = get_coupled_pseudo_cls(
             fields[pure_type1],
             fields2[pure_type2],
@@ -234,6 +235,8 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None,
                 "TT": pcls_unbinned["spin0xspin0"][0],
                 "TE": pcls_unbinned["spin0xspin2"][0],
                 "TB": pcls_unbinned["spin0xspin2"][1],
+                "ET": pcls_unbinned["spin0xspin2"][0],
+                "BT": pcls_unbinned["spin0xspin2"][1],
                 "EE": pcls_unbinned["spin2xspin2"][0],
                 "EB": pcls_unbinned["spin2xspin2"][1],
                 "BE": pcls_unbinned["spin2xspin2"][2],
@@ -244,13 +247,17 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None,
             "TT": pcls["spin0xspin0"][0],
             "TE": pcls["spin0xspin2"][0],
             "TB": pcls["spin0xspin2"][1],
+            "ET": pcls["spin0xspin2"][0],
+            "BT": pcls["spin0xspin2"][1],
             "EE": pcls["spin2xspin2"][0],
             "EB": pcls["spin2xspin2"][1],
             "BE": pcls["spin2xspin2"][2],
             "BB": pcls["spin2xspin2"][3]
         }
 
-    for idx, (pure_type1, pure_type2) in enumerate(product(cases, cases)):
+    for idx, field_pair in enumerate(field_pairs):
+        pure_type1 = f"pure{field_pair[0]}"
+        pure_type2 = f"pure{field_pair[1]}"
         pcls_mat[idx] = np.array([
             tmp_pcls[pure_type1, pure_type2]["TT"],
             tmp_pcls[pure_type1, pure_type2]["TE"],
@@ -348,7 +355,7 @@ def plot_pcls_mat_transfer(pcls_mat_unfilt, pcls_mat_filt, lb, file_name,
     """
     import matplotlib.pyplot as plt
 
-    field_pairs = [f"{p}{q}" for (p, q) in product("TEB", "TEB")]
+    field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
     plt.figure(figsize=(25, 25))
     grid = plt.GridSpec(9, 9, hspace=0.3, wspace=0.3)
     msk = np.ones_like(lb).astype(bool)

@@ -7,7 +7,7 @@ from matplotlib import cm
 import camb
 
 
-def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30,
+def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=None,
                    verbose=True):
     """
     """
@@ -27,7 +27,7 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30,
             "tau": 0.0544,
             "r": 0.0,
         }
-    if verbose:
+    if verbose and fwhm_amin is not None:
         print(f"  Beam FWHM: {fwhm_amin} arcmin\n")
     params = camb.set_params(**cosmo_params)
     results = camb.get_results(params)
@@ -35,7 +35,10 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30,
         params, CMB_unit='muK', raw_cl=True, lmax=lmax
     )
     lth = np.arange(lmin, lmax+1)
-    bl_sq = beam_gaussian(lth, fwhm_amin)**2
+    bl_sq = np.ones_like(lth)
+    if fwhm_amin is not None:
+        bl_sq = beam_gaussian(lth, fwhm_amin)**2
+        print("beam sq", bl_sq[:10])
 
     cl_th = {
         "TT": powers["total"][:, 0][lmin:lmax+1]*bl_sq,
@@ -46,6 +49,8 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30,
     }
     for spec in ["EB", "TB", "BE", "BT"]:
         cl_th[spec] = np.zeros_like(lth)
+    for spec in cl_th:
+       cl_th[spec][:2] = 0.  # Remove monopole and dipole
 
     return lth, cl_th
 
@@ -242,6 +247,8 @@ def power_law_cl(ell, amp, delta_ell, power_law_index):
         pl_ps[spec] = A / (ell + delta_ell) ** power_law_index
         if spec != spec[::-1]:
             pl_ps[spec[::-1]] = pl_ps[spec]
+    for spec in pl_ps:
+        pl_ps[spec][:2] = 0.  # Remove monopole and dipole
 
     return pl_ps
 
