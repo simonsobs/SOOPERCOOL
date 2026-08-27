@@ -3,6 +3,7 @@ import soopercool.ps_utils as pu
 import soopercool.utils as su
 import yaml
 import numpy as np
+import healpy as hp
 import os
 import time
 
@@ -35,9 +36,13 @@ class BBmeta(object):
         self._set_general_attributes()
 
         # Basic sanity checks
-        if self.lmax > 3*self.nside-1:
+        if self.pix_type == "car":
+            lmax_res = mu._lmax_from_car_geometry(self.car_template)
+        elif self.pix_type == "hp":
+            lmax_res = 3*self.nside -1
+        if self.lmax > lmax_res:
             raise ValueError("lmax should be lower or equal "
-                             f"to 3*nside-1 = {3*self.nside-1}")
+                             f"to lmax_res = {lmax_res}.")
 
         # Initialize method to parse map_sets metadata
         map_sets_attributes = list(self.map_sets[
@@ -320,7 +325,6 @@ class BBmeta(object):
         cl_th: dict
             Unbinned coadded cross-map set power spectra.
         """
-        import healpy as hp
         bins = self.read_nmt_binning()
         ps_names = self.get_ps_names_list(type="all", coadd=True)
         cl_theory = {}
@@ -368,6 +372,7 @@ class BBmeta(object):
                     cl_theory = synch_cl
 
         if all(x is None for x in cl_theory.values()):
+            print("Loading default theory cls")
             _, cl_th = su.get_theory_cls()  # Load default theory Cls
             for ps in ps_names:
                 cl_theory[ps] = cl_th
@@ -741,6 +746,19 @@ class BBmeta(object):
         if not return_bpwf:
             return inv_couplings
         return inv_couplings, bandpower_window_functions
+    
+    def get_geometry(self):
+        """
+        Return the map geometry (shape, wcs) given the pixelization scheme.
+        Returns None for wcs if pix_type is "hp". Shape does not include the
+        predimensions (e.g. 3 for TQU map).
+        """
+        if self.pix_type == "hp":
+            return mu.geometry_from_template_or_nside(nside=self.nside)
+        else:
+            return mu.geometry_from_template_or_nside(
+                template_file=self.car_template
+            )
 
     @classmethod
     def make_dir(cls, dir):

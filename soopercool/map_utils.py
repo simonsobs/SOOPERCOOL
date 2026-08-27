@@ -157,7 +157,10 @@ def _lmax_from_car_geometry(geometry):
     int
         Maximum multipole.
     """
-    _, wcs = geometry
+    if isinstance(geometry, str):
+        _, wcs = enmap.read_map_geometry(geometry)
+    elif isinstance(geometry,tuple):
+        _, wcs = geometry
     res = np.deg2rad(np.min(np.abs(wcs.wcs.cdelt)))
 
     return uharm.res2lmax(res)
@@ -698,15 +701,13 @@ def sky_average(map, pix_type="hp"):
             return weighted_sum / np.sum(pixel_area_sr)
 
 
-def binary_mask_from_map(map, pix_type="hp", geometry=None):
+def binary_mask_from_map(map, pix_type="hp"):
     """
     Generate a binary mask from a map.
     Parameters
     ----------
     map : np.ndarray or enmap.ndmap
         Input map.
-    ncomp : int
-        Number of components of the output template.
     pix_type : str, optional
         Pixelization type.
 
