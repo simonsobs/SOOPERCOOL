@@ -11,8 +11,6 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=None,
                    verbose=True):
     """
     """
-    if verbose:
-        print("\nTheory C_ells:")
     if cosmo_params is None:
         if verbose:
             print("  WARNING: "
@@ -38,7 +36,6 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=None,
     bl_sq = np.ones_like(lth)
     if fwhm_amin is not None:
         bl_sq = beam_gaussian(lth, fwhm_amin)**2
-        print("beam sq", bl_sq[:10])
 
     cl_th = {
         "TT": powers["total"][:, 0][lmin:lmax+1]*bl_sq,
