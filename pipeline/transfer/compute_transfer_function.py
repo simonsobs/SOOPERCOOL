@@ -7,6 +7,13 @@ import numpy as np
 
 def main(args):
     """
+    Compute the filtering transfer function as in Hervias et al. 2025.
+    
+    Requires a set of filtered and unfiltered pure-type power spectrum matrices,
+    obtained with 'compute_pseudo_cells_tf_estimation.py'.
+
+    Saves the full set of cross-filtering-tag transfer functions (as defined
+    under 'map_sets' in the yaml) under tf_settings["transfer_directory"].
     """
     meta = BBmeta(args.globals)
 
@@ -52,7 +59,6 @@ def main(args):
     for ftag1, ftag2 in filtering_pairs:
         lab1 = f"{ftag1[0]}_{ftag1[1]}"
         lab2 = f"{ftag2[0]}_{ftag2[1]}"
-        print(f"{tf_dir}/transfer_function_{lab1}_x_{lab2}.npz")
         tf = trans[ftag1, ftag2]
         np.savez(
             f"{tf_dir}/transfer_function_{lab1}_x_{lab2}.npz",
@@ -61,22 +67,20 @@ def main(args):
         full_tf[ftag1, ftag2] = tf["full_tf"]
 
     if do_plot:
-        import os
-        plot_dir = "/".join(os.path.split(tf_dir)[:-1]) + "/plots/transfer_functions"  # noqa
+        plot_dir = f"{out_dir}/plots/transfer_functions"
         BBmeta.make_dir(plot_dir)
 
         for ftag1, ftag2 in filtering_pairs:
             lab1 = f"{ftag1[0]}_{ftag1[1]}"
             lab2 = f"{ftag2[0]}_{ftag2[1]}"
-            tf_dict = np.load(f"{tf_dir}/transfer_function_{lab1}_x_{lab2}.npz")  # noqa
+            tf_dict = np.load(f"{tf_dir}/transfer_function_{lab1}_x_{lab2}.npz")  # noqa: E501
 
             utils.plot_transfer_function(
                 lb, tf_dict, meta.lmin, meta.lmax,
                 ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"],
                 file_name=f"{plot_dir}/transfer_{lab1}_x_{lab2}.pdf"
             )
-        print(plot_dir)
-
+        print(f"Saved TF plots under {plot_dir}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
