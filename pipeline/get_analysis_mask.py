@@ -132,9 +132,9 @@ def main(args):
         else:
             sum_hits = hit_maps[0].copy() * 0.
             for h in hit_maps:
-                if h.shape[0]==1:
+                if h.shape[0] == 1:
                     sum_hits += h
-                elif h.shape[0]>1:
+                elif h.shape[0] > 1:
                     sum_hits += h[0]
                 else:
                     raise ValueError(
