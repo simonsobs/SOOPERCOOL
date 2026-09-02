@@ -132,7 +132,14 @@ def main(args):
         else:
             sum_hits = hit_maps[0].copy() * 0.
             for h in hit_maps:
-                sum_hits += h
+                if h.shape[0]==1:
+                    sum_hits += h
+                elif h.shape[0]>1:
+                    sum_hits += h[0]
+                else:
+                    raise ValueError(
+                        "Check your hits/weights maps, the shape is wrong."
+                    )
 
     #############
     # BINARY MASK
