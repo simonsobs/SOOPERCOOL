@@ -41,7 +41,25 @@ def main(args):
         pix_type=meta.pix_type,
         car_template=meta.car_template
     )
+
     mask_binary = mu.binarize_mask(mask)
+    mask_kspace = mu.binarize_mask(mask)
+
+    # NEW: Accept external kspace mask that is larger than the analysis mask.
+    # Crop-smooth its edges and apodize it to make sure the kspace filter
+    # does not introduce any biasing artifacts.
+    crop_size = 2
+    smooth_scale = 2
+    apod_radius_deg = 2
+    apod_type = "C1"
+
+    if args.kspace_mask is not None:
+        mask_kspace = mu.read_map(args.kspace_mask, pix_type=meta.pix_type,
+                                  fields_hp=[0])
+        mask_kspace = mu.crop_borders(mask_kspace, crop_size, smooth_scale,
+                                      pix_type=meta.pix_type)
+        mask_kspace = mu.apodize_mask(mask_kspace, apod_radius_deg, apod_type,
+                                      pix_type=meta.pix_type)
 
     tf_settings = meta.transfer_settings
     id_start, n_sims_est = (
@@ -50,8 +68,9 @@ def main(args):
     )
     do_tf_val = False
     if "validation" in tf_settings:
-        n_sims_val = tf_settings["tf_val_num_sims"]
-        do_tf_val = True
+        if tf_settings["validation"] is not None:
+            n_sims_val = tf_settings["tf_val_num_sims"]
+            do_tf_val = True
 
     pure_types = [f"pure{f}" for f in "TEB"]
 
@@ -68,7 +87,8 @@ def main(args):
 
         else:
             print(
-                f"   No k-space filter to be applied to map set {map_set}. Skipping." # noqa
+                f"   No k-space filter to be applied to map set {map_set}. "
+                "Skipping."
             )
 
         print("  Filtering TF estimation sims")
@@ -76,7 +96,7 @@ def main(args):
         map_dir = tf_settings[f"{f_prefix}filtered_map_dir"][ftag]
         for id_sim in range(id_start, id_start + n_sims_est):
             for pure_type in pure_types:
-                fname = tf_settings[f"{f_prefix}filtered_map_template"][ftag].format(
+                fname = tf_settings[f"{f_prefix}filtered_map_template"][ftag].format(  # noqa: E501
                     pure_type=pure_type, id_sim=id_sim
                 )
                 path = f"{map_dir}/{fname}"
@@ -85,10 +105,10 @@ def main(args):
             continue
 
         print("  Filtering TF validation sims")
-        map_dir = tf_settings["validation"][f"{f_prefix}filtered_map_dir"][ftag]
+        map_dir = tf_settings["validation"][f"{f_prefix}filtered_map_dir"][ftag]  # noqa: E501
         for id_sim in range(id_start, id_start + n_sims_val):
             for pure_type in pure_types:
-                fname = tf_settings["validation"][f"{f_prefix}filtered_map_template"][ftag].format(
+                fname = tf_settings["validation"][f"{f_prefix}filtered_map_template"][ftag].format(  # noqa: E501
                     id_sim=id_sim
                 )
                 path = f"{map_dir}/{fname}"
@@ -101,14 +121,13 @@ def main(args):
     local_files_list = [mpi_shared_list[i] for i in task_ids]
 
     for map_fname, kspace_pars, kspace_tag in local_files_list:
-
         m = mu.read_map(
             map_fname,
             pix_type=meta.pix_type,
             car_template=meta.car_template,
             fields_hp=[0, 1, 2],
         )
-        m *= mask_binary
+        m *= mask_kspace
 
         # TODO: need to add a step before to mask noisy edges of the map
         # with bright pixels which makes the filtering more stable
@@ -144,6 +163,13 @@ if __name__ == "__main__":
         help="(Optional) whether to apply kspace filtering on unfiltered "
              "or filtered maps. The latter is used for filter-and-bin maps, "
              "the former may be used for kspace-only TF sims.",
+    )
+    parser.add_argument(
+        "--kspace_mask",
+        help="(Optional) path to external mask that will be edge-cropped," \
+             " smoothed, apodized and then used to multiply the map by "
+             "before kspace filtering.",
+        default=None
     )
     args = parser.parse_args()
 
