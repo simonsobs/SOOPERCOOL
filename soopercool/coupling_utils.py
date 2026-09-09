@@ -37,6 +37,7 @@ def get_transfer_with_error(mean_pcls_mat_filt,
         Matrix of shape (N_field_pairs, N_field_pairs, N_bins)
         containing statistical errors on the TF.
     """
+    Nsims = np.array(pcls_mat_filt).shape[0]
     cct_inv = np.transpose(
         np.linalg.inv(
             np.transpose(
@@ -67,7 +68,7 @@ def get_transfer_with_error(mean_pcls_mat_filt,
                     clf))
                 for clf in pcls_mat_filt]
         ), axis=0
-    )
+    ) / np.sqrt(Nsims)
 
     return tf, tferr
 
@@ -244,7 +245,7 @@ def average_pcls_matrices(pcls_mat_dict, filtering_pairs,
 def load_transfer_function(transfer_dir, ms1, ms2,
                            ftag_from_map_set,
                            ktag_from_map_set,
-                           nmt_bins):
+                           nmt_bins, return_std=False):
     """
     Load the transfer function for a given pair of map sets.
 
@@ -279,8 +280,17 @@ def load_transfer_function(transfer_dir, ms1, ms2,
 
     lab1 = f"{ftag1}_{ktag1}"
     lab2 = f"{ftag2}_{ktag2}"
-    tf_fname = f"{transfer_dir}/transfer_function_{lab1}_x_{lab2}.npz"
-    return np.load(tf_fname)["full_tf"]
+    tf_dict = np.load(f"{transfer_dir}/transfer_function_{lab1}_x_{lab2}.npz")
+    tf_full = tf_dict["full_tf"]
+
+    if return_std:
+        field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
+        tf_std_full = np.zeros_like(tf_full)
+        for i, fp1 in enumerate(field_pairs):
+            for j, fp2 in enumerate(field_pairs):
+                tf_std_full[i, j] = tf_dict[f"{fp2}_to_{fp1}_std"]
+        return tf_full, tf_std_full
+    return tf_full
 
 
 def compute_couplings(mcm, nmt_binning,

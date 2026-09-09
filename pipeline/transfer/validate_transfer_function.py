@@ -54,6 +54,7 @@ def main(args):
     )
     bpwins = {"filtered": {}, "unfiltered": {}}
     tfs = {}
+    tfs_std = {}
    
     for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
 
@@ -78,14 +79,16 @@ def main(args):
         )
         beam = np.outer(bl1, bl2)
 
-        transfer = cu.load_transfer_function(
+        transfer, transfer_std = cu.load_transfer_function(
             meta.transfer_settings["transfer_directory"],
             ms1, ms2,
             meta.filtering_tag_from_map_set,
             meta.kspace_tag_from_map_set,
-            nmt_bins
+            nmt_bins,
+            return_std=True
         )
         tfs[ms1, ms2] = transfer
+        tfs_std[ms1, ms2] = transfer_std
         bpwins["filtered"][ms1, ms2], _ = cu.compute_couplings(
             mcm,
             nmt_bins,
@@ -271,9 +274,17 @@ def main(args):
                             )
 
                 # TF range
+                # We cut every low-ell bin whose TF is negative or measured
+                # at less than 2 sigma.
+                # We also cut all bins centered below ell of 30.
                 transfer = tfs[ms1, ms2][fields.index(f1+f2),
                                          fields.index(f1+f2), :]
-                lmin = (lb[transfer < 0.2][-1] + lb[transfer > 0.2][0])/2. 
+                transfer_std = tfs_std[ms1, ms2][fields.index(f1+f2),
+                                                 fields.index(f1+f2), :]
+                tf_zscore = transfer / transfer_std
+                good = tf_zscore > 2.
+                
+                lmin = max((lb[~good][-1] + lb[good][0])/2., 30)
                 main.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.3)
                 sub.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.3)
 

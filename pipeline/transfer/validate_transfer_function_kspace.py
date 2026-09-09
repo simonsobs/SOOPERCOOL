@@ -83,16 +83,6 @@ def main(args):
     if rank == 0:
         print("Estimating k-space filter TF")
 
-    # Read TF estimation sims from disk
-    sim_dirs = {None: list(tf_settings["unfiltered_map_dir"].values())[0]}
-    sim_templates = {
-        None: list(tf_settings["unfiltered_map_template"].values())[0]}
-
-    # The default beam is a 30-arcminute Gaussian beam bandlimited at lmax=650
-    beam = (su.bandlim_sine2(np.arange(lmax_sim+1), 650, 50) * 
-            su.beam_gaussian(np.arange(lmax_sim+1), 30.*np.pi/180./60.))
-    beams = {"fwhm30": beam}
-
     if tf_settings["tf_est_beams_list"]:
         sim_dirs = {
             beam: tf_settings.unfiltered_map_dir[beam]
@@ -106,8 +96,21 @@ def main(args):
         for beam_label in tf_settings["tf_est_beams_list"]:
             _, bl = meta.read_beam(beam_label, lmax=lmax_sim)
             beams[beam_label] = bl
-    elif rank == 0:
-        print("Using Gaussian beam of FWHM 30 arcmin and low pass at ell=650")
+    else:
+        if rank == 0:
+            print("Using Gaussian beam of FWHM 30 arcmin and low pass at "
+                  "ell=650")
+        # The default beam is a 30-arcminute Gaussian beam bandlimited at
+        # lmax=650
+        beam = (su.bandlim_sine2(np.arange(lmax_sim+1), 650, 50) * 
+                su.beam_gaussian(np.arange(lmax_sim+1), 30.*np.pi/180./60.))
+        beams = {"fwhm30": beam}
+
+        # Read TF estimation sims from disk
+        sim_dirs = {
+            "fwhm30": list(tf_settings["unfiltered_map_dir"].values())[0]}
+        sim_templates = {
+            "fwhm30": list(tf_settings["unfiltered_map_template"].values())[0]}
 
     # MPI: parallelize over sim IDs and TF estimation beams
     mpi_shared_list = [(id_sim, beam_label)
@@ -120,7 +123,7 @@ def main(args):
     for id_sim, beam_label in local_mpi_list:
         if verbose:
             print(" TF estimation power spectra for id_sim "
-                  "{id_sim} | {beam_label}")
+                  f"{id_sim} | {beam_label}")
 
         # We add "nofilt" to make clear that the only filter is a kspace filter
         lab = f"nofilt_{beam_label}_{kspace_tag}"
@@ -368,35 +371,42 @@ def main(args):
 
     for beam in beams:
         # Load specific validation TFs, not the cross-mapset ones.
-        transfer = cu.load_transfer_function(
+        transfer, transfer_std = cu.load_transfer_function(
             meta.transfer_settings["transfer_directory"],
             beam, beam,
             ftag_from_map_set,
             kspace_tag_from_map_set,
-            nmt_bins
+            nmt_bins,
+            return_std=True
         )
-        # Set the minimum multipole as where the BB TF hits 0.2
-        # NOTE: we might want to generalize this, or require the TF to be
-        # significantly above zero.
-        lmin_tf[beam] = 2.
-        if np.any(transfer[-1, -1] < 0.2):
-            lmin_tf[beam] = (lb[transfer[-1, -1] < 0.2][-1] + lb[transfer[-1, -1] > 0.2][0])/2.  # noqa: E501
+
+        # TF range
+        # We cut every low-ell bin whose BB->BB TF is measured at less than
+        # 2 sigma. We also cut all bins centered below ell of 30.
+        tf_zscore = transfer[-1, -1] / transfer_std[-1, -1]
+        good = tf_zscore > 2.
+        if np.any(~good):
+            lmin_tf[beam] = max((lb[~good][-1] + lb[good][0])/2., 30)
+        else:
+            lmin_tf[beam] = max((lb[0])/2., 30)
+
         (bpwins[beam, "filtered"],
-         icoup[beam, "filtered"]) = cu.compute_couplings(
+            icoup[beam, "filtered"]) = cu.compute_couplings(
             mcm,
             nmt_bins,
             transfer=transfer,
             compute_Dl=meta.compute_Dl,
-            beam=beam
+            beam=None  # np.outer(beams[beam][:lmax+1], beams[beam][:lmax+1])
         )
         (bpwins[beam, "unfiltered"],
-         icoup[beam, "unfiltered"]) = cu.compute_couplings(
+        icoup[beam, "unfiltered"]) = cu.compute_couplings(
             mcm,
             nmt_bins,
             transfer=None,
             compute_Dl=meta.compute_Dl,
-            beam=beam
+            beam=None  # np.outer(beams[beam][:lmax+1], beams[beam][:lmax+1])
         )
+
     cls_dict = {
         (cl_typ, beam): {
             fp: np.array([cl[0], cl[1], 0*cl[0], cl[1], 0*cl[0],
@@ -602,7 +612,7 @@ def main(args):
     if failed_count == 0:
         print("All tests passed.")
     else:
-        print(f"WARNING: {failed_count} out of 12 tests failed.")
+        print(f"WARNING: {failed_count} out of 18 tests failed.")
 
 
 if __name__ == "__main__":

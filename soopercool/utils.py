@@ -563,12 +563,21 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
                 ylims = [0, 1.05] if f1 == f2 else [-0.01, 0.01]
 
                 ax.axhline(expected, color="k", ls="--", zorder=6)
-                # We need to understand the offdigonal TF panels in the
-                # presence of NaMaster purification - we don't have a clear
-                # interpretation.
                 ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
+                if f1 == f2:
+                    # TF range: We cut every low-ell bin whose TF is negative
+                    # or measured at less than 2 sigma. We also cut all bins
+                    # centered below ell of 30.
+                    tf_zscore = tf[f"{f1}_to_{f2}"] / tf[f"{f1}_to_{f2}_std"]
+                    good = tf_zscore > 2.
+                    if np.any(~good):
+                        lmin = max((lb[~good][-1] + lb[good][0])/2., 30)
+                    else:
+                        lmin = max((lb[0])/2., 30)
+                        
+                    ax.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.2)
                 ax.errorbar(lb, tf[f"{f1}_to_{f2}"], tf[f"{f1}_to_{f2}_std"],
-                            label=label)
+                            label=label, alpha=0.8)
 
                 if id1 == npan-1:
                     ax.set_xlabel(r"$\ell$", fontsize=14)
