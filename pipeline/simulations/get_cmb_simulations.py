@@ -14,9 +14,10 @@ def main(args):
     Generate CMB noiseless simulations of the map geometry provided by the
     soopercool yaml.
 
-    Requires masks["analysis_mask"] from SOOPERCOOL yaml as a geometry template.
-    Loops over all beams in transfer_settings['tf_val_beams_list'];
-    if the list in empty, do not apply any beam.
+    Requires masks["analysis_mask"] from SOOPERCOOL yaml as a geometry
+    template. Loops over all beams in transfer_settings['tf_val_beams_list'];
+    if the list in empty, applies 30-arcmin Gaussian beam and low-pass at
+    ell=650.
 
     Important command line arguments are:
     - "--out_dir": output directory for sims
@@ -36,7 +37,7 @@ def main(args):
     do_plots = not args.no_plots
     n_sims = args.n_sims
     id_start = args.sim_id_start
-    
+
     out_dir = args.out_dir
     if not os.path.isdir(out_dir):
         raise ValueError(f"Directory does not exist: {out_dir}")

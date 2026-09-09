@@ -14,7 +14,7 @@ def main(args):
     """
     Compute (TF*MCM)-decoupled power spectra from (un)filtered TF validation
     simulations stored under the yaml section transfer_settings['validation']
-    
+
     This script must be run before 'validate_transfer_function.py'. Running it
     is NOT a prerequisite for 'validate_transfer_function_kspace.py'.
     """
@@ -124,8 +124,8 @@ def main(args):
                          compute a transfer function for it")
 
     mpi_shared_list = [(id_sim, ftag1, ftag2)
-                        for ftag1, ftag2 in filtering_tag_pairs
-                        for id_sim in sim_ids]
+                       for ftag1, ftag2 in filtering_tag_pairs
+                       for id_sim in sim_ids]
 
     # Every rank must have the same list order
     mpi_shared_list = comm.bcast(mpi_shared_list, root=0)
@@ -232,8 +232,7 @@ def main(args):
             kspace_tag1 = meta.kspace_tag_from_map_set(ms1)
             preproc_ftag2 = meta.filtering_tag_from_map_set(ms2)
             kspace_tag2 = meta.kspace_tag_from_map_set(ms2)
-            if ((preproc_ftag1, kspace_tag1) != ftag1 or
-                (preproc_ftag2, kspace_tag2) != ftag2):
+            if ((preproc_ftag1, kspace_tag1) != ftag1 or (preproc_ftag2, kspace_tag2) != ftag2):  # noqa: E501
                 continue
 
             if verbose:

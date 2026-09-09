@@ -8,9 +8,9 @@ import numpy as np
 def main(args):
     """
     Compute the filtering transfer function as in Hervias et al. 2025.
-    
-    Requires a set of filtered and unfiltered pure-type power spectrum matrices,
-    obtained with 'compute_pseudo_cells_tf_estimation.py'.
+
+    Requires a set of filtered and unfiltered pure-type power spectrum
+    matrices, obtained with 'compute_pseudo_cells_tf_estimation.py'.
 
     Saves the full set of cross-filtering-tag transfer functions (as defined
     under 'map_sets' in the yaml) under tf_settings["transfer_directory"].
@@ -81,6 +81,7 @@ def main(args):
                 file_name=f"{plot_dir}/transfer_{lab1}_x_{lab2}.pdf"
             )
         print(f"Saved TF plots under {plot_dir}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -11,8 +11,8 @@ import os
 def main(args):
     """
     This script compares (TF*MCM)-decoupled power spectra from filtered
-    simulations with MCM-decoupled power spectra from unfiltered simulations. 
-    
+    simulations with MCM-decoupled power spectra from unfiltered simulations.
+
     The paths to read from must be given in the yaml under
     transfer['validation']. Both filtered and unfiltered sims must exist on
     disk. This supports any type of filtered simulations.
@@ -25,7 +25,7 @@ def main(args):
     """
     meta = BBmeta(args.globals)
 
-    if not "validation" in meta.transfer_settings:
+    if "validation" not in meta.transfer_settings:
         raise KeyError(
             "SOOPERCOOL config yaml must point to existing TF validation"
             "sims under transfer['validation']."
@@ -55,7 +55,7 @@ def main(args):
     bpwins = {"filtered": {}, "unfiltered": {}}
     tfs = {}
     tfs_std = {}
-   
+
     for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
 
         bpwin_fn = f"{couplings_dir}/bp_win_{ms1}_x_{ms2}.npz"
@@ -283,7 +283,7 @@ def main(args):
                                                  fields.index(f1+f2), :]
                 tf_zscore = transfer / transfer_std
                 good = tf_zscore > 2.
-                
+
                 lmin = max((lb[~good][-1] + lb[good][0])/2., 30)
                 main.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.3)
                 sub.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.3)

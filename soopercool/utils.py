@@ -47,7 +47,7 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=None,
     for spec in ["EB", "TB", "BE", "BT"]:
         cl_th[spec] = np.zeros_like(lth)
     for spec in cl_th:
-       cl_th[spec][:2] = 0.  # Remove monopole and dipole
+        cl_th[spec][:2] = 0.  # Remove monopole and dipole
 
     return lth, cl_th
 
@@ -574,7 +574,7 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
                         lmin = max((lb[~good][-1] + lb[good][0])/2., 30)
                     else:
                         lmin = max((lb[0])/2., 30)
-                        
+ 
                     ax.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.2)
                 ax.errorbar(lb, tf[f"{f1}_to_{f2}"], tf[f"{f1}_to_{f2}_std"],
                             label=label, alpha=0.8)

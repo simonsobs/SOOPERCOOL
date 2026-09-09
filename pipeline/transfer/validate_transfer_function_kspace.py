@@ -12,7 +12,6 @@ from soopercool import ps_utils as pu
 from soopercool import mpi_utils as mpi
 from soopercool import sim_utils
 from soopercool import BBmeta
-from soopercool import fft_utils as sfft
 from copy import deepcopy
 from scipy.stats import chi2
 from itertools import product
@@ -36,7 +35,7 @@ def main(args):
     """
     meta = BBmeta(args.globals)
     verbose = args.verbose
-    
+
     nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
     n_bins = nmt_bins.get_n_bands()
@@ -75,7 +74,7 @@ def main(args):
 
     # NOTE: this is a hardcoded filter for now.
     kspace_tag = "kx20"
-    kspace_pars = {"dkx": 20., "dky":0., "type": "cosine"}
+    kspace_pars = {"dkx": 20., "dky": 0., "type": "cosine"}
 
     ##############################
     # Transfer function estimation
@@ -102,7 +101,7 @@ def main(args):
                   "ell=650")
         # The default beam is a 30-arcminute Gaussian beam bandlimited at
         # lmax=650
-        beam = (su.bandlim_sine2(np.arange(lmax_sim+1), 650, 50) * 
+        beam = (su.bandlim_sine2(np.arange(lmax_sim+1), 650, 50) *
                 su.beam_gaussian(np.arange(lmax_sim+1), 30.*np.pi/180./60.))
         beams = {"fwhm30": beam}
 
@@ -364,7 +363,7 @@ def main(args):
 
     def kspace_tag_from_map_set(ms):
         return kspace_tag
-    
+
     bpwins = {}
     icoup = {}
     lmin_tf = {}
@@ -399,7 +398,7 @@ def main(args):
             beam=None  # np.outer(beams[beam][:lmax+1], beams[beam][:lmax+1])
         )
         (bpwins[beam, "unfiltered"],
-        icoup[beam, "unfiltered"]) = cu.compute_couplings(
+         icoup[beam, "unfiltered"]) = cu.compute_couplings(
             mcm,
             nmt_bins,
             transfer=None,
@@ -432,10 +431,10 @@ def main(args):
             f"{val_sims_dir}/mapTQU_{cl_type}_{beam}_{isfilt}_{id_sim:04}.fits", **kwargs_map)  # noqa: E501
 
         # Compute decoupled power spectra
-        # NOTE: we don't calculate the purified and non-purified version, 
+        # NOTE: we don't calculate the purified and non-purified version,
         # just the one that is indicated in the config. Wwe don't loop over
         # the map sets, only over the sim types.
-        field =  {
+        field = {
             "spin0": nmt.NmtField(mask, map[:1], **kwargs),
             "spin2": nmt.NmtField(
                 mask,
@@ -510,16 +509,18 @@ def main(args):
                 ls = {"unfiltered": "-", "filtered": "--"}[isfilt]
                 m = {"unfiltered": ".", "filtered": "x"}[isfilt]
                 off = {"": -2, "_bonly": 2}[case]
-                chisq = np.sum(((np.mean(clb[clab][:, lb_msk], axis=0) - \
+                chisq = np.sum(((np.mean(clb[clab][:, lb_msk], axis=0) -
                                  clth[clab_th][pols][lb_msk])**2)/np.var(clb[clab][:, lb_msk], axis=0))  # noqa: E501
                 pte = chi2.sf(chisq, df=sum(lb_msk))
+
                 if pte < 0.05:
-                        failed_count += 1
-                        print(f"FAILED: {cl_type}{case}_{beam} {isfilt} {pols} (PTE {pte:.1e})")  # noqa: E501
-                        pte_log.write(f"FAILED: {cl_type}{case}_{beam} {isfilt} {pols} (PTE {pte:.1e})\n")  # noqa: E501
+                    failed_count += 1
+                    print(f"FAILED: {cl_type}{case}_{beam} {isfilt} {pols} (PTE {pte:.1e})")  # noqa: E501
+                    pte_log.write(f"FAILED: {cl_type}{case}_{beam} {isfilt} {pols} (PTE {pte:.1e})\n")  # noqa: E501
                 caselab = {"": {True: "mask-purif.", False: "non-purif."}[meta.pure_B], "_bonly": "B-mode-only"}[case]  # noqa: E501
                 caselab += ", " + {"filtered": "filt.", "unfiltered": "unfilt."}[isfilt]  # noqa: E501
                 res = (np.mean(clb[clab], axis=0) - clth[clab_th][pols])/np.std(clb[clab], axis=0)*np.sqrt(num_val_sims)  # noqa: E501
+
                 main.errorbar(
                     lb+off,
                     np.mean(clb[clab], axis=0),

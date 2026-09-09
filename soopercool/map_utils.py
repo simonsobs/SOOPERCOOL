@@ -159,7 +159,7 @@ def _lmax_from_car_geometry(geometry):
     """
     if isinstance(geometry, str):
         _, wcs = enmap.read_map_geometry(geometry)
-    elif isinstance(geometry,tuple):
+    elif isinstance(geometry, tuple):
         _, wcs = geometry
     res = np.deg2rad(np.min(np.abs(wcs.wcs.cdelt)))
 
@@ -756,7 +756,7 @@ def binarize_mask(mask, pix_type="hp", threshold=0.):
         Pixelization type.
     threshold: float
         Threshold below which pixels in th enonbinary mask are cut.
-    
+
     Returns
     -------
     mask_out: np.ndarray or enmap.ndmap

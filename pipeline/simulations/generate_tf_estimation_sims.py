@@ -127,7 +127,7 @@ def main(args):
                         plot = enplot.plot(sims[f"pure{f}"][i],
                                         ticks=10,
                                         color="planck")
-                        plot_fn = f"{'.'.join(fname.split(".")[:-1])}_{mode}"
+                        plot_fn = f"{'.'.join(fname.split('.')[:-1])}_{mode}"
                         enplot.write(f"{fdir}/{plot_fn}", plot)
                         if verbose:
                             print(f"  PLOT {fdir}/{plot_fn}.png")

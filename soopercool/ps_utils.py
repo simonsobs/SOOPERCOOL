@@ -1,5 +1,4 @@
 import soopercool.map_utils as mu
-from itertools import product
 import pymaster as nmt
 import numpy as np
 import matplotlib.pyplot as plt

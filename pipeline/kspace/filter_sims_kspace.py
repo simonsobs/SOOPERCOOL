@@ -10,7 +10,7 @@ def main(args):
     """
     Apply kspace filter to a set of TF estimation and (optionally) TF
     validation simulations.
-    
+
     Loops over all map sets, then multiplies by the binarized analysis mask,
     then applies the kspace filter as indicated in the yaml file under
     transfer_settings['kspace_pars'].
@@ -166,7 +166,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--kspace_mask",
-        help="(Optional) path to external mask that will be edge-cropped," \
+        help="(Optional) path to external mask that will be edge-cropped,"
              " smoothed, apodized and then used to multiply the map by "
              "before kspace filtering.",
         default=None
