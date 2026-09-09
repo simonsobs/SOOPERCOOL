@@ -168,6 +168,7 @@ ___
 **K-SPACE VALIDATION**
 If you wish to run a quick validation using $k$-space filtering only, run
 ```bash
+python pipeline/get_mode_coupling.py --globals config_file.yaml
 srun -n 20 -c 11 --cpu_bind=cores python pipeline/transfer/validate_transfer_function_kspace.py --globals config_file.yaml
 ```
 which filters the TF estimation simulations on the fly using a kx20 filter, computes the transfer function, generates six sets of validation simulations (CMB signal-only, white noise, power-law signal-only, each with (E+B) and B-only signal), filters those, computes the TF-corrected decoupled power spectra, and compares them with the corresponding bandpower-convolved theory. Summary plots including chi2 statistics will be available under `{output_directory}/plots/cells_tf_val_kspace`.
