@@ -259,6 +259,9 @@ def main(args):
         out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{lab1}_x_{lab2}_unfiltered_unbinned_{id_sim:04d}.npz"  # noqa
         np.savez(out_f, pcls_mat=pcls_mat_filtered_unbinned)
         np.savez(out_unf, pcls_mat=pcls_mat_unfiltered_unbinned)
+    comm.barrier()
+    if rank == 0:
+        print("Finished.")
 
 
 if __name__ == "__main__":
