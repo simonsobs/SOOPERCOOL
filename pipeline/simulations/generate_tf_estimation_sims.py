@@ -38,13 +38,21 @@ def main(args):
 
     tf_settings = meta.transfer_settings
     sim_dirs = {None: list(tf_settings["unfiltered_map_dir"].values())[0]}
-    sim_templates = {None: list(tf_settings["unfiltered_map_template"].values())[0]}
-    beams = {None: None}
+    sim_templates = {None:
+                     list(tf_settings["unfiltered_map_template"].values())[0]}
+
+    # The default beam is a 30-arcminute Gaussian beam bandlimited at lmax=650
+    beam = (utils.bandlim_sine2(np.arange(lmax_sim+1), 650, 50) * 
+            utils.beam_gaussian(np.arange(lmax_sim+1), 30.*np.pi/180./60.))
+    beams = {"fwhm30": beam}
 
     lmax = meta.lmax
     lmax_sim = lmax + 500
     lth = np.arange(lmax_sim + 1)
     Nsims = tf_settings["tf_est_num_sims"]
+
+    # MPI related initialization
+    rank, size, comm = mpi.init(True)
 
     if tf_settings["tf_est_beams_list"]:
         sim_dirs = {
@@ -59,6 +67,8 @@ def main(args):
         for beam_label in tf_settings["tf_est_beams_list"]:
             _, bl = meta.read_beam(beam_label, lmax=lmax_sim)
             beams[beam_label] = bl
+    elif rank == 0:
+        print("Using Gaussian beam of FWHM 30 arcmin and low pass at ell=650")
 
     mask = mu.read_map(meta.masks["analysis_mask"],
                        pix_type=meta.pix_type,
@@ -73,7 +83,6 @@ def main(args):
                  ell=lth, **cl_power_law_tf_est)
         
     template = mu.template_from_map(mask, ncomp=3, pix_type=meta.pix_type)
-    mpi.init(True)
 
     for id_sim in mpi.taskrange(Nsims - 1):
         almsTEB = sim_utils.get_alms_from_cls(
