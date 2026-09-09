@@ -212,6 +212,34 @@ def beam_hpix(ll, nside):
     return beam_gaussian(ll, fwhm_hp_amin)
 
 
+def bandlim_sine2(x, xc, dx):
+    """
+    Return a sine-squared-type lowpass filter window with tapering of width dx
+    centered at xc
+    Args:
+        x: array-like
+            Values to evaluate window at
+        xc: float
+            Bandlimit center value
+        dx: float
+            Bandlimit width
+    Returns:
+        array-like
+            Values of low-pass window function evaluated at x
+    """
+    xmin = xc - dx
+    xmax = xc + dx
+    return 1 - np.where(
+        x < xmin,
+        0,
+        np.where(
+            x > xmax,
+            1.,
+            np.sin(np.pi/2*(x-xmin)/(xmax-xmin))**2
+        )
+    )
+
+
 def create_binning(lmax, delta_ell, end_first_bin=None):
     """
     """
@@ -539,7 +567,8 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
                 # presence of NaMaster purification - we don't have a clear
                 # interpretation.
                 ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
-                ax.plot(lb, tf[f"{f1}_to_{f2}"], label=label)
+                ax.errorbar(lb, tf[f"{f1}_to_{f2}"], tf[f"{f1}_to_{f2}_std"],
+                            label=label)
 
                 if id1 == npan-1:
                     ax.set_xlabel(r"$\ell$", fontsize=14)
