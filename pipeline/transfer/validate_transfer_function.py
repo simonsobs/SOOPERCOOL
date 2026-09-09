@@ -120,7 +120,7 @@ def main(args):
             preproc_ftag2 = meta.filtering_tag_from_map_set(ms2)
             kspace_tag2 = meta.kspace_tag_from_map_set(ms2)
             for id_sim in range(nsims):
-                cls = np.load(f"{cl_dir}/cls_tf_val_{preproc_ftag1}_{kspace_tag1}_x_{preproc_ftag2}_{kspace_tag2}_{ftype}_{id_sim:04d}.npz")  # noqa
+                cls = np.load(f"{cl_dir}/cls_tf_val_{preproc_ftag1}_{kspace_tag1}_x_{preproc_ftag2}_{kspace_tag2}_{ftype}_{id_sim:04d}.npz")  # noqa: E501
                 for fp in fields:
                     cls_dict[ftype, ms1, ms2, fp] += [cls[fp]]
 
@@ -165,12 +165,12 @@ def main(args):
                 # Plot theory
                 main.plot(
                     lb[lb_msk],
-                    cb2db[lb_msk]*cls_theory_binned["unfiltered"][ms1, ms2][spec][lb_msk],  # noqa
+                    cb2db[lb_msk]*cls_theory_binned["unfiltered"][ms1, ms2][spec][lb_msk],  # noqa: E501
                     color="darkorange", ls="--", alpha=0.6
                 )
                 main.plot(
                     lb[lb_msk],
-                    cb2db[lb_msk]*cls_theory_binned["filtered"][ms1, ms2][spec][lb_msk],  # noqa
+                    cb2db[lb_msk]*cls_theory_binned["filtered"][ms1, ms2][spec][lb_msk],  # noqa: E501
                     color="navy", ls="--", alpha=0.6
                 )
                 main.plot([], [], "k.", label="Simulations")
@@ -180,8 +180,8 @@ def main(args):
                 # Plot filtered & unfiltered (decoupled)
                 main.errorbar(
                     lb[lb_msk]-offset,
-                    cb2db[lb_msk]*cls_mean_dict["unfiltered", ms1, ms2, spec][lb_msk],  # noqa
-                    cb2db[lb_msk]*cls_std_dict["unfiltered", ms1, ms2, spec][lb_msk],  # noqa
+                    cb2db[lb_msk]*cls_mean_dict["unfiltered", ms1, ms2, spec][lb_msk],  # noqa: E501
+                    cb2db[lb_msk]*cls_std_dict["unfiltered", ms1, ms2, spec][lb_msk],  # noqa: E501
                     color="navy",
                     marker=".",
                     markerfacecolor="white",
@@ -190,8 +190,8 @@ def main(args):
                 )
                 main.errorbar(
                     lb[lb_msk]+offset,
-                    cb2db[lb_msk]*cls_mean_dict["filtered", ms1, ms2, spec][lb_msk],  # noqa
-                    cb2db[lb_msk]*cls_std_dict["filtered", ms1, ms2, spec][lb_msk],  # noqa
+                    cb2db[lb_msk]*cls_mean_dict["filtered", ms1, ms2, spec][lb_msk],  # noqa: E501
+                    cb2db[lb_msk]*cls_std_dict["filtered", ms1, ms2, spec][lb_msk],  # noqa: E501
                     color="darkorange",
                     marker=".",
                     markerfacecolor="white",
@@ -271,7 +271,8 @@ def main(args):
                             )
 
                 # TF range
-                transfer = tfs[ms1, ms2][fields.index(f1+f2), fields.index(f1+f2), :]
+                transfer = tfs[ms1, ms2][fields.index(f1+f2),
+                                         fields.index(f1+f2), :]
                 lmin = (lb[transfer < 0.2][-1] + lb[transfer > 0.2][0])/2. 
                 main.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.3)
                 sub.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.3)

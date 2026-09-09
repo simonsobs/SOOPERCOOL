@@ -57,7 +57,8 @@ def main(args):
     pcls_tf_est_dir = f"{out_dir}/cells_tf_est"
     BBmeta.make_dir(pcls_tf_est_dir)
 
-    num_sims = tf_settings["tf_val_num_sims"]
+    num_est_sims = tf_settings["tf_est_num_sims"]
+    num_val_sims = tf_settings["tf_val_num_sims"]
 
     # MPI related initialization
     rank, size, comm = mpi.init(True)
@@ -72,7 +73,7 @@ def main(args):
     shape, wcs = meta.get_geometry()
     lmax_res = mu.lmax_from_map(mask, pix_type=meta.pix_type)
 
-    # TODO: this is a hardcoded filter for now.
+    # NOTE: this is a hardcoded filter for now.
     kspace_tag = "kx20"
     kspace_pars = {"dkx": 20., "dky":0., "type": "cosine"}
 
@@ -84,8 +85,13 @@ def main(args):
 
     # Read TF estimation sims from disk
     sim_dirs = {None: list(tf_settings["unfiltered_map_dir"].values())[0]}
-    sim_templates = {None: list(tf_settings["unfiltered_map_template"].values())[0]}
-    beams = {None: None}
+    sim_templates = {
+        None: list(tf_settings["unfiltered_map_template"].values())[0]}
+
+    # The default beam is a 30-arcminute Gaussian beam bandlimited at lmax=650
+    beam = (su.bandlim_sine2(np.arange(lmax_sim+1), 650, 50) * 
+            su.beam_gaussian(np.arange(lmax_sim+1), 30.*np.pi/180./60.))
+    beams = {"fwhm30": beam}
 
     if tf_settings["tf_est_beams_list"]:
         sim_dirs = {
@@ -100,10 +106,12 @@ def main(args):
         for beam_label in tf_settings["tf_est_beams_list"]:
             _, bl = meta.read_beam(beam_label, lmax=lmax_sim)
             beams[beam_label] = bl
+    elif rank == 0:
+        print("Using Gaussian beam of FWHM 30 arcmin and low pass at ell=650")
 
     # MPI: parallelize over sim IDs and TF estimation beams
     mpi_shared_list = [(id_sim, beam_label)
-                       for id_sim in range(num_sims)
+                       for id_sim in range(num_est_sims)
                        for beam_label in beams]
     mpi_shared_list = comm.bcast(mpi_shared_list, root=0)
     task_ids = mpi.distribute_tasks(size, rank, len(mpi_shared_list))
@@ -111,12 +119,13 @@ def main(args):
 
     for id_sim, beam_label in local_mpi_list:
         if verbose:
-            print(f" TF estimation power spectra for id_sim {id_sim} | {beam_label}")
+            print(" TF estimation power spectra for id_sim "
+                  "{id_sim} | {beam_label}")
 
         # We add "nofilt" to make clear that the only filter is a kspace filter
         lab = f"nofilt_{beam_label}_{kspace_tag}"
-        out_f = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{lab}_x_{lab}_filtered_{id_sim:04d}.npz"  # noqa
-        out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{lab}_x_{lab}_unfiltered_{id_sim:04d}.npz"  # noqa
+        out_f = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{lab}_x_{lab}_filtered_{id_sim:04d}.npz"  # noqa: E501
+        out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{lab}_x_{lab}_unfiltered_{id_sim:04d}.npz"  # noqa: E501
         if os.path.isfile(out_f) and os.path.isfile(out_unf):
             continue
 
@@ -191,7 +200,7 @@ def main(args):
             return_unbinned=False
         )
         if id_sim == mpi_shared_list[0][0]:
-            fplt = f"{plot_dir}/pcls_mat_tf_est_{lab}_x_{lab}_{id_sim:04d}.pdf"  # noqa
+            fplt = f"{plot_dir}/pcls_mat_tf_est_{lab}_x_{lab}_{id_sim:04d}.pdf"
             pu.plot_pcls_mat_transfer(
                 pcls_mat_unfiltered, pcls_mat_filtered, lb, fplt,
                 lmax=meta.lmax
@@ -207,7 +216,7 @@ def main(args):
                     for beam_label in beams]
         pcls_mat_dict = cu.read_pcls_matrices(
             pcls_tf_est_dir, tf_pairs,
-            tf_settings["tf_est_num_sims"],
+            num_est_sims,
             tf_settings["sim_id_start"]
         )
 
@@ -241,13 +250,14 @@ def main(args):
             )
             full_tf[ftag1, ftag2] = tf["full_tf"]
 
-        plot_dir = f"{out_dir}/plots/transfer_functions"  # noqa
+        plot_dir = f"{out_dir}/plots/transfer_functions"
         BBmeta.make_dir(plot_dir)
 
         for ftag1, ftag2 in tf_pairs:
             lab1 = f"{ftag1[0]}_{ftag1[1]}"
             lab2 = f"{ftag2[0]}_{ftag2[1]}"
-            tf_dict = np.load(f"{tf_dir}/transfer_function_{lab1}_x_{lab2}.npz")  # noqa
+            tf_dict = np.load(
+                f"{tf_dir}/transfer_function_{lab1}_x_{lab2}.npz")
 
             su.plot_transfer_function(
                 lb, tf_dict, meta.lmin, meta.lmax,
@@ -262,8 +272,9 @@ def main(args):
     ####################
 
     # Make input Cls
-    # TF validation beams. Ignored if "tf_val_beams_list" is None
-    beams = {None: np.ones(lmax_sim+1, dtype=np.float64)}
+    # TF validation beams. Choose Gaussian 30 arcmin beam if
+    # "tf_val_beams_list" is None or empty
+    beams = {"fwhm30": hp.gauss_beam(fwhm=30.*np.pi/180./60., lmax=lmax_sim)}
 
     if tf_settings["tf_val_beams_list"]:
         beams = {}
@@ -277,7 +288,7 @@ def main(args):
                 for suf in ["", "_bonly"]]
     f_types = ["filtered", "unfiltered"]
 
-    # Input power spectra. White noise is not beam-convolved. Other are (option).
+    # Input power spectra. White noise is not beam-convolved.
     cls = {}
     for beam in beams:
         bl = beams[beam]
@@ -287,9 +298,11 @@ def main(args):
         ])
         cls["cmb_bonly", beam] = deepcopy(cls["cmb", beam])
         cls["cmb_bonly", beam][:3] *= 0.
-        cls["noise", beam] = np.ones(4*(lmax_sim+1), dtype=np.float64).reshape(4, -1)
+        cls["noise", beam] = np.ones(4*(lmax_sim+1),
+                                     dtype=np.float64).reshape(4, -1)
         cls["plaw", beam] = np.array([
-            su.power_law_cl(lth, **tf_settings["power_law_pars_tf_est"])[fp] * bl**2
+            su.power_law_cl(lth,
+                            **tf_settings["power_law_pars_tf_est"])[fp] * bl**2
             for fp in ["TT", "TE", "EE", "BB"]
         ])
         cls["plaw_bonly", beam] = deepcopy(cls["plaw", beam])
@@ -308,7 +321,7 @@ def main(args):
     # MPI: parallelize over sim IDs, input CL shapes, validation beams, and
     # (filtered, unfiltered)
     mpi_shared_list = [(id_sim, cl_type, beam, isfilt)
-                       for id_sim in range(num_sims)
+                       for id_sim in range(num_val_sims)
                        for cl_type, beam in cls
                        for isfilt in f_types]
     mpi_shared_list = comm.bcast(mpi_shared_list, root=0)
@@ -316,7 +329,7 @@ def main(args):
     local_mpi_list = [mpi_shared_list[i] for i in task_ids]
 
     for id_sim, cl_type, beam, isfilt in local_mpi_list:
-        print(f"Maps | sim {id_sim+1}/{num_sims} | {cl_type} | {beam} | {isfilt}")
+        print(f"Maps | sim {id_sim+1}/{num_val_sims} | {cl_type} | {beam} | {isfilt}")  # noqa: E501
         np.random.seed(id_sim+1000)
         alms = hp.synalm(cls[cl_type, beam], lmax=lmax_sim)
         mapTQU = sim_utils.get_map_from_alms(alms, map_temp)
@@ -326,7 +339,7 @@ def main(args):
                 pix_type=meta.pix_type,
                 **kspace_pars
             )
-        fn = f"{val_sims_dir}/mapTQU_{cl_type}_{beam}_{isfilt}_{id_sim:04}.fits"
+        fn = f"{val_sims_dir}/mapTQU_{cl_type}_{beam}_{isfilt}_{id_sim:04}.fits"  # noqa: E501
         mu.write_map(fn, mapTQU, pix_type=meta.pix_type)
     comm.barrier()
 
@@ -367,15 +380,17 @@ def main(args):
         # significantly above zero.
         lmin_tf[beam] = 2.
         if np.any(transfer[-1, -1] < 0.2):
-            lmin_tf[beam] = (lb[transfer[-1, -1] < 0.2][-1] + lb[transfer[-1, -1] > 0.2][0])/2.
-        bpwins[beam, "filtered"], icoup[beam, "filtered"] = cu.compute_couplings(
+            lmin_tf[beam] = (lb[transfer[-1, -1] < 0.2][-1] + lb[transfer[-1, -1] > 0.2][0])/2.  # noqa: E501
+        (bpwins[beam, "filtered"],
+         icoup[beam, "filtered"]) = cu.compute_couplings(
             mcm,
             nmt_bins,
             transfer=transfer,
             compute_Dl=meta.compute_Dl,
             beam=beam
         )
-        bpwins[beam, "unfiltered"], icoup[beam, "unfiltered"] = cu.compute_couplings(
+        (bpwins[beam, "unfiltered"],
+         icoup[beam, "unfiltered"]) = cu.compute_couplings(
             mcm,
             nmt_bins,
             transfer=None,
@@ -401,15 +416,15 @@ def main(args):
     kwargs = {"wcs": wcs, "lmax": meta.lmax, "lmax_mask": meta.lmax}
 
     for id_sim, cl_type, beam, isfilt in local_mpi_list:
-        print(f"PCLs | sim {id_sim+1}/{num_sims} | {cl_type} | {beam} | {isfilt}")
+        print(f"PCLs | sim {id_sim+1}/{num_val_sims} | {cl_type} | {beam} | {isfilt}")  # noqa: E501
         kwargs_map = {"pix_type": meta.pix_type, "fields_hp": (0, 1, 2)}
         map = mu.read_map(
-            f"{val_sims_dir}/mapTQU_{cl_type}_{beam}_{isfilt}_{id_sim:04}.fits", **kwargs_map)
+            f"{val_sims_dir}/mapTQU_{cl_type}_{beam}_{isfilt}_{id_sim:04}.fits", **kwargs_map)  # noqa: E501
 
         # Compute decoupled power spectra
         # NOTE: we don't calculate the purified and non-purified version, 
-        # just the one that is indicated in the config.
-        # NOTE: we don't loop over the map sets, only over the sim types.
+        # just the one that is indicated in the config. Wwe don't loop over
+        # the map sets, only over the sim types.
         field =  {
             "spin0": nmt.NmtField(mask, map[:1], **kwargs),
             "spin2": nmt.NmtField(
@@ -417,7 +432,8 @@ def main(args):
                 map[1:], purify_b=meta.pure_B, **kwargs)
         }
         pcls = pu.get_coupled_pseudo_cls(field, field, nmt_bins)
-        clbs = pu.decouple_pseudo_cls(pcls, icoup[beam, isfilt].reshape([n_bins*9, n_bins*9]))
+        clbs = pu.decouple_pseudo_cls(
+            pcls, icoup[beam, isfilt].reshape([n_bins*9, n_bins*9]))
 
         np.savez_compressed(
             f"{out_dir}/clb_{cl_type}_{beam}_{isfilt}_{id_sim:04}.npz", cl=clbs
@@ -436,7 +452,7 @@ def main(args):
 
     for cl_type, beam in product(cl_types, beams):
         for isfilt in f_types:
-            for id_sim in range(num_sims):
+            for id_sim in range(num_val_sims):
                 for pols in ["EE", "BB"]:
                     clab = f"{cl_type}_{beam}_{isfilt}"
                     clb[clab+f"_{pols}"] += [
@@ -468,10 +484,12 @@ def main(args):
             icls = {"EE": 2, "BB": 3}[pols]
             msk = np.logical_and(lth < lmax, lth > 2)
             for ax in [main, sub, std]:
-                ax.axvspan(xmin=lb[0]/2., xmax=lmin_tf[beam], color="k", alpha=0.2)
+                ax.axvspan(xmin=lb[0]/2., xmax=lmin_tf[beam],
+                           color="k", alpha=0.2)
                 ax.axvspan(xmin=lmax_res, xmax=lb[-1], color="k", alpha=0.2)
             lb_msk = np.logical_and(lb < lmax_res, lb > lmin_tf[beam])
-            main.plot(lth[msk], cls[cl_type, beam][icls, msk], label="Theory", c="k")
+            main.plot(lth[msk], cls[cl_type, beam][icls, msk],
+                      label="Theory", c="k")
             cases = {"BB": ["", "_bonly"], "EE": [""]}[pols]
 
             # Loop over polarizations and filtered vs unfiltered sims
@@ -487,11 +505,11 @@ def main(args):
                 pte = chi2.sf(chisq, df=sum(lb_msk))
                 if pte < 0.05:
                         failed_count += 1
-                        print(f"FAILED: {cl_type}{case}_{beam} {isfilt} {pols} (PTE {pte:.1e})")
-                        pte_log.write(f"FAILED: {cl_type}{case}_{beam} {isfilt} {pols} (PTE {pte:.1e})\n")
-                caselab = {"": {True: "mask-purif.", False: "non-purif."}[meta.pure_B], "_bonly": "B-mode-only"}[case]
-                caselab += ", " + {"filtered": "filt.", "unfiltered": "unfilt."}[isfilt]
-                res = (np.mean(clb[clab], axis=0) - clth[clab_th][pols])/np.std(clb[clab], axis=0)*np.sqrt(num_sims)  # noqa: E501
+                        print(f"FAILED: {cl_type}{case}_{beam} {isfilt} {pols} (PTE {pte:.1e})")  # noqa: E501
+                        pte_log.write(f"FAILED: {cl_type}{case}_{beam} {isfilt} {pols} (PTE {pte:.1e})\n")  # noqa: E501
+                caselab = {"": {True: "mask-purif.", False: "non-purif."}[meta.pure_B], "_bonly": "B-mode-only"}[case]  # noqa: E501
+                caselab += ", " + {"filtered": "filt.", "unfiltered": "unfilt."}[isfilt]  # noqa: E501
+                res = (np.mean(clb[clab], axis=0) - clth[clab_th][pols])/np.std(clb[clab], axis=0)*np.sqrt(num_val_sims)  # noqa: E501
                 main.errorbar(
                     lb+off,
                     np.mean(clb[clab], axis=0),
@@ -547,7 +565,8 @@ def main(args):
                             )
                         )
                 main.plot(lb, clth[clab_th][pols], ls=ls, c=c)
-            main.set_title(f"{cl_type} {pols} ({num_sims} sims, beam {beam})")
+            main.set_title(
+                f"{cl_type} {pols} ({num_val_sims} sims, beam {beam})")
             sub.axhline(0, color="k")
             sub.set_ylabel("Bias/error on mean")
             std.plot([], [], "k-", label="unfiltered")
@@ -569,12 +588,13 @@ def main(args):
 
                 # apply a function formatter
                 formatter = mticker.FuncFormatter(
-                    lambda x, pos: '{:.2e}'.format(x/np.sqrt(num_sims)))
+                    lambda x, pos: '{:.2e}'.format(x/np.sqrt(num_val_sims)))
                 ax2.yaxis.set_major_formatter(formatter)
 
             fig.align_ylabels([main, sub, std])
-            plt.savefig(f"{plot_dir}/TF_validation_{cl_type}_{beam}_{pols}.pdf",
-                        bbox_inches="tight")
+            plt.savefig(
+                f"{plot_dir}/TF_validation_{cl_type}_{beam}_{pols}.pdf",
+                bbox_inches="tight")
             plt.close()
 
     pte_log.close()
