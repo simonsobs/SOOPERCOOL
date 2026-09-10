@@ -26,7 +26,7 @@ def main(args):
       under for each filtering_tag (as defined under 'map_sets'). Accepts
       fstring placeholders {sim_id} (an integer) and {pure_type} (will loop
       over 'pureT', 'pureE', 'pureB')
-    
+
     Additional parameters required are:
     - masks['analysis_mask']: serves as geometry template for the simulations
     - general_pars['pix_type']: pixelization (car or hp)
@@ -37,14 +37,6 @@ def main(args):
     do_plots = not args.no_plots
 
     tf_settings = meta.transfer_settings
-    sim_dirs = {None: list(tf_settings["unfiltered_map_dir"].values())[0]}
-    sim_templates = {None:
-                     list(tf_settings["unfiltered_map_template"].values())[0]}
-
-    # The default beam is a 30-arcminute Gaussian beam bandlimited at lmax=650
-    beam = (utils.bandlim_sine2(np.arange(lmax_sim+1), 650, 50) * 
-            utils.beam_gaussian(np.arange(lmax_sim+1), 30.*np.pi/180./60.))
-    beams = {"fwhm30": beam}
 
     lmax = meta.lmax
     lmax_sim = lmax + 500
@@ -52,7 +44,7 @@ def main(args):
     Nsims = tf_settings["tf_est_num_sims"]
 
     # MPI related initialization
-    rank, size, comm = mpi.init(True)
+    rank, _, _ = mpi.init(True)
 
     if tf_settings["tf_est_beams_list"]:
         sim_dirs = {
@@ -67,8 +59,24 @@ def main(args):
         for beam_label in tf_settings["tf_est_beams_list"]:
             _, bl = meta.read_beam(beam_label, lmax=lmax_sim)
             beams[beam_label] = bl
-    elif rank == 0:
-        print("Using Gaussian beam of FWHM 30 arcmin and low pass at ell=650")
+    else:
+        if rank == 0:
+            print("Using Gaussian beam of FWHM 30 arcmin and low pass at "
+                  "ell=650")
+        sim_dirs = {
+            "fwhm30": next(iter(tf_settings["unfiltered_map_dir"].values()))
+        }
+        sim_templates = {
+            "fwhm30":
+            next(iter(tf_settings["unfiltered_map_template"].values()))
+        }
+
+        # The default beam is a 30-arcminute Gaussian beam bandlimited at
+        # lmax=650
+        beam = (utils.bandlim_sine2(np.arange(lmax_sim + 1), 650, 50) *
+                utils.beam_gaussian(np.arange(lmax_sim + 1),
+                                    30.*np.pi/180./60.))
+        beams = {"fwhm30": beam}
 
     mask = mu.read_map(meta.masks["analysis_mask"],
                        pix_type=meta.pix_type,
@@ -81,7 +89,7 @@ def main(args):
         BBmeta.make_dir(sim_dir)
         np.savez(f"{sim_dir}/cl_power_law_tf_est.npz",
                  ell=lth, **cl_power_law_tf_est)
-        
+
     template = mu.template_from_map(mask, ncomp=3, pix_type=meta.pix_type)
 
     for id_sim in mpi.taskrange(Nsims - 1):
@@ -124,9 +132,8 @@ def main(args):
                 )
                 if do_plots:
                     for i, mode in zip([0, 1, 2], "TQU"):
-                        plot = enplot.plot(sims[f"pure{f}"][i],
-                                        ticks=10,
-                                        color="planck")
+                        plot = enplot.plot(sims[f"pure{f}"][i], ticks=10,
+                                           color="planck")
                         plot_fn = f"{'.'.join(fname.split('.')[:-1])}_{mode}"
                         enplot.write(f"{fdir}/{plot_fn}", plot)
                         if verbose:

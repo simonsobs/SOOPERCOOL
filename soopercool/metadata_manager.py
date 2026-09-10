@@ -8,7 +8,7 @@ import os
 import time
 
 
-class BBmeta(object):
+class BBmeta():
     """
     Metadata manager for the BBmaster pipeline.
     The purpose of this class is to provide
@@ -39,7 +39,7 @@ class BBmeta(object):
         if self.pix_type == "car":
             lmax_res = mu._lmax_from_car_geometry(self.car_template)
         elif self.pix_type == "hp":
-            lmax_res = 3*self.nside -1
+            lmax_res = 3*self.nside - 1
         if self.lmax > lmax_res:
             raise ValueError("lmax should be lower or equal "
                              f"to lmax_res = {lmax_res}.")
@@ -353,23 +353,22 @@ class BBmeta(object):
                     cl_theory[ms1, ms2] += dust_cl
                 else:
                     cl_theory = dust_cl
-        if hasattr(self, "fiducial_synch"):
-            if self.fiducial_synch is not None:
-                if "{nu1}" not in self.fiducial_synch:
-                    raise KeyError("self.fiducial_synch lacks {nu1} marker.")
-                if "{nu2}" not in self.fiducial_synch:
-                    raise KeyError("self.fiducial_synch lacks {nu2} marker.")
-                for ms1, ms2 in ps_names:
-                    synch_cl = hp.read_cl(
-                        self.fiducial_synch.format(
-                            nu1=self.get_freq_tag_from_map_set(ms1),
-                            nu2=self.get_freq_tag_from_map_set(ms2)
-                        )
-                    )[:, :bins.lmax+1]
-                if cl_theory[ms1, ms2]:
-                    cl_theory[ms1, ms2] += synch_cl
-                else:
-                    cl_theory = synch_cl
+        if hasattr(self, "fiducial_synch") and self.fiducial_synch is not None:
+            if "{nu1}" not in self.fiducial_synch:
+                raise KeyError("self.fiducial_synch lacks {nu1} marker.")
+            if "{nu2}" not in self.fiducial_synch:
+                raise KeyError("self.fiducial_synch lacks {nu2} marker.")
+            for ms1, ms2 in ps_names:
+                synch_cl = hp.read_cl(
+                    self.fiducial_synch.format(
+                        nu1=self.get_freq_tag_from_map_set(ms1),
+                        nu2=self.get_freq_tag_from_map_set(ms2)
+                    )
+                )[:, :bins.lmax+1]
+            if cl_theory[ms1, ms2]:
+                cl_theory[ms1, ms2] += synch_cl
+            else:
+                cl_theory = synch_cl
 
         if all(x is None for x in cl_theory.values()):
             print("Loading default theory cls")
@@ -728,7 +727,8 @@ class BBmeta(object):
                 fname = f"couplings{filter_label}_{ftag1}_{ftag2}"
                 if not os.path.isfile(f"{couplings_dir}/{fname}.npz"):
                     raise ValueError(
-                        f"Coupling file does not exist: {couplings_dir}/{fname}.npz"  # noqa
+                        "Coupling file does not exist: "
+                        f"{couplings_dir}/{fname}.npz"
                     )
 
                 couplings = np.load(f"{couplings_dir}/{fname}.npz")
@@ -746,7 +746,7 @@ class BBmeta(object):
         if not return_bpwf:
             return inv_couplings
         return inv_couplings, bandpower_window_functions
-    
+
     def get_geometry(self):
         """
         Return the map geometry (shape, wcs) given the pixelization scheme.

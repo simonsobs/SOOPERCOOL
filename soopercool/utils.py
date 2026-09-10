@@ -552,7 +552,7 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
 
     # tf_dict could contain several versions of a TF to compare.
     # If TF_dict contains only a single TF, this ensures compatibility.
-    if "TT_to_TT" in tf_dict.keys():
+    if "TT_to_TT" in tf_dict:
         tf_dict = {"TF": tf_dict}
 
     for label, tf in tf_dict.items():
@@ -574,7 +574,7 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
                         lmin = max((lb[~good][-1] + lb[good][0])/2., 30)
                     else:
                         lmin = max((lb[0])/2., 30)
- 
+
                     ax.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.2)
                 ax.errorbar(lb, tf[f"{f1}_to_{f2}"], tf[f"{f1}_to_{f2}_std"],
                             label=label, alpha=0.8)
