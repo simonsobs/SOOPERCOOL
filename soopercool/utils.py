@@ -7,12 +7,10 @@ from matplotlib import cm
 import camb
 
 
-def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30,
+def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=None,
                    verbose=True):
     """
     """
-    if verbose:
-        print("\nTheory C_ells:")
     if cosmo_params is None:
         if verbose:
             print("  WARNING: "
@@ -27,7 +25,7 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30,
             "tau": 0.0544,
             "r": 0.0,
         }
-    if verbose:
+    if verbose and fwhm_amin is not None:
         print(f"  Beam FWHM: {fwhm_amin} arcmin\n")
     params = camb.set_params(**cosmo_params)
     results = camb.get_results(params)
@@ -35,7 +33,9 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30,
         params, CMB_unit='muK', raw_cl=True, lmax=lmax
     )
     lth = np.arange(lmin, lmax+1)
-    bl_sq = beam_gaussian(lth, fwhm_amin)**2
+    bl_sq = np.ones_like(lth)
+    if fwhm_amin is not None:
+        bl_sq = beam_gaussian(lth, fwhm_amin)**2
 
     cl_th = {
         "TT": powers["total"][:, 0][lmin:lmax+1]*bl_sq,
@@ -46,6 +46,8 @@ def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=30,
     }
     for spec in ["EB", "TB", "BE", "BT"]:
         cl_th[spec] = np.zeros_like(lth)
+    for spec in cl_th:
+        cl_th[spec][:2] = 0.  # Remove monopole and dipole
 
     return lth, cl_th
 
@@ -210,6 +212,34 @@ def beam_hpix(ll, nside):
     return beam_gaussian(ll, fwhm_hp_amin)
 
 
+def bandlim_sine2(x, xc, dx):
+    """
+    Return a sine-squared-type lowpass filter window with tapering of width dx
+    centered at xc
+    Args:
+        x: array-like
+            Values to evaluate window at
+        xc: float
+            Bandlimit center value
+        dx: float
+            Bandlimit width
+    Returns:
+        array-like
+            Values of low-pass window function evaluated at x
+    """
+    xmin = xc - dx
+    xmax = xc + dx
+    return 1 - np.where(
+        x < xmin,
+        0,
+        np.where(
+            x > xmax,
+            1.,
+            np.sin(np.pi/2*(x-xmin)/(xmax-xmin))**2
+        )
+    )
+
+
 def create_binning(lmax, delta_ell, end_first_bin=None):
     """
     """
@@ -242,6 +272,8 @@ def power_law_cl(ell, amp, delta_ell, power_law_index):
         pl_ps[spec] = A / (ell + delta_ell) ** power_law_index
         if spec != spec[::-1]:
             pl_ps[spec[::-1]] = pl_ps[spec]
+    for spec in pl_ps:
+        pl_ps[spec][:2] = 0.  # Remove monopole and dipole
 
     return pl_ps
 
@@ -520,7 +552,7 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
 
     # tf_dict could contain several versions of a TF to compare.
     # If TF_dict contains only a single TF, this ensures compatibility.
-    if "TT_to_TT" in tf_dict.keys():
+    if "TT_to_TT" in tf_dict:
         tf_dict = {"TF": tf_dict}
 
     for label, tf in tf_dict.items():
@@ -531,11 +563,21 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
                 ylims = [0, 1.05] if f1 == f2 else [-0.01, 0.01]
 
                 ax.axhline(expected, color="k", ls="--", zorder=6)
-                # We need to understand the offdigonal TF panels in the
-                # presence of NaMaster purification - we don't have a clear
-                # interpretation.
                 ax.set_title(f"{f1} $\\rightarrow$ {f2}", fontsize=14)
-                ax.plot(lb, tf[f"{f1}_to_{f2}"], label=label)
+                if f1 == f2:
+                    # TF range: We cut every low-ell bin whose TF is negative
+                    # or measured at less than 2 sigma. We also cut all bins
+                    # centered below ell of 30.
+                    tf_zscore = tf[f"{f1}_to_{f2}"] / tf[f"{f1}_to_{f2}_std"]
+                    good = tf_zscore > 2.
+                    if np.any(~good):
+                        lmin = max((lb[~good][-1] + lb[good][0])/2., 30)
+                    else:
+                        lmin = max((lb[0])/2., 30)
+
+                    ax.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.2)
+                ax.errorbar(lb, tf[f"{f1}_to_{f2}"], tf[f"{f1}_to_{f2}_std"],
+                            label=label, alpha=0.8)
 
                 if id1 == npan-1:
                     ax.set_xlabel(r"$\ell$", fontsize=14)
