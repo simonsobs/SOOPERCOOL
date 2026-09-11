@@ -432,7 +432,7 @@ def main(args):
 
         # Compute decoupled power spectra
         # NOTE: we don't calculate the purified and non-purified version,
-        # just the one that is indicated in the config. Wwe don't loop over
+        # just the one that is indicated in the config. We don't loop over
         # the map sets, only over the sim types.
         field = {
             "spin0": nmt.NmtField(mask, map[:1], **kwargs),
@@ -447,6 +447,8 @@ def main(args):
         np.savez_compressed(
             f"{out_dir}/clb_{cl_type}_{beam}_{isfilt}_{id_sim:04}.npz", cl=clbs
         )
+        fn_map = f"{val_sims_dir}/mapTQU_{cl_type}_{beam}_{isfilt}_{id_sim:04}.fits"  # noqa: E501
+        os.remove(fn_map)
     comm.barrier()
     if rank != 0:
         return
