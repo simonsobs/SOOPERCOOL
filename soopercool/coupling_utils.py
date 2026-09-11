@@ -234,6 +234,9 @@ def get_transfer_with_error(mean_pcls_mat_filt,
     error is computed from the scatter measured
     accross realizations.
 
+    This is a legacy function. Not sure we still want to use
+    it. Maybe remove in future commits.
+
     N_pure_pairs = len(["pureTxpureT", "pureTxpureE", ...])
     N_field_pairs = len(["TT", "TE", ...])
     N_bins = number of bandpower bins
@@ -294,13 +297,13 @@ def get_transfer_with_error(mean_pcls_mat_filt,
     return tf, tferr
 
 
-def get_transfer_dict_new(pcls_mat_dict,
-                          filtering_pairs,
-                          cl,
-                          mcm,
-                          nmt_binning,
-                          compute_Dl=False,
-                          tf_ordering="TM"):
+def get_transfer_dict(pcls_mat_dict,
+                      filtering_pairs,
+                      cl,
+                      mcm,
+                      nmt_binning,
+                      compute_Dl=False,
+                      tf_ordering="TM"):
     """
     This is just a wrapper to loop over the filtering_pairs
     provided and compute the transfer function for each pair
@@ -356,59 +359,6 @@ def get_transfer_dict_new(pcls_mat_dict,
             nmt_binning,
             compute_Dl
         )
-        field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
-
-        for i, fp1 in enumerate(field_pairs):
-            for j, fp2 in enumerate(field_pairs):
-                tf_dict[ftag1, ftag2][f"{fp2}_to_{fp1}"] = tf[i, j]
-                tf_dict[ftag1, ftag2][f"{fp2}_to_{fp1}_std"] = tferr[i, j]
-        tf_dict[ftag1, ftag2]["full_tf"] = tf
-
-    return tf_dict
-
-
-def get_transfer_dict(mean_pcls_mat_filt_dict,
-                      mean_pcls_mat_unfilt_dict,
-                      pcls_mat_dict,
-                      filtering_pairs):
-    """
-    This is just a wrapper to loop over the filtering_pairs
-    provided and compute the transfer function for each pair
-    using the `get_transfer_with_error` function.
-
-    Parameters
-    ----------
-    mean_pcls_mat_filt_dict : dict
-        Dictionary with keys as (ftag1, ftag2) and values as the mean
-        pseudo-cl matrices for the filtered simulations.
-    mean_pcls_mat_unfilt_dict : dict
-        Dictionary with keys as (ftag1, ftag2) and values as the mean
-        pseudo-cl matrices for the unfiltered simulations.
-    pcls_mat_dict : dict
-        Dictionary with keys as (ftag1, ftag2) and values as the pseudo-cl
-        matrices for the filtered simulations for each realizations.
-    filtering_pairs : list of tuples
-        List of filtering tag pairs (ftag1, ftag2) for which to compute
-
-    Returns
-    -------
-    tf_dict : dict
-        Dictionary with keys as (ftag1, ftag2) and values as another dict
-        containing the transfer function and its error.
-    """
-    tf_dict = {(ftag1, ftag2): {} for ftag1, ftag2 in filtering_pairs}
-    for ftag1, ftag2 in filtering_pairs:
-
-        mean_pcls_mat_filt = \
-            mean_pcls_mat_filt_dict[ftag1, ftag2]
-        mean_pcls_mat_unfilt = \
-            mean_pcls_mat_unfilt_dict[ftag1, ftag2]
-        pcls_mat_filt = \
-            pcls_mat_dict[ftag1, ftag2]["filtered"]
-
-        tf, tferr = get_transfer_with_error(mean_pcls_mat_filt,
-                                            mean_pcls_mat_unfilt,
-                                            pcls_mat_filt)
         field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
 
         for i, fp1 in enumerate(field_pairs):
