@@ -148,6 +148,8 @@ python pipeline/coadd_pseudo_cells.py --globals config_file.yaml
 This will compute all cross-bundle pairs, and coadd them into cross, noise and auto spectra. These will be corrected for the mask mode-coupling and transfer function.
 
 ## Covariances
+___
+**ANALYTIC COVARIANCES**
 From this point we only need to estimate covariances. To pre-compute and save data products required for analytic covariances you can run
 ```bash
 python pipeline/prepare_cov_inputs.py --globals config_file.yaml
@@ -161,7 +163,55 @@ srun -n 12 -c 8 --cpu_bind=cores python pipeline/compute_covariance.py --globals
 ```
 and will save all covariance blocks.
 
-Instructions for montecarlo covariances will be updated soon as these scripts need to be refurbished.
+___
+**EMPIRICAL COVARIANCES**
+We can alternatively estimate covariances empirically from a set of filtered signal, noise, and/or coadded signal+noise simulations. The relevant section in the yaml file reads
+```yaml
+covariance:
+    ## Number of sims for covariance estimation
+    cov_num_sims: 200
+    cov_id_start: 0
+
+    ## (Optional) directories of simulated noise maps
+    noise_map_sims_dir:
+        map_set1: /path/to/filtered/noise/sims
+        ...
+    ## (Optional) file name templates for noise sims.
+    # The parameters id_sim, map_set, and id_bundle will be recognized when
+    # written inside braces, and interpreted during python string formatting.
+    noise_map_sims_template:
+        map_set1: filtered_noise_sim_{id_sim:04d}(...){id_bundle}.fits
+        ...
+    ## (Optional) directories of simulated signal maps
+    signal_map_sims_dir:
+        map_set1: /path/to/filtered/signal/sims
+        ...
+    ## (Optional) file names of simulated signal maps
+    # The parameters freq_tag and id_sim will be recognized during 
+    # python string formatting if written inside braces.
+    signal_map_sims_template:
+        map_set1: filtered_signal_sim_{id_sim:04d}(...){id_bundle}.fits
+        ...
+    ## (Optional) component-wise per-frequency power spectra for plotting
+    # You can add paths to healpy.read_cl-compatible fits files, which can
+    # recognize {nu1} and {nu2} (the center frequency of the observing bands
+    # in GHz) as string formatters.
+    # You can optionally write the value null to not plot them.
+    fiducial_cmb: /path/to/fiducial/c_ells/cl_cmb.fits
+    fiducial_dust: /path/to/fiducial/c_ells/cl_dust_f{nu1:03}_f{nu2:03}.fits
+    fiducial_synch: /path/to/fiducial/c_ells/cl_synch_f{nu1:03}_f{nu2:03}.fits
+```
+
+To compute and coadd the simulation power spectra, run
+```bash
+srun -n 112 -c 1 --cpu_bind=cores python pipeline/compute_sims_pseudo_cells.py --globals config_file.yaml
+srun -n 112 -c 1 --cpu_bind=cores python pipeline/coadd_sims_pseudo_cells.py --globals config_file.yaml
+```
+To compute the empirical covariance, run
+```bash
+python pipeline/compute_covariance_from_sims.py --globals config_file.yaml
+```
+which will save the covariance under `{output_directory}/mc_covariances`.
 
 ## How to create a SACC file
 Compile all spectra and covariances you computed in a `SACC` file used as an input to the likelihood by running
