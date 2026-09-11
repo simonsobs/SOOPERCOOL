@@ -3,29 +3,33 @@ from soopercool import BBmeta
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import os
 from itertools import product
 
 
 def main(args):
     """
-    This function handles the covariance matrix computation.
-    We can use a set of simulations to build a numerical estimate
-    of the covariance matrices.
-    TODO: implement an analytical estimate of the covariances
+    This function handles the empirical covariance matrix computation.
+    We can use a set of simulations (either signal or noise, or their coadd)
+    to build a numerical estimate of the covariance matrices.
     """
     meta = BBmeta(args.globals)
     do_plots = not args.no_plots
     out_dir = meta.output_directory
 
-    cl_dir = {}
-    if os.path.isdir(f"{out_dir}/cells_sims/coadd"):
-        for typ in ["signal", "noise", "coadd"]:
-            cl_dir[typ] = f"{out_dir}/cells_sims/{typ}"
+    # If the config yaml lists signal simulations, this script attempts at
+    # computing signal-only covariance, analogous for noise simulations. If
+    # both are present, signal, noise, and coadded covariances are computed.
+    if "signal_alm_sims_dir" in meta.covariance or "signal_map_sims_dir" in meta.covariance:  # noqa: E501
+        if "noise_map_sims_dir" in meta.covariance:
+            cl_types = ["signal", "noise", "coadd"]
+        else:
+            cl_types = ["signal"]
+    elif "noise_map_sims_dir" in meta.covariance:
+        cl_types = ["noise"]
     else:
-        cl_dir["coadd"] = f"{out_dir}/cells_sims"
-
-    cltypes = list(cl_dir.keys())
+        raise ValueError("Covariance section in config must point to at least "
+                         "signal or noise sims.")
+    cl_dir = {typ: f"{out_dir}/cells_sims/{typ}" for typ in cl_types}
 
     if do_plots:
         plot_dir = f"{out_dir}/plots/mc_covariances"
@@ -38,10 +42,7 @@ def main(args):
 
     nmt_bins = meta.read_nmt_binning()
     n_bins = nmt_bins.get_n_bands()
-
-    cov_settings = meta.covariance
-
-    Nsims = cov_settings["cov_num_sims"]
+    Nsims = meta.covariance["cov_num_sims"]
 
     field_pairs = [f"{m1}{m2}" for m1 in "TEB" for m2 in "TEB"]
 
@@ -57,7 +58,7 @@ def main(args):
 
     # Load the simulations
     cl_dict = {}
-    for cltyp, (ms1, ms2) in product(cltypes, cross_ps_names):
+    for cltyp, (ms1, ms2) in product(cl_types, cross_ps_names):
         cl_dict[cltyp, ms1, ms2] = []
         for iii in range(Nsims):
             cells_dict = np.load(
@@ -73,7 +74,7 @@ def main(args):
         cl_dict[cltyp, ms1, ms2] = np.array(cl_dict[cltyp, ms1, ms2])
 
     full_cov_dict = {}
-    for cltyp, (ms1, ms2, ms3, ms4) in product(cltypes, cov_names):
+    for cltyp, (ms1, ms2, ms3, ms4) in product(cl_types, cov_names):
 
         cl12 = cl_dict[cltyp, ms1, ms2]
         cl34 = cl_dict[cltyp, ms3, ms4]
@@ -104,7 +105,7 @@ def main(args):
 
         full_size = n_spec*n_fields*n_bins
 
-        for clt in cltypes:
+        for clt in cl_types:
             full_cov = np.zeros((full_size, full_size))
             for i, (ms1, ms2) in enumerate(cross_ps_names):
                 for j, (ms3, ms4) in enumerate(cross_ps_names):

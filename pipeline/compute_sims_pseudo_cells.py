@@ -16,6 +16,9 @@ from itertools import product
 
 def main(args):
     """
+    This script computes the decouples and TF-corrected cross-bundle
+    power spectra from signal and/or noise simulations. It reads simulations
+    and, if applicable, co-adds signal and noise on the fly.
     """
     meta = BBmeta(args.globals)
     verbose = args.verbose
@@ -24,13 +27,10 @@ def main(args):
     cells_dir = f"{out_dir}/cells_sims"
     couplings_dir = f"{out_dir}/couplings"
     nsims = meta.covariance["cov_num_sims"]
-    coadd_on_the_fly = True
-    if "coadd_on_the_fly" in meta.covariance:
-        coadd_on_the_fly = meta.covariance["coadd_on_the_fly"]
 
     BBmeta.make_dir(cells_dir)
+    map_types = ["signal", "noise", "coadd"]
 
-    print("WARNING: Assuming signal sims are beam convolved.")
     use_alms, use_maps = (False, False)
     if "signal_alm_sims_dir" in meta.covariance:
         use_alms = meta.covariance["signal_alm_sims_dir"] is not None
@@ -46,38 +46,17 @@ def main(args):
         signal_map_templates = meta.covariance["signal_map_sims_template"]
     if not use_alms and not use_maps:
         print("Using noise sims only for covariance")
+        map_types = ["noise"]
+    else:
+        print("WARNING: Assuming signal sims are beam convolved.")
 
     binary_dir = meta.masks["analysis_mask"].replace("analysis", "binary")
     binary = mu.read_map(binary_dir,
                          pix_type=meta.pix_type,
                          car_template=meta.car_template)
-    map_types = ["signal", "noise", "coadd"]
+
     for typ in map_types:
         BBmeta.make_dir(f"{cells_dir}/{typ}")
-    if coadd_on_the_fly:
-        print("WARNING: Assuming signal sims are beam convolved.")
-        use_alms, use_maps = (False, False)
-        if "signal_alm_sims_dir" in meta.covariance:
-            use_alms = meta.covariance["signal_alm_sims_dir"] is not None
-        if not use_alms and "signal_map_sims_dir" in meta.covariance:
-            use_maps = meta.covariance["signal_map_sims_dir"] is not None
-        if use_alms:
-            print("Using alms for signal covariance")
-            signal_alm_dirs = meta.covariance["signal_alm_sims_dir"]
-            signal_alm_templates = meta.covariance["signal_alm_sims_template"]
-        if use_maps:
-            print("Using maps for signal covariance")
-            signal_map_dirs = meta.covariance["signal_map_sims_dir"]
-            signal_map_templates = meta.covariance["signal_map_sims_template"]
-        if not use_alms and not use_maps:
-            print("Using noise sims only for covariance")
-
-        binary_dir = meta.masks["analysis_mask"].replace("analysis", "binary")
-        binary = mu.read_map(binary_dir,
-                             pix_type=meta.pix_type,
-                             car_template=meta.car_template)
-        for typ in ["signal", "noise", "coadd"]:
-            BBmeta.make_dir(f"{cells_dir}/{typ}")
 
     mask = mu.read_map(meta.masks["analysis_mask"],
                        pix_type=meta.pix_type,
@@ -147,6 +126,7 @@ def main(args):
     rank, size, comm = mpi.init(True, logger=None)
     id_start = meta.covariance["cov_id_start"]
     nsims = meta.covariance["cov_num_sims"]
+    print("nsims", nsims)
     sim_ids = [i for i in range(id_start, id_start+nsims)]
 
     # Initialize tasks for MPI sharing
