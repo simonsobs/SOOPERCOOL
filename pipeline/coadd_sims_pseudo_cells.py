@@ -73,9 +73,10 @@ def main(args):
         plot_dir = f"{out_dir}/plots/cells_sims"
         BBmeta.make_dir(plot_dir)
 
-        fiducial_cmb = meta.covariance["fiducial_cmb"]
-        fiducial_dust = meta.covariance["fiducial_dust"]
-        fiducial_synch = meta.covariance["fiducial_synch"]
+        fiducial_sky_comps = {"cmb": None, "dust": None, "synch": None}
+        for comp in fiducial_sky_comps:
+            if f"fiducial_{comp}" in meta.covariance:
+                fiducial_sky_comps[comp] = meta.covariance[f"fiducial_{comp}"]
 
     # Load bundle C_ells
     cells_dict_sims = {
@@ -217,8 +218,8 @@ def main(args):
             nu2 = meta.freq_tag_from_map_set(map_set2)
 
             clb_th = None
-            if fiducial_cmb:
-                cmb_cl = hp.read_cl(fiducial_cmb)[:, :lmax+1]
+            if fiducial_sky_comps["cmb"]:
+                cmb_cl = hp.read_cl(fiducial_sky_comps["cmb"])[:, :lmax+1]
                 napp = nmt_bins.lmax + 1 - cmb_cl.shape[1]
                 if napp > 0:
                     cmb_cl = np.concatenate(
@@ -226,11 +227,11 @@ def main(args):
                     )
                 cmb_clb = nmt_bins.bin_cell(cmb_cl)[:, mask]
                 clb_th = cmb_clb
-            if fiducial_dust:
-                if not os.path.isfile(fiducial_dust.format(nu1=nu1, nu2=nu2)):
+            if fiducial_sky_comps["dust"]:
+                if not os.path.isfile(fiducial_sky_comps["dust"].format(nu1=nu1, nu2=nu2)):  # noqa: E501
                     nu1, nu2 = nu2, nu1
                 dust_cl = hp.read_cl(
-                    fiducial_dust.format(nu1=nu1, nu2=nu2)
+                    fiducial_sky_comps["dust"].format(nu1=nu1, nu2=nu2)
                 )[:, :lmax+1]
                 napp = nmt_bins.lmax + 1 - dust_cl.shape[1]
                 if napp > 0:
@@ -242,11 +243,11 @@ def main(args):
                     clb_th += dust_clb
                 else:
                     clb_th = dust_clb
-            if fiducial_synch:
-                if not os.path.isfile(fiducial_dust.format(nu1=nu1, nu2=nu2)):
+            if fiducial_sky_comps["synch"]:
+                if not os.path.isfile(fiducial_sky_comps["synch"].format(nu1=nu1, nu2=nu2)):  # noqa: E501
                     nu1, nu2 = nu2, nu1
                 synch_cl = hp.read_cl(
-                    fiducial_synch.format(nu1=nu1, nu2=nu2)
+                    fiducial_sky_comps["synch"].format(nu1=nu1, nu2=nu2)
                 )[:, :lmax+1]
                 napp = nmt_bins.lmax + 1 - synch_cl.shape[1]
                 if napp > 0:

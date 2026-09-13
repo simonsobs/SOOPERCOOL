@@ -170,7 +170,6 @@ We can alternatively estimate covariances empirically from a set of filtered sig
 covariance:
     ## Number of sims for covariance estimation
     cov_num_sims: 200
-    cov_id_start: 0
 
     ## (Optional) directories of simulated noise maps
     noise_map_sims_dir:
@@ -196,7 +195,6 @@ covariance:
     # You can add paths to healpy.read_cl-compatible fits files, which can
     # recognize {nu1} and {nu2} (the center frequency of the observing bands
     # in GHz) as string formatters.
-    # You can optionally write the value null to not plot them.
     fiducial_cmb: /path/to/fiducial/c_ells/cl_cmb.fits
     fiducial_dust: /path/to/fiducial/c_ells/cl_dust_f{nu1:03}_f{nu2:03}.fits
     fiducial_synch: /path/to/fiducial/c_ells/cl_synch_f{nu1:03}_f{nu2:03}.fits

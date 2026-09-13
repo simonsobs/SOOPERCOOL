@@ -124,10 +124,8 @@ def main(args):
     cls_dict_sims = {pn: {} for pn in ps_pairs}
 
     rank, size, comm = mpi.init(True, logger=None)
-    id_start = meta.covariance["cov_id_start"]
     nsims = meta.covariance["cov_num_sims"]
-    print("nsims", nsims)
-    sim_ids = [i for i in range(id_start, id_start+nsims)]
+    sim_ids = [i for i in range(nsims)]
 
     # Initialize tasks for MPI sharing
     mpi_shared_list = [(i, m) for i, m in product(sim_ids, map_types)]
