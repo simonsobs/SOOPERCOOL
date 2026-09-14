@@ -19,6 +19,7 @@ def main(args):
     BBmeta.make_dir(tf_dir)
 
     nmt_bins = meta.read_nmt_binning()
+    nl = nmt_bins.lmax + 1
     lb = nmt_bins.get_effective_ells()
 
     filtering_pairs = meta.get_independent_filtering_pairs()
@@ -38,6 +39,7 @@ def main(args):
         tf_settings["power_law_c_ell"]
     )
     _, cl = cl["l"], cl["cl"]
+    cl = cl[:nl]
 
     trans = cu.get_transfer_dict(
         pcls_mat_dict,
