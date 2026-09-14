@@ -19,10 +19,30 @@ def main(args):
     verbose = args.verbose
 
     out_dir = meta.output_directory
-    cells_dir = {}
-    map_types = ["signal", "noise", "coadd"]
-    for typ in map_types:
-        cells_dir[typ] = f"{out_dir}/cells_sims/{typ}"
+
+    # If the config yaml lists signal simulations, this script attempts at
+    # computing signal-only covariance, same for noise simulations. If both
+    # are present, signal, noise, and coadded covariances will be computed.
+    if "signal_alm_sims_dir" in meta.covariance or "signal_map_sims_dir" in meta.covariance:  # noqa: E501
+        if "noise_map_sims_dir" in meta.covariance:
+            # If signal and noise sims are available, compute cross, auto, and
+            # noise = auto-cross spectra for signal, noise, and coadded maps
+            # each.
+            map_types = ["signal", "noise", "coadd"]
+            coadd_types = ["cross", "auto", "noise"]
+        else:
+            # If only signal sims are available, compute the auto spectrum
+            # only.
+            map_types = ["signal"]
+            coadd_types = ["auto"]
+    elif "noise_map_sims_dir" in meta.covariance:
+        # If only noise sims are available, compute auto and cross spectra.
+        map_types = ["noise"]
+        coadd_types = ["cross", "auto"]
+    else:
+        raise ValueError("Covariance section in config must point to at least "
+                         "signal or noise sims.")
+    cells_dir = {typ: f"{out_dir}/cells_sims/{typ}" for typ in map_types}
 
     nmt_bins = meta.read_nmt_binning()
     lmax = nmt_bins.lmax
@@ -43,17 +63,20 @@ def main(args):
         import healpy as hp
         import matplotlib.pyplot as plt
 
-        mask = lb < meta.lmax
+        lmax_plot = 600  # ISO analysis band-limits TF sims at lmax 650
+        mask = np.logical_and(lb < min(meta.lmax, lmax_plot), lb > 25)
         field_pairs_theory = {"TT": 0, "EE": 1, "BB": 2, "TE": 3}
-        colors = {"cross": "navy", "auto": "darkorange", "noise": "r"}
-        mst = {"cross": "x", "auto": "o", "noise": "v"}
+        colors = {"cross": "navy", "auto": "darkorange", "noise": "r",
+                  "signal": "teal", "coadd": "violet"}
+        mst = {"coadd": "+", "signal": ".", "noise": "v"}
 
         plot_dir = f"{out_dir}/plots/cells_sims"
         BBmeta.make_dir(plot_dir)
 
-        fiducial_cmb = meta.covariance["fiducial_cmb"]
-        fiducial_dust = meta.covariance["fiducial_dust"]
-        fiducial_synch = meta.covariance["fiducial_synch"]
+        fiducial_sky_comps = {"cmb": None, "dust": None, "synch": None}
+        for comp in fiducial_sky_comps:
+            if f"fiducial_{comp}" in meta.covariance:
+                fiducial_sky_comps[comp] = meta.covariance[f"fiducial_{comp}"]
 
     # Load bundle C_ells
     cells_dict_sims = {
@@ -143,13 +166,12 @@ def main(args):
     # Plot mean and standard deviation over simulations
     if do_plots:
         conv = 1e12 if args.units_K else 1
-        types = ["cross", "auto", "noise"]
         if rank == 0:
             if size > 1:
                 for i in range(1, size):
                     cells_dict = comm.recv(source=i, tag=11)
                     for clt, type, (m1, m2), fp in product(map_types,
-                                                           types,
+                                                           coadd_types,
                                                            cross_map_set_list,
                                                            field_pairs):
                         cells_dict_sims[type][clt, m1, m2][fp] += [
@@ -169,7 +191,7 @@ def main(args):
                         for fp in field_pairs
                     } for clt, (m1, m2) in product(map_types,
                                                    cross_map_set_list)
-                } for type in types
+                } for type in coadd_types
             }
             cells_dict_mean = {
                 type: {
@@ -183,7 +205,7 @@ def main(args):
                         for fp in field_pairs
                     } for clt, (m1, m2) in product(map_types,
                                                    cross_map_set_list)
-                } for type in types
+                } for type in coadd_types
             }
         else:
             comm.send(cells_dict_sims, dest=0, tag=11)
@@ -196,8 +218,8 @@ def main(args):
             nu2 = meta.freq_tag_from_map_set(map_set2)
 
             clb_th = None
-            if fiducial_cmb:
-                cmb_cl = hp.read_cl(fiducial_cmb)[:, :lmax+1]
+            if fiducial_sky_comps["cmb"]:
+                cmb_cl = hp.read_cl(fiducial_sky_comps["cmb"])[:, :lmax+1]
                 napp = nmt_bins.lmax + 1 - cmb_cl.shape[1]
                 if napp > 0:
                     cmb_cl = np.concatenate(
@@ -205,11 +227,11 @@ def main(args):
                     )
                 cmb_clb = nmt_bins.bin_cell(cmb_cl)[:, mask]
                 clb_th = cmb_clb
-            if fiducial_dust:
-                if not os.path.isfile(fiducial_dust.format(nu1=nu1, nu2=nu2)):
+            if fiducial_sky_comps["dust"]:
+                if not os.path.isfile(fiducial_sky_comps["dust"].format(nu1=nu1, nu2=nu2)):  # noqa: E501
                     nu1, nu2 = nu2, nu1
                 dust_cl = hp.read_cl(
-                    fiducial_dust.format(nu1=nu1, nu2=nu2)
+                    fiducial_sky_comps["dust"].format(nu1=nu1, nu2=nu2)
                 )[:, :lmax+1]
                 napp = nmt_bins.lmax + 1 - dust_cl.shape[1]
                 if napp > 0:
@@ -221,11 +243,11 @@ def main(args):
                     clb_th += dust_clb
                 else:
                     clb_th = dust_clb
-            if fiducial_synch:
-                if not os.path.isfile(fiducial_dust.format(nu1=nu1, nu2=nu2)):
+            if fiducial_sky_comps["synch"]:
+                if not os.path.isfile(fiducial_sky_comps["synch"].format(nu1=nu1, nu2=nu2)):  # noqa: E501
                     nu1, nu2 = nu2, nu1
                 synch_cl = hp.read_cl(
-                    fiducial_synch.format(nu1=nu1, nu2=nu2)
+                    fiducial_sky_comps["synch"].format(nu1=nu1, nu2=nu2)
                 )[:, :lmax+1]
                 napp = nmt_bins.lmax + 1 - synch_cl.shape[1]
                 if napp > 0:
@@ -243,12 +265,12 @@ def main(args):
             )
 
             for fp in field_pairs:
+                f, (main, sub) = plt.subplots(
+                    2, 1, gridspec_kw={'height_ratios': [3, 1]},
+                    figsize=(10, 9), sharex=True
+                )
                 if fp in field_pairs_theory and clb_th is not None:
                     ifp = field_pairs_theory[fp]
-                    f, (main, sub) = plt.subplots(
-                        2, 1, gridspec_kw={'height_ratios': [3, 1]},
-                        figsize=(10, 9), sharex=True
-                    )
                     y = clb_th[ifp] * beam1 * beam2
                     res = cells_dict_mean["cross"][("coadd",
                                                     map_set1,
@@ -270,39 +292,38 @@ def main(args):
                         labeltop=False, direction="in"
                     )
                     sub.set_ylim(-5, 5)
-                    main.set_xlim(0, meta.lmax)
-                for typ in types:
-                    main.errorbar(
-                        lb,
-                        conv*cells_dict_mean[typ][("coadd", map_set1,
-                                                   map_set2)][fp],
-                        yerr=conv*cells_dict_std[typ][("coadd", map_set1,
-                                                       map_set2)][fp],
-                        label=typ, marker=mst[typ], lw=0.7,
-                        c=colors[typ]
-                    )
+                    main.set_xlim(25, min(lmax_plot, meta.lmax))
                 else:
                     f, main = plt.subplots(1, 1, figsize=(10, 8))
                     main.set_xlabel(r"$\ell$", fontsize=15)
-                    main.set_xlim(0, meta.lmax)
+                    main.set_xlim(25, min(lmax_plot, meta.lmax))
+                for mtyp in map_types:
+                    coadd_typ = "auto" if mtyp == "noise" else "cross"
+                    main.errorbar(
+                        lb[mask],
+                        conv*cells_dict_mean[coadd_typ][(mtyp, map_set1, map_set2)][fp][mask],  # noqa: E501
+                        yerr=conv*cells_dict_std[coadd_typ][(mtyp, map_set1, map_set2)][fp][mask],  # noqa: E501
+                        label=mtyp, marker=mst[mtyp], lw=0.7,
+                        c=colors[mtyp]
+                    )
 
                 if fp == fp[::-1]:
                     main.set_yscale("log")
-                    if fp == "TT":
-                        main.set_ylim(1e-4, 1e7)
-                    elif fp == "EE":
-                        main.set_ylim(1e-8, 1e1)
-                    elif fp == "BB":
-                        main.set_ylim(1e-10, 1e1)
-                elif fp in ["TE", "ET"]:
-                    main.set_yscale("log")
-                    main.set_ylim(1e-8, 1e3)
+                    # if fp == "TT":
+                    #     main.set_ylim(1e-4, 1e7)
+                    # elif fp == "EE":
+                    #     main.set_ylim(1e-8, 1e1)
+                    # elif fp == "BB":
+                    #     main.set_ylim(1e-10, 1e1)
+                # elif fp in ["TE", "ET"]:
+                #     main.set_yscale("log")
+                    # main.set_ylim(1e-8, 1e3)
                 else:
                     main.axhline(0, color="k", linestyle="--")
-                    if fp in ["EB", "BE"]:
-                        main.set_ylim(-0.01, 0.01)
-                    else:
-                        main.set_ylim(-4, 4)
+                    # if fp in ["EB", "BE"]:
+                    #     main.set_ylim(-0.01, 0.01)
+                    # else:
+                    #     main.set_ylim(-4, 4)
                 main.set_ylabel(
                     r"$C_\ell^\mathrm{%s} \; [\mu K_\mathrm{CMB}^2]$" % fp,
                     fontsize=15
