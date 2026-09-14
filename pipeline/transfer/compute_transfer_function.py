@@ -29,24 +29,24 @@ def main(args):
         tf_settings["sim_id_start"]
     )
 
-    # Average the pseudo-cl matrices
-    pcls_mat_filtered_mean = cu.average_pcls_matrices(
-        pcls_mat_dict,
-        filtering_pairs,
-        filtered=True
-    )
-    pcls_mat_unfiltered_mean = cu.average_pcls_matrices(
-        pcls_mat_dict,
-        filtering_pairs,
-        filtered=False
-    )
-
     # Compute and save the transfer functions
+    mcm = cu.read_mcm(
+        f"{out_dir}/couplings/mcm.npz",
+        full_mcm=True
+    )
+    cl = np.load(
+        tf_settings["power_law_c_ell"]
+    )
+    _, cl = cl["l"], cl["cl"]
+
     trans = cu.get_transfer_dict(
-        pcls_mat_filtered_mean,
-        pcls_mat_unfiltered_mean,
         pcls_mat_dict,
-        filtering_pairs
+        filtering_pairs,
+        cl,
+        mcm,
+        nmt_bins,
+        compute_Dl=meta.compute_Dl,
+        tf_ordering=tf_settings["tf_ordering"]
     )
     full_tf = {}
     for ftag1, ftag2 in filtering_pairs:

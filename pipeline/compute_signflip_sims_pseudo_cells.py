@@ -87,7 +87,8 @@ def main(args):
             nmt_bins,
             transfer=transfer,
             compute_Dl=meta.compute_Dl,
-            beam=beam
+            beam=beam,
+            tf_ordering=meta.transfer_settings["tf_ordering"]
         )
         inv_couplings = inv_couplings.reshape([n_bins*9, n_bins*9])
         inv_couplings_beamed[ms1, ms2] = inv_couplings
