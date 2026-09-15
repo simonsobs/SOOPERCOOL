@@ -139,6 +139,7 @@ transfer_settings:
     ## Optional beams applied on TF validation sims
     tf_val_beams_list: []
 ```
+For details on how to validate transfer fucntions on simulations, see the `README.md` under `pipeline/transfer`.
 ___
 **IF RUNNING WITH FOURIER SPACE FILTERING**
 If you want to apply a Fourier-space filter on the maps, you'll also need to compute the associated transfer function. In this case, you'll first need to apply this $k$-space filter on simulations. This can be done running
@@ -164,43 +165,6 @@ Once you've computed the pure T/E/B spectra, you can estimate the power suppress
 ```bash
 python pipeline/transfer/compute_transfer_function.py --globals config_file.yaml
 ```
-___
-**K-SPACE VALIDATION**
-If you wish to run a quick validation using $k$-space filtering only, run
-```bash
-python pipeline/get_mode_coupling.py --globals config_file.yaml
-srun -n 20 -c 11 --cpu_bind=cores python pipeline/transfer/validate_transfer_function_kspace.py --globals config_file.yaml
-```
-which filters the TF estimation simulations on the fly using a kx20 filter, computes the transfer function, generates six sets of validation simulations (CMB signal-only, white noise, power-law signal-only, each with (E+B) and B-only signal), filters those, computes the TF-corrected decoupled power spectra, and compares them with the corresponding bandpower-convolved theory. Summary plots including chi2 statistics will be available under `{output_directory}/plots/cells_tf_val_kspace`.
-___
-**GENERAL VALIDATION**
-If you wish to validate the transfer function for general filtering settings, your config file must point to existing filtered and unfiltered simulations matching the existing transfer functions saved at disk. For example, the config may look like
-```yaml
-transfer_settings:
-  ## Path to existing transfer fucntions
-  transfer_directory: /path/to/existing/transfer_functions
-  ...
-  ## Path to the sims for TF validation
-  validation:
-    unfiltered_map_dir:
-      SATp1_f090_south_science: /path/to/unfiltered/cmb_sims
-      SATp1_f150_south_science: /path/to/unfiltered/cmb_sims
-    unfiltered_map_template:
-      SATp1_f090_south_science: "cmb_4arcmin_fwhm30_sim{id_sim:04d}_CAR.fits"
-      SATp1_f150_south_science: "cmb_4arcmin_fwhm30_sim{id_sim:04d}_CAR.fits"
-    filtered_map_dir:
-      SATp1_f090_south_science: /path/to/filtered/cmb_sims
-      SATp1_f150_south_science: /path/to/filtered/cmb_sims
-    filtered_map_template:
-      SATp1_f090_south_science: "cmb_4arcmin_fwhm30_sim{id_sim:04d}_CAR.fits"
-      SATp1_f150_south_science: "cmb_4arcmin_fwhm30_sim{id_sim:04d}_CAR.fits"
-```
-To compute power spectra and validate them, you then run
-```bash
-srun -n 20 -c 11 --cpu_bind=cores python pipeline/transfer/compute_pseudo_cells_tf_validation.py --globals config.yaml
-python pipeline/transfer/validate_transfer_function.py --globals config.yaml
-```
-which saves validation plots under `{output_directory}/plots/cells_tf_val`.
 
 ## Power spectra
 From this point, getting power spectra is quite straightforward, just run sequentially
