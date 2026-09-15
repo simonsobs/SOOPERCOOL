@@ -1,10 +1,12 @@
-import soopercool.map_utils as mu
-import numpy as np
 import os
+
+import camb
 import healpy as hp
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import cm
-import camb
+
+import soopercool.map_utils as mu
 
 
 def get_theory_cls(cosmo_params=None, lmax=4000, lmin=0, fwhm_amin=None,
@@ -588,7 +590,7 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
                         ax.ticklabel_format(axis="y", style="scientific",
                                             scilimits=(0, 0), useMathText=True)
 
-                ax.set_xlim(lmin, lmax)
+                ax.set_xlim(2, lmax)
                 ax.set_ylim(ylims[0], ylims[1])
                 if label is not None and id1 == 0 and id2 == npan - 1:
                     ax.legend(fontsize=10, bbox_to_anchor=[1, 1],

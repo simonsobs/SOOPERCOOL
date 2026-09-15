@@ -8,7 +8,7 @@ import os
 import time
 
 
-class BBmeta():
+class BBmeta:
     """
     Metadata manager for the BBmaster pipeline.
     The purpose of this class is to provide
@@ -336,28 +336,26 @@ class BBmeta():
         for ms1, ms2 in ps_names:
             cl_theory[ms1, ms2] = None
 
-        if hasattr(self, "fiducial_cmb"):
-            if self.fiducial_cmb is not None:
-                cmb_cl = hp.read_cl(self.fiducial_cmb)[:, :bins.lmax+1]
-                for ps in ps_names:
-                    cl_theory[ps] = cmb_cl
-        if hasattr(self, "fiducial_dust"):
-            if self.fiducial_dust is not None:
-                if "{nu1}" not in self.fiducial_dust:
-                    raise KeyError("self.fiducial_dust lacks {nu1} marker.")
-                if "{nu2}" not in self.fiducial_dust:
-                    raise KeyError("self.fiducial_dust lacks {nu2} marker.")
-                for ms1, ms2 in ps_names:
-                    dust_cl = hp.read_cl(
-                        self.fiducial_dust.format(
-                            nu1=self.get_freq_tag_from_map_set(ms1),
-                            nu2=self.get_freq_tag_from_map_set(ms2)
-                        )
-                    )[:, :bins.lmax+1]
-                if cl_theory[ms1, ms2]:
-                    cl_theory[ms1, ms2] += dust_cl
-                else:
-                    cl_theory = dust_cl
+        if hasattr(self, "fiducial_cmb") and self.fiducial_cmb is not None:
+            cmb_cl = hp.read_cl(self.fiducial_cmb)[:, :bins.lmax+1]
+            for ps in ps_names:
+                cl_theory[ps] = cmb_cl
+        if hasattr(self, "fiducial_dust") and self.fiducial_dust is not None:
+            if "{nu1}" not in self.fiducial_dust:
+                raise KeyError("self.fiducial_dust lacks {nu1} marker.")
+            if "{nu2}" not in self.fiducial_dust:
+                raise KeyError("self.fiducial_dust lacks {nu2} marker.")
+            for ms1, ms2 in ps_names:
+                dust_cl = hp.read_cl(
+                    self.fiducial_dust.format(
+                        nu1=self.get_freq_tag_from_map_set(ms1),
+                        nu2=self.get_freq_tag_from_map_set(ms2)
+                    )
+                )[:, :bins.lmax+1]
+            if cl_theory[ms1, ms2]:
+                cl_theory[ms1, ms2] += dust_cl
+            else:
+                cl_theory = dust_cl
         if hasattr(self, "fiducial_synch") and self.fiducial_synch is not None:
             if "{nu1}" not in self.fiducial_synch:
                 raise KeyError("self.fiducial_synch lacks {nu1} marker.")
@@ -378,7 +376,7 @@ class BBmeta():
         if all(x is None for x in cl_theory.values()):
             print("LOADING DEFAULT THEORY CLS "
                   "with 30arcmin FWHM Gaussian beam.")
-            _, cl_th = su.get_theory_cls()
+            _, cl_th = su.get_theory_cls(fwhm_amin=30.)
             for ps in ps_names:
                 cl_theory[ps] = cl_th
         else:

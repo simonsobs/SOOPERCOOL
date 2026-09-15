@@ -618,7 +618,7 @@ def template_from_map(map, ncomp, pix_type="hp"):
     """
     _check_pix_type(pix_type)
     if pix_type == "hp":
-        if map.shape > 1:
+        if map.ndim > 1:
             new_shape = (ncomp,) + map.shape[1:]
         else:
             new_shape = (ncomp, len(map))
