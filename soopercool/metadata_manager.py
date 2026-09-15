@@ -316,9 +316,14 @@ class BBmeta():
         """
         Load fiducial power spectra from healpy-like fits file indicated
         in the parameter file and coadds them.
+
+        NOTE: We assume they have been beam convolved with a 30 arcmin
+        Gaussian beam. We do not plan on generalizing this to multiple beams
+        as we expect the TF validation to not depend much on the beam.
+
         Accepted keys are "fiducial_cmb", "fiducial_dust", and "fiducial_synch"
         or a subset thereof. If no file is found, load Planck 2018 camb file
-        with r=0 and AL=1.
+        with r=0 and AL=1 and a Gaussian beam of 30 arcmin FWHM.
 
         Return
         ------
@@ -371,10 +376,15 @@ class BBmeta():
                 cl_theory = synch_cl
 
         if all(x is None for x in cl_theory.values()):
-            print("Loading default theory cls")
-            _, cl_th = su.get_theory_cls()  # Load default theory Cls
+            print("LOADING DEFAULT THEORY CLS "
+                  "with 30arcmin FWHM Gaussian beam.")
+            _, cl_th = su.get_theory_cls()
             for ps in ps_names:
                 cl_theory[ps] = cl_th
+        else:
+            print("LOADING CUSTOM THEORY CLS. "
+                  "IMPORTANT: Make sure these have been convolved with a "
+                  "30arcmin Gaussian beam, otherwise validation will fail.")
         return cl_theory
 
     def plot_dir_from_output_dir(self, out_dir):

@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from soopercool import ps_utils as pu
 from soopercool import coupling_utils as cu
 import soopercool.utils as su
-import os
 
 
 def main(args):
@@ -16,6 +15,14 @@ def main(args):
     The paths to read from must be given in the yaml under
     transfer['validation']. Both filtered and unfiltered sims must exist on
     disk. This supports any type of filtered simulations.
+
+    The validation is performed against the bandpower-coupled theory. For this
+    comparison to work, the input theory spectra need to be convolved with a
+    Gaussian beam of FWHM of 30 arcmin.
+
+    TODO: We currently have the capability to load CMB + foreground theory
+    spectra and CMB-only spectra. We plan to extend this to power-law and
+    other input spectral shapes.
 
     If you don't have access to a set of validation simulations, consider
     running `validate_transfer_function_kspace.py` for a quick and simple,
@@ -44,7 +51,14 @@ def main(args):
     BBmeta.make_dir(plot_dir)
 
     ps_pairs = meta.get_ps_names_list(type="all", coadd=True)
+    filtering_tag_pairs = meta.get_independent_filtering_pairs()
     fields = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
+
+    # NOTE: The hardcoded choice is a 30-arcminute Gaussian beam. We anticipate
+    # this choice to not affect the conclusions on the TF validation w.r.t.
+    # wider beams, but we should check explicitly when adding LF channels.
+    bl = su.beam_gaussian(np.arange(meta.lmax + 1), 30.*np.pi/180./60.)
+    beam = np.outer(bl, bl)
 
     # Load MCMs, transfer functions and compute coupling matrices
     # This avoid saving all products to disk and save disk space.
@@ -52,32 +66,30 @@ def main(args):
         f"{couplings_dir}/mcm.npz",
         full_mcm=True
     )
-    bpwins = {"filtered": {}, "unfiltered": {}}
+    bpwins = {}
     tfs = {}
     tfs_std = {}
 
-    for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
+    bpwins["unfiltered"], _ = cu.compute_couplings(
+        mcm,
+        nmt_bins,
+        transfer=None,
+        compute_Dl=meta.compute_Dl,
+        beam=beam
+    )
 
-        bpwin_fn = f"{couplings_dir}/bp_win_{ms1}_x_{ms2}.npz"
-        if os.path.isfile(bpwin_fn):
-            bpwins[ms1, ms2] = np.load(bpwin_fn)["bp_win"]
+    for ms1, ms2 in ps_pairs:
+        preproc_ftag1 = meta.filtering_tag_from_map_set(ms1)
+        preproc_ftag2 = meta.filtering_tag_from_map_set(ms2)
+        kspace_tag1 = meta.kspace_tag_from_map_set(ms1)
+        kspace_tag2 = meta.kspace_tag_from_map_set(ms2)
+        ftag1 = (preproc_ftag1, kspace_tag1)
+        ftag2 = (preproc_ftag2, kspace_tag2)
+
+        if (ftag1, ftag2) in bpwins:
+            # We only loop over distinct filtering combinations, not all
+            # map set pairs (those will have identical beam anyways).
             continue
-
-        _, bl1 = su.read_beam_from_file(
-            "/".join([
-                meta.beam_dir_from_map_set(ms1),
-                meta.beam_file_from_map_set(ms1)
-            ]),
-            lmax=meta.lmax
-        )
-        _, bl2 = su.read_beam_from_file(
-            "/".join([
-                meta.beam_dir_from_map_set(ms2),
-                meta.beam_file_from_map_set(ms2)
-            ]),
-            lmax=meta.lmax
-        )
-        beam = np.outer(bl1, bl2)
 
         transfer, transfer_std = cu.load_transfer_function(
             meta.transfer_settings["transfer_directory"],
@@ -87,19 +99,12 @@ def main(args):
             nmt_bins,
             return_std=True
         )
-        tfs[ms1, ms2] = transfer
-        tfs_std[ms1, ms2] = transfer_std
-        bpwins["filtered"][ms1, ms2], _ = cu.compute_couplings(
+        tfs[ftag1, ftag2] = transfer
+        tfs_std[ftag1, ftag2] = transfer_std
+        bpwins[ftag1, ftag2], _ = cu.compute_couplings(
             mcm,
             nmt_bins,
             transfer=transfer,
-            compute_Dl=meta.compute_Dl,
-            beam=beam
-        )
-        bpwins["unfiltered"][ms1, ms2], _ = cu.compute_couplings(
-            mcm,
-            nmt_bins,
-            transfer=None,
             compute_Dl=meta.compute_Dl,
             beam=beam
         )
@@ -110,37 +115,35 @@ def main(args):
     ftypes = ["filtered", "unfiltered"]
 
     cls_dict = {
-        (ftype, ms1, ms2, fp): []
+        (ftype, ftag1, ftag2, fp): []
         for fp in fields
         for ftype in ftypes
-        for ms1, ms2 in ps_pairs
+        for ftag1, ftag2 in filtering_tag_pairs
     }
 
     for ftype in ftypes:
-        for ms1, ms2 in ps_pairs:
-            preproc_ftag1 = meta.filtering_tag_from_map_set(ms1)
-            kspace_tag1 = meta.kspace_tag_from_map_set(ms1)
-            preproc_ftag2 = meta.filtering_tag_from_map_set(ms2)
-            kspace_tag2 = meta.kspace_tag_from_map_set(ms2)
+        for ftag1, ftag2 in filtering_tag_pairs:
+            preproc_ftag1, kspace_tag1 = ftag1
+            preproc_ftag2, kspace_tag2 = ftag2
             for id_sim in range(nsims):
                 cls = np.load(f"{cl_dir}/cls_tf_val_{preproc_ftag1}_{kspace_tag1}_x_{preproc_ftag2}_{kspace_tag2}_{ftype}_{id_sim:04d}.npz")  # noqa: E501
                 for fp in fields:
-                    cls_dict[ftype, ms1, ms2, fp] += [cls[fp]]
+                    cls_dict[ftype, ftag1, ftag2, fp] += [cls[fp]]
 
     # Compute mean and std
     cls_mean_dict = {
-        (ftype, ms1, ms2, fp):
-        np.mean(cls_dict[ftype, ms1, ms2, fp], axis=0)
+        (ftype, ftag1, ftag2, fp):
+        np.mean(cls_dict[ftype, ftag1, ftag2, fp], axis=0)
         for ftype in ftypes
         for fp in fields
-        for ms1, ms2 in ps_pairs
+        for ftag1, ftag2 in filtering_tag_pairs
     }
     cls_std_dict = {
-        (ftype, ms1, ms2, fp):
-        np.std(cls_dict[ftype, ms1, ms2, fp], axis=0)
+        (ftype, ftag1, ftag2, fp):
+        np.std(cls_dict[ftype, ftag1, ftag2, fp], axis=0)
         for ftype in ftypes
         for fp in fields
-        for ms1, ms2 in ps_pairs
+        for ftag1, ftag2 in filtering_tag_pairs
     }
 
     # Compute the bandpower-convolved theory spectra for (un)filtered sims.
@@ -148,13 +151,24 @@ def main(args):
     cls_theory_binned = {"filtered": {}, "unfiltered": {}}
 
     for ftype in ["filtered", "unfiltered"]:
+
         for ms1, ms2 in ps_pairs:
-            cls_theory_binned[ftype][ms1, ms2] = pu.bin_theory_cls(
-                cls_theory[ms1, ms2], bpwins[ftype][ms1, ms2]
+            preproc_ftag1 = meta.filtering_tag_from_map_set(ms1)
+            preproc_ftag2 = meta.filtering_tag_from_map_set(ms2)
+            kspace_tag1 = meta.kspace_tag_from_map_set(ms1)
+            kspace_tag2 = meta.kspace_tag_from_map_set(ms2)
+            ftag1 = (preproc_ftag1, kspace_tag1)
+            ftag2 = (preproc_ftag2, kspace_tag2)
+
+            cls_theory_binned[ftype][ftag1, ftag2] = pu.bin_theory_cls(
+                cls_theory[ms1, ms2], bpwins[ftype][ftag1, ftag2]
             )
 
     # Make plots
-    for ms1, ms2 in ps_pairs:
+    for ftag1, ftag2 in filtering_tag_pairs:
+        preproc_ftag1, kspace_tag1 = ftag1
+        preproc_ftag2, kspace_tag2 = ftag2
+
         plt.figure(figsize=(16, 16))
         grid = plt.GridSpec(9, 3, hspace=0.3, wspace=0.3)
 
@@ -168,12 +182,12 @@ def main(args):
                 # Plot theory
                 main.plot(
                     lb[lb_msk],
-                    cb2db[lb_msk]*cls_theory_binned["unfiltered"][ms1, ms2][spec][lb_msk],  # noqa: E501
+                    cb2db[lb_msk]*cls_theory_binned["unfiltered"][ftag1, ftag2][spec][lb_msk],  # noqa: E501
                     color="darkorange", ls="--", alpha=0.6
                 )
                 main.plot(
                     lb[lb_msk],
-                    cb2db[lb_msk]*cls_theory_binned["filtered"][ms1, ms2][spec][lb_msk],  # noqa: E501
+                    cb2db[lb_msk]*cls_theory_binned["filtered"][ftag1, ftag2][spec][lb_msk],  # noqa: E501
                     color="navy", ls="--", alpha=0.6
                 )
                 main.plot([], [], "k.", label="Simulations")
@@ -183,8 +197,8 @@ def main(args):
                 # Plot filtered & unfiltered (decoupled)
                 main.errorbar(
                     lb[lb_msk]-offset,
-                    cb2db[lb_msk]*cls_mean_dict["unfiltered", ms1, ms2, spec][lb_msk],  # noqa: E501
-                    cb2db[lb_msk]*cls_std_dict["unfiltered", ms1, ms2, spec][lb_msk],  # noqa: E501
+                    cb2db[lb_msk]*cls_mean_dict["unfiltered", ftag1, ftag2, spec][lb_msk],  # noqa: E501
+                    cb2db[lb_msk]*cls_std_dict["unfiltered", ftag1, ftag2, spec][lb_msk],  # noqa: E501
                     color="navy",
                     marker=".",
                     markerfacecolor="white",
@@ -193,8 +207,8 @@ def main(args):
                 )
                 main.errorbar(
                     lb[lb_msk]+offset,
-                    cb2db[lb_msk]*cls_mean_dict["filtered", ms1, ms2, spec][lb_msk],  # noqa: E501
-                    cb2db[lb_msk]*cls_std_dict["filtered", ms1, ms2, spec][lb_msk],  # noqa: E501
+                    cb2db[lb_msk]*cls_mean_dict["filtered", ftag1, ftag2, spec][lb_msk],  # noqa: E501
+                    cb2db[lb_msk]*cls_std_dict["filtered", ftag1, ftag2, spec][lb_msk],  # noqa: E501
                     color="darkorange",
                     marker=".",
                     markerfacecolor="white",
@@ -205,13 +219,13 @@ def main(args):
                     main.set_yscale("log")
 
                 # Plot residuals
-                res_unf = (cls_mean_dict["unfiltered", ms1, ms2, spec] -
-                           cls_theory_binned["unfiltered"][ms1, ms2][spec])
-                res_unf /= ((cls_std_dict["unfiltered", ms1, ms2, spec]
+                res_unf = (cls_mean_dict["unfiltered", ftag1, ftag2, spec] -
+                           cls_theory_binned["unfiltered"][ftag1, ftag2][spec])
+                res_unf /= ((cls_std_dict["unfiltered", ftag1, ftag2, spec]
                              / np.sqrt(nsims)))
-                res_f = (cls_mean_dict["filtered", ms1, ms2, spec] -
-                         cls_theory_binned["filtered"][ms1, ms2][spec])
-                res_f /= ((cls_std_dict["filtered", ms1, ms2, spec]
+                res_f = (cls_mean_dict["filtered", ftag1, ftag2, spec] -
+                         cls_theory_binned["filtered"][ftag1, ftag2][spec])
+                res_f /= ((cls_std_dict["filtered", ftag1, ftag2, spec]
                            / np.sqrt(nsims)))
 
                 sub.axhspan(-3, 3, color="k", alpha=0.2)
@@ -277,10 +291,10 @@ def main(args):
                 # We cut every low-ell bin whose TF is negative or measured
                 # at less than 2 sigma.
                 # We also cut all bins centered below ell of 30.
-                transfer = tfs[ms1, ms2][fields.index(f1+f2),
-                                         fields.index(f1+f2), :]
-                transfer_std = tfs_std[ms1, ms2][fields.index(f1+f2),
-                                                 fields.index(f1+f2), :]
+                transfer = tfs[ftag1, ftag2][fields.index(f1+f2),
+                                             fields.index(f1+f2), :]
+                transfer_std = tfs_std[ftag1, ftag2][fields.index(f1+f2),
+                                                     fields.index(f1+f2), :]
                 tf_zscore = transfer / transfer_std
                 good = tf_zscore > 2.
 
@@ -304,7 +318,7 @@ def main(args):
                         r"$\Delta C_\ell / (\sigma/\sqrt{N_\mathrm{sims}})$",
                         fontsize=13
                     )
-        plt.savefig(f"{plot_dir}/cls_{ms1}_x_{ms2}.pdf", bbox_inches="tight")
+        plt.savefig(f"{plot_dir}/cls_{preproc_ftag1}_{kspace_tag1}_x_{preproc_ftag2}_{kspace_tag2}.pdf", bbox_inches="tight")  # noqa: E501
     print(f"Validation plots saved at {plot_dir}.")
 
 

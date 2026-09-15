@@ -34,10 +34,9 @@ def main(args):
     nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
     n_bins = nmt_bins.get_n_bands()
-    ps_pairs = meta.get_ps_names_list(type="all", coadd=True)
 
     if "validation" not in meta.transfer_settings:
-        raise KeyError("Subsection 'transfer.validation' in config missing.")
+        raise KeyError("Subsection transfer['validation'] in config missing.")
 
     validation_dict = meta.transfer_settings["validation"]
     simdir_unfiltered = validation_dict["unfiltered_map_dir"]
@@ -64,31 +63,36 @@ def main(args):
     sim_id_start = 0 if "sim_id_start" not in tf_settings else tf_settings["sim_id_start"]  # noqa
     sim_ids = range(sim_id_start, tf_settings["tf_val_num_sims"]+sim_id_start)
 
+    # NOTE: The hardcoded choice is a 30-arcminute Gaussian beam. We anticipate
+    # this choice to not affect the conclusions on the TF validation w.r.t.
+    # wider beams, but we should check explicitly when adding LF channels.
+    bl = su.beam_gaussian(np.arange(meta.lmax + 1), 30.*np.pi/180./60.)
+
     # Load MCMs, transfer functions and compute coupling matrices
     # This avoid saving all products to disk and save disk space.
     mcm = cu.read_mcm(
         f"{couplings_dir}/mcm.npz",
         full_mcm=True
     )
+
+    filtering_tags = meta.get_filtering_tags()
+    filtering_tag_pairs = meta.get_independent_filtering_pairs()
+
     inv_couplings = {}
     for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
+        preproc_ftag1 = meta.filtering_tag_from_map_set(ms1)
+        preproc_ftag2 = meta.filtering_tag_from_map_set(ms2)
+        kspace_tag1 = meta.kspace_tag_from_map_set(ms1)
+        kspace_tag2 = meta.kspace_tag_from_map_set(ms2)
+        ftag1 = (preproc_ftag1, kspace_tag1)
+        ftag2 = (preproc_ftag2, kspace_tag2)
 
-        _, bl1 = su.read_beam_from_file(
-            "/".join([
-                meta.beam_dir_from_map_set(ms1),
-                meta.beam_file_from_map_set(ms1)
-            ]),
-            lmax=meta.lmax
-        )
-        _, bl2 = su.read_beam_from_file(
-            "/".join([
-                meta.beam_dir_from_map_set(ms2),
-                meta.beam_file_from_map_set(ms2)
-            ]),
-            lmax=meta.lmax
-        )
-        print("bl", ms1, ms2, bl1[:10])
-        beam = np.outer(bl1, bl2)
+        if (ftag1, ftag2) in inv_couplings:
+            # We only loop over distinct filtering combinations, not all
+            # map set pairs (those will have identical beam anyways).
+            continue
+
+        beam = np.outer(bl, bl)
 
         transfer = cu.load_transfer_function(
             meta.transfer_settings["transfer_directory"],
@@ -113,11 +117,10 @@ def main(args):
         )
         inv_couplings_fil = inv_couplings_fil.reshape([n_bins*9, n_bins*9])
         inv_couplings_unf = inv_couplings_unf.reshape([n_bins*9, n_bins*9])
-        inv_couplings["filtered", ms1, ms2] = inv_couplings_fil
-        inv_couplings["unfiltered", ms1, ms2] = inv_couplings_unf
-
-    filtering_tags = meta.get_filtering_tags()
-    filtering_tag_pairs = meta.get_independent_filtering_pairs()
+        inv_couplings[ftag1, ftag2] = {
+            "filtered": inv_couplings_fil,
+            "unfiltered": inv_couplings_unf
+        }
 
     if (None, None) in filtering_tags and len(filtering_tags) < 1:
         raise ValueError("There must be at least one filter \
@@ -228,41 +231,32 @@ def main(args):
                 }
 
         # Computing power spectra
-        for ms1, ms2 in ps_pairs:
-            preproc_ftag1 = meta.filtering_tag_from_map_set(ms1)
-            kspace_tag1 = meta.kspace_tag_from_map_set(ms1)
-            preproc_ftag2 = meta.filtering_tag_from_map_set(ms2)
-            kspace_tag2 = meta.kspace_tag_from_map_set(ms2)
-            if ((preproc_ftag1, kspace_tag1) != ftag1 or (preproc_ftag2, kspace_tag2) != ftag2):  # noqa: E501
-                continue
+        if verbose:
+            print(f" Power spectrum for {ftag1} x {ftag2}")
 
-            if verbose:
-                print(f" Power spectrum for {ftag1} x {ftag2}")
+        pcls_filtered = pu.get_coupled_pseudo_cls(
+            fields[ftag1]["filtered"],
+            fields[ftag2]["filtered"],
+            nmt_bins
+        )
+        pcls_unfiltered = pu.get_coupled_pseudo_cls(
+            fields[ftag1]["unfiltered"],
+            fields[ftag2]["unfiltered"],
+            nmt_bins
+        )
+        decoupled_cls_filtered = pu.decouple_pseudo_cls(
+            pcls_filtered, inv_couplings[ftag1, ftag2]["filtered"]
+        )
+        decoupled_cls_unfiltered = pu.decouple_pseudo_cls(
+            pcls_unfiltered, inv_couplings[ftag1, ftag2]["unfiltered"]
+        )
+        out_f = f"{cls_tf_val_dir}/cls_tf_val_{ftag1[0]}_{ftag1[1]}_x_{ftag2[0]}_{ftag2[1]}_filtered_{id_sim:04d}.npz"  # noqa
+        out_unf = f"{cls_tf_val_dir}/cls_tf_val_{ftag1[0]}_{ftag1[1]}_x_{ftag2[0]}_{ftag2[1]}_unfiltered_{id_sim:04d}.npz"  # noqa
 
-            pcls_filtered = pu.get_coupled_pseudo_cls(
-                fields[ftag1]["filtered"],
-                fields[ftag2]["filtered"],
-                nmt_bins
-            )
-            pcls_unfiltered = pu.get_coupled_pseudo_cls(
-                fields[ftag1]["unfiltered"],
-                fields[ftag2]["unfiltered"],
-                nmt_bins
-            )
-            decoupled_cls_filtered = pu.decouple_pseudo_cls(
-                pcls_filtered, inv_couplings["filtered", ms1, ms2]
-            )
-            decoupled_cls_unfiltered = pu.decouple_pseudo_cls(
-                pcls_unfiltered, inv_couplings["unfiltered", ms1, ms2]
-            )
+        np.savez(out_f, **decoupled_cls_filtered, lb=lb)
+        np.savez(out_unf, **decoupled_cls_unfiltered, lb=lb)
 
-            out_f = f"{cls_tf_val_dir}/cls_tf_val_{ftag1[0]}_{ftag1[1]}_x_{ftag2[0]}_{ftag2[1]}_filtered_{id_sim:04d}.npz"  # noqa
-            out_unf = f"{cls_tf_val_dir}/cls_tf_val_{ftag1[0]}_{ftag1[1]}_x_{ftag2[0]}_{ftag2[1]}_unfiltered_{id_sim:04d}.npz"  # noqa
-
-            np.savez(out_f, **decoupled_cls_filtered, lb=lb)
-            np.savez(out_unf, **decoupled_cls_unfiltered, lb=lb)
-
-        comm.Barrier()
+    comm.Barrier()
 
 
 if __name__ == "__main__":
