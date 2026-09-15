@@ -52,10 +52,13 @@ def main(args):
         tf_settings["tf_est_num_sims"],
     )
     do_tf_val = False
+    # Validation is an optional subsection in the yaml file structure. It
+    # points to unfiltered and filtered simulations with known input that we
+    # compute the TF-corrected decoupled power spectra of. If this section
+    # exists, the kspace filtering script filters those as well.
     if "validation" in tf_settings:
-        if tf_settings["validation"] is not None:
-            n_sims_val = tf_settings["tf_val_num_sims"]
-            do_tf_val = True
+        n_sims_val = tf_settings["tf_val_num_sims"]
+        do_tf_val = True
 
     pure_types = [f"pure{f}" for f in "TEB"]
 
@@ -77,11 +80,11 @@ def main(args):
             )
 
         print("  Filtering TF estimation sims")
-        f_prefix = {True: "un", False: ""}[args.apply_on_unfiltered]
-        map_dir = tf_settings[f"{f_prefix}filtered_map_dir"][ftag]
+        which_map = "unfiltered_map" if args.apply_on_unfiltered else "filtered_map"  # noqa: E501
+        map_dir = tf_settings[f"{which_map}_dir"][ftag]
         for id_sim in range(id_start, id_start + n_sims_est):
             for pure_type in pure_types:
-                fname = tf_settings[f"{f_prefix}filtered_map_template"][ftag].format(  # noqa: E501
+                fname = tf_settings[f"{which_map}_template"][ftag].format(
                     pure_type=pure_type, id_sim=id_sim
                 )
                 path = f"{map_dir}/{fname}"
@@ -90,10 +93,10 @@ def main(args):
             continue
 
         print("  Filtering TF validation sims")
-        map_dir = tf_settings["validation"][f"{f_prefix}filtered_map_dir"][ftag]  # noqa: E501
+        map_dir = tf_settings["validation"][f"{which_map}_dir"][ftag]
         for id_sim in range(id_start, id_start + n_sims_val):
             for pure_type in pure_types:
-                fname = tf_settings["validation"][f"{f_prefix}filtered_map_template"][ftag].format(  # noqa: E501
+                fname = tf_settings["validation"][f"{which_map}_template"][ftag].format(  # noqa: E501
                     id_sim=id_sim
                 )
                 path = f"{map_dir}/{fname}"
@@ -114,9 +117,6 @@ def main(args):
         )
         m *= kspace_mask
 
-        # TODO: need to add a step before to mask noisy edges of the map
-        # with bright pixels which makes the filtering more stable
-        # Maybe using the binary + galactic mask is enough for this!
         m_filtered = sfft.kspace_filter(
             m,
             pix_type=meta.pix_type,
