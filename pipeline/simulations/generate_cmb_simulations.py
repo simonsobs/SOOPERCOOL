@@ -1,12 +1,13 @@
+import os
+
 import healpy as hp
+import matplotlib.pyplot as plt
 import numpy as np
 import pymaster as nmt
-import os
+import soopercool.utils as ut
 from soopercool import BBmeta
 from soopercool import map_utils as mu
 from soopercool import sim_utils as su
-import soopercool.utils as ut
-import matplotlib.pyplot as plt
 
 
 def main(args):
@@ -18,7 +19,8 @@ def main(args):
     template. Applies a 30-arcmin Gaussian beam.
 
     Important command line arguments are:
-    - "--out_dir": output directory for sims
+    - "--out_dir": output directory for sims. Defaults to
+                   f"{out_dir}/sims_tf_val"
     - "--n_sims": number of simulations to be generated
     - "--sim_id_start": first sim ID (defaults to 0)
 
@@ -33,17 +35,24 @@ def main(args):
     nside = None if pix_type == "car" else meta.nside
 
     do_plots = not args.no_plots
-    n_sims = args.n_sims
+    if args.n_sims is None:
+        n_sims = meta.transfer_settings["tf_val_num_sims"]
+    else:
+        n_sims = args.n_sims
     id_start = args.sim_id_start
 
-    out_dir = args.out_dir
-    if not os.path.isdir(out_dir):
-        raise ValueError(f"Directory does not exist: {out_dir}")
+    if args.out_dir is None:
+        tf_val_dir = f"{meta.output_directory}/sims_tf_val"
+        BBmeta.make_dir(tf_val_dir)
+    else:
+        if not os.path.isdir(args.out_dir):
+            raise ValueError(f"Directory does not exist: {args.out_dir}")
+        tf_val_dir = args.out_dir
 
     mask = mu.read_map(meta.masks["analysis_mask"],
                        pix_type=meta.pix_type,
                        car_template=meta.car_template)
-    shape, wcs = (mask.shape, mask.wcs)
+    shape, wcs = meta.get_geometry()
     template = mu.template_from_map(mask, ncomp=3, pix_type=meta.pix_type)
 
     cosmo = {
@@ -61,7 +70,7 @@ def main(args):
     # this choice to not affect the conclusions on the TF validation w.r.t.
     # wider beams, but we should check explicitly when adding LF channels.
     lth, clth = ut.get_theory_cls(cosmo_params=cosmo, lmax=lmax, fwhm_amin=30.)
-    np.savez(f"{out_dir}/cl_cmb_fwhm30.fits", l=lth, **clth)
+    np.savez(f"{tf_val_dir}/cl_cmb_fwhm30.fits", l=lth, **clth)
 
     if do_plots:
         ls = np.arange(2, lmax+1)
@@ -82,11 +91,11 @@ def main(args):
         if pix_type == "car":
             res_arcmin = np.min(np.abs(wcs.wcs.cdelt))*60.
             res_label = f"{int(res_arcmin):2d}arcmin"
-        fn_sim = f"{out_dir}/cmb_{res_label}_fwhm30_sim{id_sim:04d}_{pix_type.upper()}.fits"  # noqa: E501
+        fn_sim = f"{tf_val_dir}/cmb_{res_label}_fwhm30_sim{id_sim:04d}_{pix_type.upper()}.fits"  # noqa: E501
         mu.write_map(fn_sim, sim, pix_type=pix_type)
         if do_plots:
             mask_ones = np.ones(shape)
-            f = nmt.NmtField(mask_ones, sim[-2:], spin=2, wcs=wcs, lmax=lmax)
+            f = nmt.NmtField(mask_ones, sim[1:], spin=2, wcs=wcs, lmax=lmax)
             cls += [wsp.decouple_cell(nmt.compute_coupled_cell(f, f))]
     if do_plots:
         _, (ax1, ax2) = plt.subplots(nrows=2, sharex=True,
@@ -106,9 +115,9 @@ def main(args):
         ax1.set_ylabel(r"$C_\ell$")
         ax2.set_xlabel(r"$\ell$")
         ax1.set_yscale("log")
-        plt.savefig(f"{out_dir}/sim_pcls.pdf", bbox_inches="tight")
+        plt.savefig(f"{tf_val_dir}/sim_pcls.pdf", bbox_inches="tight")
         if verbose:
-            print(f"Plot saved to {out_dir}/sim_pcls.pdf")
+            print(f"Plot saved to {tf_val_dir}/sim_pcls.pdf")
 
 
 if __name__ == "__main__":
@@ -118,12 +127,17 @@ if __name__ == "__main__":
         "--globals", help="Path to the global parameter file."
     )
     parser.add_argument(
-        "--out_dir", help="Output directory"
+        "--out_dir",
+        help="Output directory. Defaults to "
+        "{meta.output_directory}/sims_tf_val",
+        default=None
     )
     parser.add_argument(
         "--n_sims",
         type=int,
-        help="Number of simulations"
+        help="Number of simulations. "
+             "Defaults to meta.transfer_settings['tf_val_num_sims'].",
+        default=None
     )
     parser.add_argument(
         "--sim_id_start",

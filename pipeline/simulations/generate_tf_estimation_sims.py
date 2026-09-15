@@ -1,10 +1,9 @@
 import argparse
-from soopercool import BBmeta, utils
-from soopercool import mpi_utils as mpi
-from soopercool import map_utils as mu
-from soopercool import sim_utils
-from pixell import enplot
+
 import numpy as np
+from soopercool import BBmeta, sim_utils, utils
+from soopercool import map_utils as mu
+from soopercool import mpi_utils as mpi
 
 
 def main(args):
@@ -123,13 +122,10 @@ def main(args):
                     pix_type=meta.pix_type
                 )
                 if do_plots:
-                    for i, mode in zip([0, 1, 2], "TQU"):
-                        plot = enplot.plot(sims[f"pure{f}"][i], ticks=10,
-                                           color="planck")
-                        plot_fn = f"{'.'.join(fname.split('.')[:-1])}_{mode}"
-                        enplot.write(f"{fdir}/{plot_fn}", plot)
-                        if verbose:
-                            print(f"  PLOT {fdir}/{plot_fn}.png")
+                    plot_fn = f"{'.'.join(fname.split('.')[:-1])}"
+                    mu.plot_map(sims[f"pure{f}"],
+                                file_name=f"{fdir}/{plot_fn}",
+                                pix_type=meta.pix_type)
 
 
 if __name__ == "__main__":
