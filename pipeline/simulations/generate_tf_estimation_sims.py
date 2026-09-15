@@ -46,37 +46,29 @@ def main(args):
     # MPI related initialization
     rank, _, _ = mpi.init(True)
 
-    if tf_settings["tf_est_beams_list"]:
-        sim_dirs = {
-            beam: tf_settings.unfiltered_map_dir[beam]
-            for beam in tf_settings["beam_list"]
-        }
-        sim_templates = {
-            beam: tf_settings.unfiltered_map_template[beam]
-            for beam in tf_settings["beam_list"]
-        }
-        beams = {}
-        for beam_label in tf_settings["tf_est_beams_list"]:
-            _, bl = meta.read_beam(beam_label, lmax=lmax_sim)
-            beams[beam_label] = bl
-    else:
-        if rank == 0:
-            print("Using Gaussian beam of FWHM 30 arcmin and low pass at "
-                  "ell=650")
-        sim_dirs = {
-            "fwhm30": next(iter(tf_settings["unfiltered_map_dir"].values()))
-        }
-        sim_templates = {
-            "fwhm30":
-            next(iter(tf_settings["unfiltered_map_template"].values()))
-        }
+    if rank == 0:
+        print("Using Gaussian beam of FWHM 30 arcmin")
 
-        # The default beam is a 30-arcminute Gaussian beam bandlimited at
-        # lmax=650
-        beam = (utils.bandlim_sine2(np.arange(lmax_sim + 1), 650, 50) *
-                utils.beam_gaussian(np.arange(lmax_sim + 1),
-                                    30.*np.pi/180./60.))
-        beams = {"fwhm30": beam}
+    # The hardcoded choice is a 30-arcminute Gaussian beam. We anticipate
+    # this choice to not affect the validity of the TF approximation.
+    beam = (
+        utils.beam_gaussian(np.arange(lmax_sim + 1), 30.*np.pi/180./60.)
+        # NOTE: We previously applied a sine-shaped bandlimit function
+        # as an alternative to the Gaussian beam (this was the choice for
+        # SAT ISO v2--v4) to avoid pixel aliasing. This set high multpoles
+        # to zero and led to numerical instability in the mode coupling
+        # matrix calculation, so we changed this.
+        # utils.bandlim_sine2(np.arange(lmax_sim + 1), 650, 50)
+    )
+    beams = {"fwhm30": beam}
+
+    sim_dirs = {
+        "fwhm30": next(iter(tf_settings["unfiltered_map_dir"].values()))
+    }
+    sim_templates = {
+        "fwhm30":
+        next(iter(tf_settings["unfiltered_map_template"].values()))
+    }
 
     mask = mu.read_map(meta.masks["analysis_mask"],
                        pix_type=meta.pix_type,
@@ -88,7 +80,7 @@ def main(args):
     for sim_dir in sim_dirs.values():
         BBmeta.make_dir(sim_dir)
         np.savez(f"{sim_dir}/cl_power_law_tf_est.npz",
-                 ell=lth, **cl_power_law_tf_est)
+                 l=lth, cl=cl_power_law_tf_est["TT"] * beam**2)
 
     template = mu.template_from_map(mask, ncomp=3, pix_type=meta.pix_type)
 

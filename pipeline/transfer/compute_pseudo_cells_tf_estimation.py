@@ -11,6 +11,10 @@ from pixell import enmap
 
 def main(args):
     """
+    This script computes the (binned and, optionally, unbinned) coupled
+    power spectra of the filtered-masked and masked TF estimation simulations,
+    and saves them in npz files. Running this script is a prerequisite for
+    `compute_transfer_function.py`.
     """
     rank, size, comm = mpi.init(True)
 

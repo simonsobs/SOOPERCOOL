@@ -15,9 +15,7 @@ def main(args):
     soopercool yaml.
 
     Requires masks["analysis_mask"] from SOOPERCOOL yaml as a geometry
-    template. Loops over all beams in transfer_settings['tf_val_beams_list'];
-    if the list in empty, applies 30-arcmin Gaussian beam and low-pass at
-    ell=650.
+    template. Applies a 30-arcmin Gaussian beam.
 
     Important command line arguments are:
     - "--out_dir": output directory for sims
@@ -25,7 +23,7 @@ def main(args):
     - "--sim_id_start": first sim ID (defaults to 0)
 
     Saves simulations under
-    "{out_dir}/cmb_{res_label}_{beamlab}_sim{id_sim:04d}_{CAR}.fits".
+    "{out_dir}/cmb_{res_label}_fwhm30_sim{id_sim:04d}_{CAR}.fits".
     Optionally plots decoupled sim CLs to "{out_dir}/sim_pcls.pdf".
     """
     meta = BBmeta(args.globals)
@@ -41,14 +39,6 @@ def main(args):
     out_dir = args.out_dir
     if not os.path.isdir(out_dir):
         raise ValueError(f"Directory does not exist: {out_dir}")
-    tf_settings = meta.transfer_settings
-    beams = {None: None}
-
-    if tf_settings["tf_est_beams_list"]:
-        beams = {}
-        for beam_label in tf_settings["tf_est_beams_list"]:
-            _, bl = meta.read_beam(beam_label, lmax=lmax)
-            beams[beam_label] = bl
 
     mask = mu.read_map(meta.masks["analysis_mask"],
                        pix_type=meta.pix_type,
@@ -67,7 +57,11 @@ def main(args):
        "r": 0.0,
     }
 
-    _, clth = ut.get_theory_cls(cosmo_params=cosmo, lmax=lmax)
+    # NOTE: The hardcoded choice is a 30-arcminute Gaussian beam. We anticipate
+    # this choice to not affect the conclusions on the TF validation w.r.t.
+    # wider beams, but we should check explicitly when adding LF channels.
+    lth, clth = ut.get_theory_cls(cosmo_params=cosmo, lmax=lmax, fwhm_amin=30.)
+    np.savez(f"{out_dir}/cl_cmb_fwhm30.fits", l=lth, **clth)
 
     if do_plots:
         ls = np.arange(2, lmax+1)
@@ -80,29 +74,20 @@ def main(args):
         np.random.seed(id_sim)
         almsTEB = hp.synalm([clth["TT"], clth["TE"], clth["EE"], clth["BB"]],
                             lmax=lmax)
-        for beam_label, bl in beams.items():
-            if verbose:
-                print(f"  # {id_sim} | {beam_label}")
+        if verbose:
+            print(f"  # {id_sim} | fwhm30")
 
-            if beam_label is not None:
-                almsTEB_post = su.beam_alms(almsTEB.copy(), bl)
-            else:
-                almsTEB_post = almsTEB
-            sim = su.get_map_from_alms(almsTEB_post, template=template)
-            beamlab = beam_label
-            if beam_label is None:
-                beamlab = "nobeam"
-            res_label = f"nside{nside}"
-            if pix_type == "car":
-                res_arcmin = np.min(np.abs(wcs.wcs.cdelt))*60.
-                res_label = f"{int(res_arcmin):2d}arcmin"
-            fn_sim = f"{out_dir}/cmb_{res_label}_{beamlab}_sim{id_sim:04d}_{pix_type.upper()}.fits"  # noqa: E501
-            mu.write_map(fn_sim, sim, pix_type=pix_type)
-            if do_plots:
-                mask_ones = np.ones(shape)
-                f = nmt.NmtField(mask_ones, sim[-2:], spin=2, wcs=wcs,
-                                 lmax=lmax)
-                cls += [wsp.decouple_cell(nmt.compute_coupled_cell(f, f))]
+        sim = su.get_map_from_alms(almsTEB, template=template)
+        res_label = f"nside{nside}"
+        if pix_type == "car":
+            res_arcmin = np.min(np.abs(wcs.wcs.cdelt))*60.
+            res_label = f"{int(res_arcmin):2d}arcmin"
+        fn_sim = f"{out_dir}/cmb_{res_label}_fwhm30_sim{id_sim:04d}_{pix_type.upper()}.fits"  # noqa: E501
+        mu.write_map(fn_sim, sim, pix_type=pix_type)
+        if do_plots:
+            mask_ones = np.ones(shape)
+            f = nmt.NmtField(mask_ones, sim[-2:], spin=2, wcs=wcs, lmax=lmax)
+            cls += [wsp.decouple_cell(nmt.compute_coupled_cell(f, f))]
     if do_plots:
         _, (ax1, ax2) = plt.subplots(nrows=2, sharex=True,
                                      height_ratios=[3, 1])
