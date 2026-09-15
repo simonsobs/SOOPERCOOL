@@ -122,6 +122,7 @@ def get_transfer_dict(mean_pcls_mat_filt_dict,
                 tf_dict[ftag1, ftag2][f"{fp2}_to_{fp1}"] = tf[i, j]
                 tf_dict[ftag1, ftag2][f"{fp2}_to_{fp1}_std"] = tferr[i, j]
         tf_dict[ftag1, ftag2]["full_tf"] = tf
+        tf_dict[ftag1, ftag2]["full_tf_std"] = tferr
 
     return tf_dict
 
@@ -284,11 +285,7 @@ def load_transfer_function(transfer_dir, ms1, ms2,
     tf_full = tf_dict["full_tf"]
 
     if return_std:
-        field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
-        tf_std_full = np.zeros_like(tf_full)
-        for i, fp1 in enumerate(field_pairs):
-            for j, fp2 in enumerate(field_pairs):
-                tf_std_full[i, j] = tf_dict[f"{fp2}_to_{fp1}_std"]
+        tf_std_full = tf_dict["full_tf_std"]
         return tf_full, tf_std_full
     return tf_full
 
