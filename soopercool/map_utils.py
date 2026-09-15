@@ -141,26 +141,21 @@ def alm2map(alm, pix_type="hp", nside=None, car_template=None,
         return curvedsky.alm2map(alm, map)
 
 
-def _lmax_from_car_geometry(geometry):
+def _lmax_from_car_geometry_template(geometry_template):
     """
-    Determine the maximum multipole from a CAR map.
+    Determine the maximum multipole from a CAR geometry template.
 
     Parameters
     ----------
-    geometry: tuple of (shape, wcs)
-        CAR map shape (nx, ny) and wcs (instance of astropy.wcs.WCS)
-    pix_type : str, optional
-        Pixelization type.
+    geometry_template: str
+        File path to pixell CAR geometry template, or map.
 
     Returns
     -------
     int
         Maximum multipole.
     """
-    if isinstance(geometry, str):
-        _, wcs = enmap.read_map_geometry(geometry)
-    elif isinstance(geometry, tuple):
-        _, wcs = geometry
+    _, wcs = enmap.read_map_geometry(geometry_template)
     res = np.deg2rad(np.min(np.abs(wcs.wcs.cdelt)))
 
     return uharm.res2lmax(res)
@@ -186,8 +181,7 @@ def lmax_from_map(map, pix_type="hp"):
 
     if isinstance(map, str):
         if pix_type == "car":
-            geometry = enmap.read_map_geometry(map)
-            lmax = _lmax_from_car_geometry(geometry)
+            lmax = _lmax_from_car_geometry_template(map)
             return lmax
         else:
             map = read_map(map)

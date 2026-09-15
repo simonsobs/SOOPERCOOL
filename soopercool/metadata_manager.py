@@ -37,7 +37,7 @@ class BBmeta():
 
         # Basic sanity checks
         if self.pix_type == "car":
-            lmax_res = mu._lmax_from_car_geometry(self.car_template)
+            lmax_res = mu._lmax_from_car_geometry_template(self.car_template)
         elif self.pix_type == "hp":
             lmax_res = 3*self.nside - 1
         if self.lmax > lmax_res:
