@@ -28,7 +28,8 @@ def main(args):
     cls_tf_val_dir = f"{out_dir}/cells_tf_val"
     BBmeta.make_dir(cls_tf_val_dir)
 
-    kspace_dir = f"{out_dir}/kspace_filtered_sims"
+    kspace_dir = f"{out_dir}/sims_tf_val_kspace_filtered"
+    BBmeta.make_dirs(kspace_dir)
 
     nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
