@@ -49,7 +49,7 @@ def main(args):
     if args.kspace_mask is None:
         kspace_fn = f"{masks_dir}/kspace_mask.fits"
     else:
-        kspace_fn = args.kspace_mask 
+        kspace_fn = args.kspace_mask
     kspace_mask = mu.read_map(
         kspace_fn,
         pix_type=meta.pix_type,
@@ -87,8 +87,8 @@ def main(args):
 
         if rank == 0:
             print(" Processing filtering tag: "
-                    f"({preproc_ftag}, {kspace_tag})")
-        
+                  f"({preproc_ftag}, {kspace_tag})")
+
         if kspace_tag is not None:
             kspace_pars = tf_settings["kspace_pars"][kspace_tag]
             if rank == 0:
@@ -104,7 +104,7 @@ def main(args):
         out_dir = est_dir
         for id_sim in range(id_start, id_start + n_sims_est):
             for pure_type in pure_types:
-                fname = tf_settings[f"{which_map}_template"][preproc_ftag].format(
+                fname = tf_settings[f"{which_map}_template"][preproc_ftag].format(  # noqa: E501
                     pure_type=pure_type, id_sim=id_sim
                 )
                 path = f"{map_dir}/{fname}"

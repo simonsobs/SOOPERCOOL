@@ -35,14 +35,14 @@ def kspace_filter(m, dkx=0, dky=0, type="sharp", pix_type="car"):
         raise NotImplementedError(
             "k-space filtering is currently only implemented for CAR maps."
         )
-        ## This is a preliminary fix that involves reprojection. This has not
+        # This is a preliminary fix that involves reprojection. This has not
         # been validated, and not safe ell-range has been established.
         # nside = hp.npix2nside(m.shape[-1])
-        # res_amin = min(16, floor_power_of_2(np.sqrt(np.pi/3.)/nside * 180*60/np.pi))
+        # res_amin = min(16, floor_power_of_2(np.sqrt(np.pi/3.)/nside * 180*60/np.pi))  # noqa: E501
         # res = res_amin * np.pi / 180./ 60.
         # shape, wcs = enmap.fullsky_geometry(res)
         # m = reproject.healpix2map(m, shape=shape, wcs=wcs, lmax=3*nside-1)
-    
+
     ky, kx = m.lmap()
     mf = enmap.fft(m)
 

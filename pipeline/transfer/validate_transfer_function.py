@@ -224,11 +224,11 @@ def main(args):
                 res_unf = (cls_mean_dict["unfiltered", ftag1, ftag2, spec] -
                            cls_theory_binned["unfiltered"][spec])
                 res_unf /= (cls_std_dict["unfiltered", ftag1, ftag2, spec]
-                             / np.sqrt(nsims))
+                            / np.sqrt(nsims))
                 res_f = (cls_mean_dict["filtered", ftag1, ftag2, spec] -
                          cls_theory_binned[ftag1, ftag2][spec])
                 res_f /= (cls_std_dict["filtered", ftag1, ftag2, spec]
-                           / np.sqrt(nsims))
+                          / np.sqrt(nsims))
 
                 sub.axhspan(-3, 3, color="k", alpha=0.2)
                 sub.axhspan(-2, 2, color="k", alpha=0.2)

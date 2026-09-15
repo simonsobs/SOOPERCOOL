@@ -1,11 +1,13 @@
+import os
+import time
+
+import healpy as hp
+import numpy as np
+import yaml
+
 import soopercool.map_utils as mu
 import soopercool.ps_utils as pu
 import soopercool.utils as su
-import yaml
-import numpy as np
-import healpy as hp
-import os
-import time
 
 
 class BBmeta:
