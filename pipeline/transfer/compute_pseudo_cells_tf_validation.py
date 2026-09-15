@@ -5,37 +5,42 @@ import numpy as np
 from soopercool import ps_utils as pu
 from soopercool import mpi_utils as mpi
 from soopercool import map_utils as mu
+from soopercool import coupling_utils as cu
+import soopercool.utils as su
 from pixell import enmap
 
 
 def main(args):
     """
+    Compute (TF*MCM)-decoupled power spectra from (un)filtered TF validation
+    simulations stored under the yaml section transfer_settings['validation']
+
+    This script must be run before 'validate_transfer_function.py'. Running it
+    is NOT a prerequisite for 'validate_transfer_function_kspace.py'.
     """
     rank, size, comm = mpi.init(True)
 
     meta = BBmeta(args.globals)
     verbose = args.verbose
     out_dir = meta.output_directory
+    couplings_dir = f"{out_dir}/couplings"
 
     cls_tf_val_dir = f"{out_dir}/cells_tf_val"
     BBmeta.make_dir(cls_tf_val_dir)
 
+    kspace_dir = f"{out_dir}/sims_tf_val_kspace_filtered"
+    BBmeta.make_dirs(kspace_dir)
+
     nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
-    ps_pairs = meta.get_ps_names_list(type="all", coadd=True)
+    n_bins = nmt_bins.get_n_bands()
 
-    inv_couplings_filtered = meta.get_inverse_couplings()["filtered"]
-    inv_couplings_unfiltered = meta.get_inverse_couplings()["unfiltered"]
+    if "validation" not in meta.transfer_settings:
+        raise KeyError("Subsection transfer['validation'] in config missing.")
 
-    simdir_unfiltered = meta.transfer_settings["unfiltered_map_dir"]
-    if "validation" not in simdir_unfiltered:
-        raise KeyError("Unfiltered validation sims must be provided.")
-    simdir_unfiltered = simdir_unfiltered["validation"]
-
-    simdir_filtered = meta.transfer_settings["filtered_map_dir"]
-    if "validation" not in simdir_filtered:
-        raise KeyError("Filtered validation sims must be provided.")
-    simdir_filtered = simdir_filtered["validation"]
+    validation_dict = meta.transfer_settings["validation"]
+    simdir_unfiltered = validation_dict["unfiltered_map_dir"]
+    simdir_filtered = validation_dict["filtered_map_dir"]
 
     mask_file = meta.masks["analysis_mask"]
     if mask_file is None:
@@ -58,48 +63,131 @@ def main(args):
     sim_id_start = 0 if "sim_id_start" not in tf_settings else tf_settings["sim_id_start"]  # noqa
     sim_ids = range(sim_id_start, tf_settings["tf_val_num_sims"]+sim_id_start)
 
-    mpi_shared_list = sim_ids
+    # NOTE: The hardcoded choice is a 30-arcminute Gaussian beam. We anticipate
+    # this choice to not affect the conclusions on the TF validation w.r.t.
+    # wider beams, but we should check explicitly when adding LF channels.
+    bl = su.beam_gaussian(np.arange(meta.lmax + 1), 30.*np.pi/180./60.)
+
+    # Load MCMs, transfer functions and compute coupling matrices
+    # This avoid saving all products to disk and save disk space.
+    mcm = cu.read_mcm(
+        f"{couplings_dir}/mcm.npz",
+        full_mcm=True
+    )
+
+    filtering_tags = meta.get_filtering_tags()
+    filtering_tag_pairs = meta.get_independent_filtering_pairs()
+
+    inv_couplings = {}
+    for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
+        preproc_ftag1 = meta.filtering_tag_from_map_set(ms1)
+        preproc_ftag2 = meta.filtering_tag_from_map_set(ms2)
+        kspace_tag1 = meta.kspace_tag_from_map_set(ms1)
+        kspace_tag2 = meta.kspace_tag_from_map_set(ms2)
+        ftag1 = (preproc_ftag1, kspace_tag1)
+        ftag2 = (preproc_ftag2, kspace_tag2)
+
+        if (ftag1, ftag2) in inv_couplings:
+            # We only loop over distinct filtering combinations, not all
+            # map set pairs (those will have identical beam anyways).
+            continue
+
+        beam = np.outer(bl, bl)
+
+        transfer = cu.load_transfer_function(
+            meta.transfer_settings["transfer_directory"],
+            ms1, ms2,
+            meta.filtering_tag_from_map_set,
+            meta.kspace_tag_from_map_set,
+            nmt_bins
+        )
+        _, inv_couplings_fil = cu.compute_couplings(
+            mcm,
+            nmt_bins,
+            transfer=transfer,
+            compute_Dl=meta.compute_Dl,
+            beam=beam
+        )
+        _, inv_couplings_unf = cu.compute_couplings(
+            mcm,
+            nmt_bins,
+            transfer=None,
+            compute_Dl=meta.compute_Dl,
+            beam=beam
+        )
+        inv_couplings_fil = inv_couplings_fil.reshape([n_bins*9, n_bins*9])
+        inv_couplings_unf = inv_couplings_unf.reshape([n_bins*9, n_bins*9])
+        inv_couplings[ftag1, ftag2] = {
+            "filtered": inv_couplings_fil,
+            "unfiltered": inv_couplings_unf
+        }
+
+    if (None, None) in filtering_tags and len(filtering_tags) < 1:
+        raise ValueError("There must be at least one filter \
+                         applied to the data to be able to \
+                         compute a transfer function for it")
+
+    mpi_shared_list = [(id_sim, ftag1, ftag2)
+                       for ftag1, ftag2 in filtering_tag_pairs
+                       for id_sim in sim_ids]
+
     # Every rank must have the same list order
     mpi_shared_list = comm.bcast(mpi_shared_list, root=0)
 
     task_ids = mpi.distribute_tasks(size, rank, len(mpi_shared_list))
     local_mpi_list = [mpi_shared_list[i] for i in task_ids]
 
-    for id_sim in local_mpi_list:
+    for id_sim, ftag1, ftag2 in local_mpi_list:
         if verbose:
-            print(f"id_sim {id_sim}")
+            print(f" Doing id_sim {id_sim} | {ftag1} x {ftag2}")
 
         # Create namaster fields
-        fields = {"filtered": {}, "unfiltered": {}}
+        ftags_unique = list(dict.fromkeys([ftag1, ftag2]))
+        fields = {
+            ftag: {
+                "filtered": {},
+                "unfiltered": {}
+            } for ftag in ftags_unique
+        }
 
-        for map_set in meta.map_sets_list:
+        for ftag in ftags_unique:
+            preproc_ftag, kspace_tag = ftag
             if verbose:
-                print(f" Field for {map_set}")
-            unfiltered_map_dir = simdir_unfiltered[map_set]
-            unfiltered_map_tmpl = tf_settings["unfiltered_map_template"]["validation"][map_set] # noqa
+                print(f" Field for ('{preproc_ftag}', '{kspace_tag}')")
+
+            unfiltered_map_dir = simdir_unfiltered[preproc_ftag]
+            unfiltered_map_tmpl = validation_dict["unfiltered_map_template"][preproc_ftag] # noqa
             unfiltered_map_file = unfiltered_map_tmpl.format(id_sim=id_sim)
             unfiltered_map_file = f"{unfiltered_map_dir}/{unfiltered_map_file}"
 
-            filtered_map_dir = simdir_filtered[map_set]
-            filtered_map_tmpl = tf_settings["filtered_map_template"]["validation"][map_set] # noqa
+            if kspace_tag is None:
+                filtered_map_dir = validation_dict["filtered_map_dir"][preproc_ftag] # noqa
+            else:
+                filtered_map_dir = kspace_dir
+
+            filtered_map_dir = simdir_filtered[preproc_ftag]
+            filtered_map_tmpl = validation_dict["filtered_map_template"][preproc_ftag] # noqa
             filtered_map_file = filtered_map_tmpl.format(id_sim=id_sim)
             filtered_map_file = f"{filtered_map_dir}/{filtered_map_file}"
+
+            if kspace_tag is not None:
+                filtered_map_file = filtered_map_file.replace(
+                    ".fits", f"_kspace_{kspace_tag}.fits"
+                )
 
             m_unf = mu.read_map(
                 unfiltered_map_file,
                 pix_type=meta.pix_type,
                 fields_hp=[0, 1, 2],
                 car_template=meta.car_template,
-                convert_K_to_muK=True
             )
             m_f = mu.read_map(
                 filtered_map_file,
                 pix_type=meta.pix_type,
                 fields_hp=[0, 1, 2],
                 car_template=meta.car_template,
-                convert_K_to_muK=True
             )
-            for f_tag, m in zip(["filtered", "unfiltered"], [m_f, m_unf]):
+            for isfil_tag, m in zip(["filtered", "unfiltered"], [m_f, m_unf]):
                 wcs = None
                 if hasattr(m, 'wcs'):
                     # This is a patch. Reproject mask and map onto template
@@ -119,46 +207,56 @@ def main(args):
                     mask_restrict = np.all(mask_restrict, axis=0).astype(float)
                     mask_restrict *= np.array(mask)
                     _, wcs = enmap.read_map_geometry(meta.car_template)
+                else:
+                    mask_restrict = mask
 
-                field_spin0 = nmt.NmtField(mask_restrict, m[:1], wcs=wcs,
-                                           lmax=meta.lmax)
-                field_spin2 = nmt.NmtField(mask_restrict, m[1:], wcs=wcs,
-                                           lmax=meta.lmax,
-                                           purify_b=meta.pure_B)
-                fields[f_tag][map_set] = {
+                field_spin0 = nmt.NmtField(
+                    mask_restrict,
+                    m[:1],
+                    wcs=wcs,
+                    lmax=meta.lmax,
+                    lmax_mask=meta.lmax
+                )
+                field_spin2 = nmt.NmtField(
+                    mask_restrict,
+                    m[1:],
+                    wcs=wcs,
+                    lmax=meta.lmax,
+                    lmax_mask=meta.lmax,
+                    purify_b=meta.pure_B
+                )
+                fields[ftag][isfil_tag] = {
                     "spin0": field_spin0,
                     "spin2": field_spin2
                 }
 
         # Computing power spectra
-        for ms1, ms2 in ps_pairs:
-            if verbose:
-                print(f" Power spectrum for {ms1} x {ms2}")
+        if verbose:
+            print(f" Power spectrum for {ftag1} x {ftag2}")
 
-            pcls_filtered = pu.get_coupled_pseudo_cls(
-                fields["filtered"][ms1],
-                fields["filtered"][ms2],
-                nmt_bins
-            )
-            pcls_unfiltered = pu.get_coupled_pseudo_cls(
-                fields["unfiltered"][ms1],
-                fields["unfiltered"][ms2],
-                nmt_bins
-            )
-            decoupled_cls_filtered = pu.decouple_pseudo_cls(
-                pcls_filtered, inv_couplings_filtered[ms1, ms2]
-            )
-            decoupled_cls_unfiltered = pu.decouple_pseudo_cls(
-                pcls_unfiltered, inv_couplings_unfiltered[ms1, ms2]
-            )
+        pcls_filtered = pu.get_coupled_pseudo_cls(
+            fields[ftag1]["filtered"],
+            fields[ftag2]["filtered"],
+            nmt_bins
+        )
+        pcls_unfiltered = pu.get_coupled_pseudo_cls(
+            fields[ftag1]["unfiltered"],
+            fields[ftag2]["unfiltered"],
+            nmt_bins
+        )
+        decoupled_cls_filtered = pu.decouple_pseudo_cls(
+            pcls_filtered, inv_couplings[ftag1, ftag2]["filtered"]
+        )
+        decoupled_cls_unfiltered = pu.decouple_pseudo_cls(
+            pcls_unfiltered, inv_couplings[ftag1, ftag2]["unfiltered"]
+        )
+        out_f = f"{cls_tf_val_dir}/cls_tf_val_{ftag1[0]}_{ftag1[1]}_x_{ftag2[0]}_{ftag2[1]}_filtered_{id_sim:04d}.npz"  # noqa
+        out_unf = f"{cls_tf_val_dir}/cls_tf_val_{ftag1[0]}_{ftag1[1]}_x_{ftag2[0]}_{ftag2[1]}_unfiltered_{id_sim:04d}.npz"  # noqa
 
-            out_f = f"{cls_tf_val_dir}/cls_tf_val_{ms1}_x_{ms2}_filtered_{id_sim:04d}.npz"  # noqa
-            out_unf = f"{cls_tf_val_dir}/cls_tf_val_{ms1}_x_{ms2}_unfiltered_{id_sim:04d}.npz"  # noqa
+        np.savez(out_f, **decoupled_cls_filtered, lb=lb)
+        np.savez(out_unf, **decoupled_cls_unfiltered, lb=lb)
 
-            np.savez(out_f, **decoupled_cls_filtered, lb=lb)
-            np.savez(out_unf, **decoupled_cls_unfiltered, lb=lb)
-
-        comm.Barrier()
+    comm.Barrier()
 
 
 if __name__ == "__main__":

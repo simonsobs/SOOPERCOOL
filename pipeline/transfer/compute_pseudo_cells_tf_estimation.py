@@ -11,6 +11,10 @@ from pixell import enmap
 
 def main(args):
     """
+    This script computes the (binned and, optionally, unbinned) coupled
+    power spectra of the filtered-masked and masked TF estimation simulations,
+    and saves them in npz files. Running this script is a prerequisite for
+    `compute_transfer_function.py`.
     """
     rank, size, comm = mpi.init(True)
 
@@ -19,14 +23,14 @@ def main(args):
     out_dir = meta.output_directory
 
     do_plot = not args.no_plots
-    if do_plot:
-        plot_dir = f"{out_dir}/plots/cells_tf_est"
-        BBmeta.make_dir(plot_dir)
+    plot_dir = f"{out_dir}/plots/cells_tf_est"
+    BBmeta.make_dir(plot_dir)
 
     pcls_tf_est_dir = f"{out_dir}/cells_tf_est"
     BBmeta.make_dir(pcls_tf_est_dir)
 
-    kspace_dir = f"{out_dir}/kspace_filtered_sims"
+    kspace_dir = f"{out_dir}/sims_tf_est_kspace_filtered"
+    BBmeta.make_dir(kspace_dir)
 
     nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
@@ -88,6 +92,8 @@ def main(args):
 
         for pure_type in ["pureT", "pureE", "pureB"]:
             for ftag in ftags_unique:
+                if verbose:
+                    print(f"   {pure_type} | {ftag}")
 
                 preproc_ftag, kspace_tag = ftag
 
@@ -187,14 +193,16 @@ def main(args):
                         mask,
                         map[:1],
                         wcs=wcs,
-                        lmax=meta.lmax
+                        lmax=meta.lmax,
+                        lmax_mask=meta.lmax
                     ),
                     "spin2": nmt.NmtField(
                         mask,
                         map[1:],
                         purify_b=purify_b,
                         wcs=wcs,
-                        lmax=meta.lmax
+                        lmax=meta.lmax,
+                        lmax_mask=meta.lmax
                     )
                 }
                 field_filtered = {
@@ -202,14 +210,16 @@ def main(args):
                         mask,
                         map_filtered[:1],
                         wcs=wcs,
-                        lmax=meta.lmax
+                        lmax=meta.lmax,
+                        lmax_mask=meta.lmax
                     ),
                     "spin2": nmt.NmtField(
                         mask,
                         map_filtered[1:],
                         purify_b=purify_b,
                         wcs=wcs,
-                        lmax=meta.lmax
+                        lmax=meta.lmax,
+                        lmax_mask=meta.lmax
                     )
                 }
 
@@ -240,11 +250,11 @@ def main(args):
         out_f = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{lab1}_x_{lab2}_filtered_{id_sim:04d}.npz"  # noqa
         out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{lab1}_x_{lab2}_unfiltered_{id_sim:04d}.npz"  # noqa
 
-        if do_plot:
+        if do_plot or id_sim == mpi_shared_list[0][0]:
             fplt = f"{plot_dir}/pcls_mat_tf_est_{lab1}_x_{lab2}_{id_sim:04d}.pdf"  # noqa
             ps_utils.plot_pcls_mat_transfer(
                 pcls_mat_unfiltered, pcls_mat_filtered, lb, fplt,
-                lmax=600
+                lmax=meta.lmax
             )
 
         np.savez(out_f, pcls_mat=pcls_mat_filtered)
@@ -254,6 +264,9 @@ def main(args):
         out_unf = f"{pcls_tf_est_dir}/pcls_mat_tf_est_{lab1}_x_{lab2}_unfiltered_unbinned_{id_sim:04d}.npz"  # noqa
         np.savez(out_f, pcls_mat=pcls_mat_filtered_unbinned)
         np.savez(out_unf, pcls_mat=pcls_mat_unfiltered_unbinned)
+    comm.barrier()
+    if rank == 0:
+        print("Finished.")
 
 
 if __name__ == "__main__":

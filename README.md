@@ -113,6 +113,33 @@ This is one of the key element of the SOOPERCOOL pipeline. Transfer functions de
 ```bash
 srun -n 10 -c 10 --cpu_bind=cores python pipeline/transfer/compute_pseudo_cells_tf_estimation.py --globals config_file.yaml
 ```
+Transfer function simulations can be reused. If you need to generate them yourself, you can run
+```bash
+python pipeline/simulations/generate_tf_estimation_sims.py --globals config_file.yaml
+```
+which will generate the Gaussian power-law simulations used for TF estimation according to the following settings in the yaml:
+```yaml
+transfer_settings:
+    ...
+    sim_id_start: 0
+    ## Number of sims for tf estimation
+    tf_est_num_sims: 20
+    ## Number of sims for tf validation
+    tf_val_num_sims: 20
+    ## Parameters of the PL sims used for TF estimation
+    power_law_pars_tf_est:
+        amp: 1.0
+        delta_ell: 10.
+        power_law_index: 2.
+    ## Optional beams applied on TF estimation sims
+    # Here, paste the list of map_sets whose corresponding beams should be
+    # simulated in the transfer function estimation simulations. If this is an
+    # empty list, sims are convolved with a 30-arcmin Gaussian beam.
+    tf_est_beams_list: []
+    ## Optional beams applied on TF validation sims
+    tf_val_beams_list: []
+```
+For details on how to validate transfer fucntions on simulations, see the `README.md` under `pipeline/transfer`.
 ___
 **IF RUNNING WITH FOURIER SPACE FILTERING**
 If you want to apply a Fourier-space filter on the maps, you'll also need to compute the associated transfer function. In this case, you'll first need to apply this $k$-space filter on simulations. This can be done running
