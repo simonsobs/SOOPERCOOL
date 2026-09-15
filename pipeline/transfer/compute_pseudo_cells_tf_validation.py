@@ -1,13 +1,14 @@
 import argparse
-from soopercool import BBmeta
-import pymaster as nmt
+
 import numpy as np
-from soopercool import ps_utils as pu
-from soopercool import mpi_utils as mpi
-from soopercool import map_utils as mu
-from soopercool import coupling_utils as cu
+import pymaster as nmt
 import soopercool.utils as su
 from pixell import enmap
+from soopercool import BBmeta
+from soopercool import coupling_utils as cu
+from soopercool import map_utils as mu
+from soopercool import mpi_utils as mpi
+from soopercool import ps_utils as pu
 
 
 def main(args):
@@ -29,7 +30,7 @@ def main(args):
     BBmeta.make_dir(cls_tf_val_dir)
 
     kspace_dir = f"{out_dir}/sims_tf_val_kspace_filtered"
-    BBmeta.make_dirs(kspace_dir)
+    BBmeta.make_dir(kspace_dir)
 
     nmt_bins = meta.read_nmt_binning()
     lb = nmt_bins.get_effective_ells()
@@ -257,6 +258,8 @@ def main(args):
         np.savez(out_unf, **decoupled_cls_unfiltered, lb=lb)
 
     comm.Barrier()
+    if rank == 0:
+        print("Finished.")
 
 
 if __name__ == "__main__":

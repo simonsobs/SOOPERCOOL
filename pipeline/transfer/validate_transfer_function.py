@@ -148,21 +148,23 @@ def main(args):
 
     # Compute the bandpower-convolved theory spectra for (un)filtered sims.
     cls_theory = meta.load_fiducial_cl()
-    cls_theory_binned = {"filtered": {}, "unfiltered": {}}
+    cls_theory_binned = {}
 
-    for ftype in ["filtered", "unfiltered"]:
+    cls_theory_binned["unfiltered"] = pu.bin_theory_cls(
+        cls_theory[ps_pairs[0][0], ps_pairs[0][1]], bpwins["unfiltered"]
+    )
 
-        for ms1, ms2 in ps_pairs:
-            preproc_ftag1 = meta.filtering_tag_from_map_set(ms1)
-            preproc_ftag2 = meta.filtering_tag_from_map_set(ms2)
-            kspace_tag1 = meta.kspace_tag_from_map_set(ms1)
-            kspace_tag2 = meta.kspace_tag_from_map_set(ms2)
-            ftag1 = (preproc_ftag1, kspace_tag1)
-            ftag2 = (preproc_ftag2, kspace_tag2)
+    for ms1, ms2 in ps_pairs:
+        preproc_ftag1 = meta.filtering_tag_from_map_set(ms1)
+        preproc_ftag2 = meta.filtering_tag_from_map_set(ms2)
+        kspace_tag1 = meta.kspace_tag_from_map_set(ms1)
+        kspace_tag2 = meta.kspace_tag_from_map_set(ms2)
+        ftag1 = (preproc_ftag1, kspace_tag1)
+        ftag2 = (preproc_ftag2, kspace_tag2)
 
-            cls_theory_binned[ftype][ftag1, ftag2] = pu.bin_theory_cls(
-                cls_theory[ms1, ms2], bpwins[ftype][ftag1, ftag2]
-            )
+        cls_theory_binned[ftag1, ftag2] = pu.bin_theory_cls(
+            cls_theory[ms1, ms2], bpwins[ftag1, ftag2]
+        )
 
     # Make plots
     for ftag1, ftag2 in filtering_tag_pairs:
@@ -182,12 +184,12 @@ def main(args):
                 # Plot theory
                 main.plot(
                     lb[lb_msk],
-                    cb2db[lb_msk]*cls_theory_binned["unfiltered"][ftag1, ftag2][spec][lb_msk],  # noqa: E501
+                    cb2db[lb_msk]*cls_theory_binned["unfiltered"][spec][lb_msk],  # noqa: E501
                     color="darkorange", ls="--", alpha=0.6
                 )
                 main.plot(
                     lb[lb_msk],
-                    cb2db[lb_msk]*cls_theory_binned["filtered"][ftag1, ftag2][spec][lb_msk],  # noqa: E501
+                    cb2db[lb_msk]*cls_theory_binned[ftag1, ftag2][spec][lb_msk],  # noqa: E501
                     color="navy", ls="--", alpha=0.6
                 )
                 main.plot([], [], "k.", label="Simulations")
@@ -220,13 +222,13 @@ def main(args):
 
                 # Plot residuals
                 res_unf = (cls_mean_dict["unfiltered", ftag1, ftag2, spec] -
-                           cls_theory_binned["unfiltered"][ftag1, ftag2][spec])
-                res_unf /= ((cls_std_dict["unfiltered", ftag1, ftag2, spec]
-                             / np.sqrt(nsims)))
+                           cls_theory_binned["unfiltered"][spec])
+                res_unf /= (cls_std_dict["unfiltered", ftag1, ftag2, spec]
+                             / np.sqrt(nsims))
                 res_f = (cls_mean_dict["filtered", ftag1, ftag2, spec] -
-                         cls_theory_binned["filtered"][ftag1, ftag2][spec])
-                res_f /= ((cls_std_dict["filtered", ftag1, ftag2, spec]
-                           / np.sqrt(nsims)))
+                         cls_theory_binned[ftag1, ftag2][spec])
+                res_f /= (cls_std_dict["filtered", ftag1, ftag2, spec]
+                           / np.sqrt(nsims))
 
                 sub.axhspan(-3, 3, color="k", alpha=0.2)
                 sub.axhspan(-2, 2, color="k", alpha=0.2)
@@ -264,11 +266,11 @@ def main(args):
                                 va='top',
                                 color=color,
                                 fontsize=8,
-                                arrowprops=dict(
-                                    arrowstyle='->',
-                                    lw=1.5,
-                                    color=color,
-                                )
+                                arrowprops={
+                                    "arrowstyle": '->',
+                                    "lw": 1.5,
+                                    "color": color,
+                                }
                             )
 
                         elif yi < ymin:
@@ -280,11 +282,11 @@ def main(args):
                                 va='bottom',
                                 color=color,
                                 fontsize=8,
-                                arrowprops=dict(
-                                    arrowstyle='->',
-                                    lw=1.5,
-                                    color=color,
-                                )
+                                arrowprops={
+                                    "arrowstyle": '->',
+                                    "lw": 1.5,
+                                    "color": color,
+                                }
                             )
 
                 # TF range
@@ -297,8 +299,11 @@ def main(args):
                                                      fields.index(f1+f2), :]
                 tf_zscore = transfer / transfer_std
                 good = tf_zscore > 2.
+                if np.any(~good):
+                    lmin = max((lb[~good][-1] + lb[good][0])/2., 30)
+                else:
+                    lmin = max((lb[0])/2., 30)
 
-                lmin = max((lb[~good][-1] + lb[good][0])/2., 30)
                 main.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.3)
                 sub.axvspan(xmin=lb[0]/2., xmax=lmin, color="k", alpha=0.3)
 
