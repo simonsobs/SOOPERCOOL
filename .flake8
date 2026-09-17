@@ -1,5 +1,4 @@
 [flake8]
 exclude =
     build/,
-    legacy/,
-    setup.py
+    legacy/

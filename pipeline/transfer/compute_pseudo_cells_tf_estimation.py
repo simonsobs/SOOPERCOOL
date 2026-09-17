@@ -256,10 +256,14 @@ def main(args):
         np.savez(out_unf, pcls_mat=pcls_mat_unfiltered_unbinned)
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
     parser.add_argument("--verbose", action="store_true")
     parser.add_argument("--no_plots", action="store_true")
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

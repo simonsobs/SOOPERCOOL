@@ -438,7 +438,7 @@ def main(args):
     print(f"    Apodization radius point source: {masks_settings['apod_radius_point_source']}")  # noqa: E501
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(description="Get analysis mask")
     parser.add_argument("--globals", help="Path to the paramfile")
     parser.add_argument("--verbose", help="Verbose mode",
@@ -448,3 +448,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

@@ -49,7 +49,7 @@ def main(args):
     print(f"  SAVED: {binning_dir}/{file_name}_large_first_bin.npz")
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
     parser.add_argument("--deltal", type=int,
@@ -59,3 +59,7 @@ if __name__ == "__main__":
                         help="Directory to save binning at.")
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

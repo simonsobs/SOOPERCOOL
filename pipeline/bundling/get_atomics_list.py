@@ -91,7 +91,7 @@ def main(args):
           f"under {args.outdir}/atomic_maps_list.npz")
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--map_dir",
                         help="Atomic maps directory.")
@@ -105,3 +105,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

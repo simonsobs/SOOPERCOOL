@@ -78,10 +78,14 @@ def main(args):
         print(plot_dir)
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
     parser.add_argument("--no_plots", action="store_true",
                         help="Do not plot transfer function.")
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

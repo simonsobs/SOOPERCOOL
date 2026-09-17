@@ -219,7 +219,7 @@ def main(args):
                 plt.close()
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(
         description="Coadd the cross-bundle power spectra for data"
     )
@@ -239,3 +239,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

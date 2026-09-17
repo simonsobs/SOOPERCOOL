@@ -252,7 +252,7 @@ def main(args):
             np.savez(fname, **decoupled_pcls, lb=nmt_bins.get_effective_ells())
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--globals",
@@ -270,3 +270,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

@@ -3,6 +3,7 @@ import soopercool.ps_utils as pu
 import soopercool.utils as su
 import yaml
 import numpy as np
+import logging
 import os
 import time
 
@@ -53,6 +54,24 @@ class BBmeta(object):
 
         # Initialize a timer
         self.timer = Timer()
+
+        # Initialize a logger
+        self.logger = self._init_logger()
+
+    def _init_logger(self):
+        """
+        Initialize a logger for the pipeline, shared across all
+        scripts using this metadata manager.
+        """
+        logger = logging.getLogger("soopercool")
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(
+                logging.Formatter("%(asctime)s: %(message)s (%(levelname)s)")
+            )
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
+        return logger
 
     def _check_required_settings(self):
         """

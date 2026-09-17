@@ -1,0 +1,67 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["soopercool", "pipeline"]
+exclude = ["pipeline/postproc/sacc_viewer"]
+
+[project]
+name = "soopercool"
+version = "0.0.0"
+description = "BB MASTER - The SO BB MASTER pipeline"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [
+    { name = "David Alonso", email = "david.alonso@physics.ox.ac.uk" },
+]
+urls = { Homepage = "https://github.com/simonsobs/SOOPERCOOL" }
+dependencies = [
+    "numpy",
+    "scipy",
+    "healpy",
+    "pymaster",
+    "sacc",
+    "camb",
+    "wget",
+    "pixell",
+    "scikit-learn",
+]
+
+[project.scripts]
+soopercool-get-analysis-mask = "pipeline.get_analysis_mask:cli"
+soopercool-prepare-cov-inputs = "pipeline.prepare_cov_inputs:cli"
+# soopercool-generate-simulations = "pipeline.generate_simulations:cli"
+soopercool-compute-signflip-sims-pseudo-cells = "pipeline.compute_signflip_sims_pseudo_cells:cli"
+soopercool-get-mode-coupling = "pipeline.get_mode_coupling:cli"
+soopercool-precompute-cov-couplings = "pipeline.precompute_cov_couplings:cli"
+soopercool-compute-covariance = "pipeline.compute_covariance:cli"
+soopercool-compute-covariance-from-sims = "pipeline.compute_covariance_from_sims:cli"
+soopercool-coadd-pseudo-cells = "pipeline.coadd_pseudo_cells:cli"
+soopercool-coadd-sims-pseudo-cells = "pipeline.coadd_sims_pseudo_cells:cli"
+# soopercool-pre-processer-ext = "pipeline.pre_processer_ext:cli"
+# soopercool-sacc-plotter = "pipeline.sacc_plotter:cli"
+soopercool-create-sacc-file-analytic = "pipeline.create_sacc_file_analytic:cli"
+soopercool-compute-sims-pseudo-cells = "pipeline.compute_sims_pseudo_cells:cli"
+soopercool-compute-pseudo-cells = "pipeline.compute_pseudo_cells:cli"
+soopercool-create-sacc-file = "pipeline.create_sacc_file:cli"
+# soopercool-reformat-beam-products = "pipeline.beams.reformat_beam_products:cli"
+soopercool-compute-beam-covariance = "pipeline.beams.compute_beam_covariance:cli"
+# soopercool-get-sat-beams = "pipeline.misc.get_sat_beams:cli"
+soopercool-validate-mask = "pipeline.misc.validate_mask:cli"
+# soopercool-get-noise-ps-for-sims = "pipeline.misc.get_noise_ps_for_sims:cli"
+soopercool-get-binning = "pipeline.misc.get_binning:cli"
+# soopercool-bundle-atomic-maps = "pipeline.bundling.bundle_atomic_maps:cli"
+# soopercool-generate-map-bundles = "pipeline.bundling.generate_map_bundles:cli"
+# soopercool-get-atomics-list = "pipeline.bundling.get_atomics_list:cli"
+soopercool-compute-pseudo-cells-tf-estimation = "pipeline.transfer.compute_pseudo_cells_tf_estimation:cli"
+soopercool-validate-transfer-function = "pipeline.transfer.validate_transfer_function:cli"
+soopercool-compute-pseudo-cells-tf-validation = "pipeline.transfer.compute_pseudo_cells_tf_validation:cli"
+soopercool-compute-transfer-function = "pipeline.transfer.compute_transfer_function:cli"
+soopercool-generate-noise-from-data = "pipeline.simulations.generate_noise_from_data:cli"
+soopercool-generate-sat-noise = "pipeline.simulations.generate_sat_noise:cli"
+soopercool-generate-mock-cmb-sky = "pipeline.simulations.generate_mock_cmb_sky:cli"
+soopercool-generate-tf-estimation-sims = "pipeline.simulations.generate_tf_estimation_sims:cli"
+soopercool-filter-sims-kspace = "pipeline.kspace.filter_sims_kspace:cli"
+soopercool-fit-eb-angles = "pipeline.postproc.fit_EB_angles:cli"
+soopercool-fit-cals-and-beams = "pipeline.postproc.fit_cals_and_beams:cli"

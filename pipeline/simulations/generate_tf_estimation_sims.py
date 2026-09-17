@@ -139,7 +139,7 @@ def main(args):
     #                         bbox_inches="tight")
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(
         description="Generate pureT/E/B simulations \
                      for transfer function estimation")
@@ -151,3 +151,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()
