@@ -28,6 +28,13 @@ dependencies = [
     "scikit-learn",
 ]
 
+[dependency-groups]
+dev = [
+    "flake8",
+    "pytest",
+    "pytest-cov",
+]
+
 [project.scripts]
 soopercool-get-analysis-mask = "pipeline.get_analysis_mask:cli"
 soopercool-prepare-cov-inputs = "pipeline.prepare_cov_inputs:cli"
