@@ -6,7 +6,6 @@ import pymaster as nmt
 import os
 from soopercool import mpi_utils as mpi
 from itertools import product
-import logging
 import time
 
 
@@ -18,11 +17,7 @@ def main(args):
     rank, size, comm = mpi.init(True)
 
     meta = BBmeta(args.globals)
-    logging.basicConfig(
-        level=logging.WARNING,
-        format="%(asctime)s: %(message)s (%(levelname)s)",
-    )
-    logger = logging.getLogger("benchmark")
+    logger = meta.logger
 
     out_dir = meta.output_directory
     # Define output directory
