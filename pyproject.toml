@@ -1,6 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["soopercool", "pipeline"]
+exclude = ["pipeline/postproc/sacc_viewer"]
 
 [project]
 name = "soopercool"
@@ -60,7 +64,3 @@ soopercool-generate-tf-estimation-sims = "pipeline.simulations.generate_tf_estim
 soopercool-filter-sims-kspace = "pipeline.kspace.filter_sims_kspace:cli"
 soopercool-fit-eb-angles = "pipeline.postproc.fit_EB_angles:cli"
 soopercool-fit-cals-and-beams = "pipeline.postproc.fit_cals_and_beams:cli"
-
-[tool.setuptools.packages.find]
-include = ["soopercool*", "pipeline*"]
-exclude = ["pipeline.postproc.sacc_viewer*"]
