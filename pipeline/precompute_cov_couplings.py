@@ -239,7 +239,7 @@ def main(args):
         logger.info(f"[{rank}] nn cwsp computed in {time.time() - t0:.2f}s")
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(
         description="Compute and saves couplings for covariance matrices"
     )
@@ -247,3 +247,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

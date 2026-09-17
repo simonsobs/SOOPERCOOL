@@ -231,7 +231,7 @@ def main(args):
         print(f"WARNING: {failed_count} out of 6 tests failed.")
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--out_dir", type=str, help="Output directory")
     parser.add_argument("--mask_fname",
@@ -251,3 +251,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

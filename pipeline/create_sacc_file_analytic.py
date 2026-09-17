@@ -190,7 +190,7 @@ def main(args):
         )
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(
         description="Sacc compilation of power spectra and covariances."
     )
@@ -203,3 +203,7 @@ if __name__ == "__main__":
     mode.add_argument("--data", action="store_true")
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

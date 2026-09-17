@@ -164,7 +164,7 @@ def main(args):
         )
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(
         description="Analytic covariance matrix computation."
     )
@@ -173,3 +173,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

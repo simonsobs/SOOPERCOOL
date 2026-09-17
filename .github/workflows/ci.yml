@@ -53,7 +53,7 @@ jobs:
           pip install -U pytest-cov
           pip install -U coveralls
           pip install -U pixell
-          python setup.py install
+          pip install .
 
       - name: Lint
         uses: py-actions/flake8@v2

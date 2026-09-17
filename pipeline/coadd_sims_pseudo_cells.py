@@ -346,7 +346,7 @@ def main(args):
                           f"{plot_dir}/pcls_{map_set1}_{map_set2}_{fp}.png")
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(
         description="Coadd the cross-bundle power spectra for simulations"
     )
@@ -370,3 +370,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

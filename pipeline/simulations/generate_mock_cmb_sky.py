@@ -128,9 +128,13 @@ def main(args):
     #         plt.clf()
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
     parser.add_argument("--verbose", action="store_true", help="Verbose mode.")
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

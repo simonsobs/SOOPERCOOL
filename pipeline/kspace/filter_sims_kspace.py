@@ -89,7 +89,7 @@ def main(args):
         )
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(description="")
     parser.add_argument(
         "--globals", help="Path to the soopercool parameter file"
@@ -97,3 +97,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+if __name__ == "__main__":
+    cli()
