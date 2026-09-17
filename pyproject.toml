@@ -25,6 +25,7 @@ dependencies = [
     "camb",
     "wget",
     "pixell",
+    "scikit-learn",
 ]
 
 [project.scripts]
