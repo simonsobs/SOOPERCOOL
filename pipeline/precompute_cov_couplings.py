@@ -5,8 +5,8 @@ from soopercool import map_utils as mu
 import pymaster as nmt
 import os
 from soopercool import mpi_utils as mpi
-import sotodlib.preprocess.preprocess_util as pp_utils
 from itertools import product
+import logging
 import time
 
 
@@ -18,7 +18,11 @@ def main(args):
     rank, size, comm = mpi.init(True)
 
     meta = BBmeta(args.globals)
-    logger = pp_utils.init_logger("benchmark", verbosity=1)
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="%(asctime)s: %(message)s (%(levelname)s)",
+    )
+    logger = logging.getLogger("benchmark")
 
     out_dir = meta.output_directory
     # Define output directory
