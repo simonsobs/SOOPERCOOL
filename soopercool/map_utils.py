@@ -832,3 +832,52 @@ def get_apodized_mask_from_nhits(nhits_map, nside,
                                            apotype=apod_type)
 
     return nhits_map * binary_mask
+
+
+def deproject_templates(map, templates, mask):
+    """
+    Deproject an arbitrary number of TQU templates
+    from a map using a given mask.
+
+    Parameters
+    ----------
+    map : np.ndarray
+        Input map to be deprojected.
+        Should be of shape (3, Npix) for healpix or (3, Ny, Nx) for CAR.
+    templates : list of np.ndarray, np.ndarray
+        List of templates to deproject from the map.
+        Should be of shape (n_templates, *map.shape)
+    mask : np.ndarray
+        Mask to apply to map and templates before deprojection.
+        Should be of shape map.shape[1:]
+    """
+    templates = np.array(templates)
+    masked_map = map * mask[None, :]
+    masked_templates = templates * mask[None, None, :]
+
+    n_templates = masked_templates.shape[0]
+
+    # Compute inner products of templates
+    denom = np.einsum(
+        "ai,bi->ab",
+        masked_templates.reshape(n_templates, -1),
+        masked_templates.reshape(n_templates, -1)
+    )
+    inv_denom = np.linalg.inv(denom)
+
+    # Compute coefficients
+    num = np.einsum(
+        "ai,i->a",
+        masked_templates.reshape(n_templates, -1),
+        masked_map.reshape(-1)
+    )
+    alphas = inv_denom @ num
+
+    # Apply deprojection
+    map_filtered = masked_map - np.einsum(
+        "a,ai->i",
+        alphas,
+        masked_templates.reshape(n_templates, -1)
+    ).reshape(masked_map.shape)
+
+    return map_filtered, alphas
