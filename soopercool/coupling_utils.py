@@ -737,14 +737,11 @@ def compute_couplings(mcm, nmt_binning,
         # of phi below.
         phiT = np.zeros([size, size, nl])
 
-        for i in range(n_bins):
-            idx = nmt_binning.get_ell_list(i)
-
-            if transfer is not None:
-                # this is to play with
-                # numpy broadcasting
+        if transfer is not None:
+            for i in range(n_bins):
+                idx = nmt_binning.get_ell_list(i)
                 phiT[:, :, idx] = transfer[:, :, i][:, :, None]
-        if transfer is None:
+        else:
             phiT[:, :, :] = np.eye(size, size)[:, :, None]
         mcm_phiT = np.einsum(
             "AiCj,CBj->AiBj",
