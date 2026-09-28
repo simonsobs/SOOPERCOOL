@@ -78,18 +78,18 @@ def get_transfer_with_error_TM(pcls_mat_filt,
             np.mean(pcls_mat_filt, axis=0)
         )
     )
+
     T_std = np.std(
-        np.array(
-            [np.einsum(
-                "ijl,jkl->kil",
-                cct_inv,
-                np.einsum(
-                    "jil,jkl->ikl",
-                    cb_coupled_matrix,
-                    clf
-                )
-            ) for clf in pcls_mat_filt]
-        ), axis=0
+        np.einsum(
+            "ijl,njkl->nkil",
+            cct_inv,
+            np.einsum(
+                "jil,njkl->nikl",
+                cb_coupled_matrix,
+                pcls_mat_filt
+            )
+        ),
+        axis=0
     )
 
     return T_mean, T_std
@@ -105,6 +105,12 @@ def get_transfer_with_error_MT(pcls_mat_filt,
     assuming that the binned filtered pseudo-Cl is given by
 
     \\tilde{C}_{b} = P_{b\\ell} M_{\\ell,\\ell'} T_{\\ell'} C_{\\ell'}
+
+    In this first implementation, we assume that the transfer function
+    is constant within each bin. This is done defining the product
+    `phiC` below. The definition of this product will need to be updated
+    if we want to allow for a different basis expansion of the transfer
+    function.
 
     Parameters
     ----------
