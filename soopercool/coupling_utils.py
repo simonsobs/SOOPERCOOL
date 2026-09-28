@@ -641,6 +641,11 @@ def compute_couplings(mcm, nmt_binning,
     Compute couplings from pre-computed mode-coupling
     matrices `mcm` and optional transfer functions.
 
+    For `tf_ordering=MT`, we assume that the TF is flat
+    within each bin. This is done defining the product
+    `phiT` below. This definition will need to be updated
+    if we want to study other TF basis expansions.
+
     Parameters
     ----------
     mcm : ndarray
