@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 
 
 def get_transfer_with_error_TM(pcls_mat_filt,
@@ -268,6 +269,10 @@ def get_transfer_with_error(mean_pcls_mat_filt,
         Matrix of shape (N_field_pairs, N_field_pairs, N_bins)
         containing statistical errors on the TF.
     """
+    warnings.warn(
+        "This function is deprecated and will be removed in future versions.",
+        DeprecationWarning
+    )
     cct_inv = np.transpose(
         np.linalg.inv(
             np.transpose(
