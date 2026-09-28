@@ -55,20 +55,14 @@ def init(switch=False, logger=None):
 
 
 def is_initialized():
-    global _initialized
     return _initialized
 
 
 def is_mpion():
-    global _switch
     return _switch
 
 
 def taskrange(imax, imin=0, shift=0, logger=None):
-    """
-    """
-    global rank, size
-
     if (not isinstance(imin, int) or not isinstance(imax, int)
             or not isinstance(shift, int)):
         raise TypeError("imin, imax and shift must be integers")
