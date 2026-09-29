@@ -1,5 +1,13 @@
+import math
+
 import numpy as np
 from pixell import enmap
+
+
+def floor_power_of_2(x):
+    if x <= 0:
+        raise ValueError("x must be positive")
+    return 2 ** math.floor(math.log2(x))
 
 
 def kspace_filter(m, dkx=0, dky=0, type="sharp", pix_type="car"):
@@ -27,22 +35,32 @@ def kspace_filter(m, dkx=0, dky=0, type="sharp", pix_type="car"):
         raise NotImplementedError(
             "k-space filtering is currently only implemented for CAR maps."
         )
+        # This is a preliminary fix that involves reprojection. This has not
+        # been validated, and not safe ell-range has been established.
+        # nside = hp.npix2nside(m.shape[-1])
+        # res_amin = min(16, floor_power_of_2(np.sqrt(np.pi/3.)/nside * 180*60/np.pi))  # noqa: E501
+        # res = res_amin * np.pi / 180./ 60.
+        # shape, wcs = enmap.fullsky_geometry(res)
+        # m = reproject.healpix2map(m, shape=shape, wcs=wcs, lmax=3*nside-1)
 
-    elif pix_type == "car":
-        ky, kx = m.lmap()
-        mf = enmap.fft(m)
+    ky, kx = m.lmap()
+    mf = enmap.fft(m)
 
-        if type == "sharp":
-            msk_x = np.abs(kx) < dkx
-            msk_y = np.abs(ky) < dky
-            msk = msk_x | msk_y
-            mf[:, msk] = 0.0
-        if type == "cosine":
-            w_x = cosine_taper(np.abs(kx), 0, dkx)
-            w_y = cosine_taper(np.abs(ky), 0, dky)
-            mf *= w_x * w_y
-        mf_back = enmap.ifft(mf).real
-        return mf_back
+    if type == "sharp":
+        msk_x = np.abs(kx) < dkx
+        msk_y = np.abs(ky) < dky
+        msk = msk_x | msk_y
+        mf[:, msk] = 0.0
+    if type == "cosine":
+        w_x = cosine_taper(np.abs(kx), 0, dkx)
+        w_y = cosine_taper(np.abs(ky), 0, dky)
+        mf *= w_x * w_y
+    mf_back = enmap.ifft(mf).real
+
+    # if pix_type == "hp":
+    #     mf_back = reproject.map2healpix(mf_back, nside=nside, lmax=3*nside-1)
+
+    return mf_back
 
 
 def cosine_taper(k, kmin, kmax):

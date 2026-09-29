@@ -19,9 +19,7 @@ def main(args):
     if args.lmax is not None:
         lmax = args.lmax
     else:
-        from pixell import enmap
-        geometry = enmap.read_map_geometry(meta.car_template)
-        lmax = mu._lmax_from_car_geometry(geometry)
+        lmax = mu._lmax_from_car_geometry_template(meta.car_template)
 
     # nmt_bins.lmax+1 cannot extend beyond lmax-1 because otherwise
     # coupled_cells would have len == lmax < nmt_bins.lmax+1

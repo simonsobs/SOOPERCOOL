@@ -314,13 +314,15 @@ def main(args):
         mu.plot_map(
             analysis_mask,
             title="Analysis mask after cropping borders",
-            file_name=f"{plot_dir}/{mask_label}_mask",
+            file_name=f"{plot_dir}/kspace_mask",
             pix_type=meta.pix_type,
             lims=[-analysis_mask.max(), analysis_mask.max()]
         )
 
+    # The cropped binary mask is considered suitable to multiply by before
+    # kspace filtering, as this leads to minimal harmonic-space artifacts.
     mu.write_map(
-        f"{masks_dir}/binary_galactic_cropped.fits",
+        f"{masks_dir}/kspace_mask.fits",
         analysis_mask,
         pix_type=meta.pix_type
     )
