@@ -38,8 +38,7 @@ def main(args):
     cl = np.load(
         tf_settings["power_law_c_ell"]
     )
-    _, cl = cl["l"], cl["cl"]
-    cl = cl[:nl]
+    cl = cl["cl"][:nl]
 
     trans = cu.get_transfer_dict(
         pcls_mat_dict,
