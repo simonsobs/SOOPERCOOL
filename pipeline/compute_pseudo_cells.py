@@ -126,13 +126,20 @@ def main(args):
             mask = enmap.insert(flat_template.copy()[0], mask)
             m = enmap.insert(flat_template.copy(), m)
 
-        field_spin0 = nmt.NmtField(mask, m[:1], wcs=wcs, lmax=meta.lmax)
+        field_spin0 = nmt.NmtField(
+            mask,
+            m[:1],
+            wcs=wcs,
+            lmax=meta.lmax,
+            lmax_mask=meta.lmax
+        )
         field_spin2 = nmt.NmtField(
             mask,
             m[1:],
             wcs=wcs,
             purify_b=meta.pure_B,
-            lmax=meta.lmax
+            lmax=meta.lmax,
+            lmax_mask=meta.lmax
         )
 
         fields[map_set, id_bundle] = {
@@ -266,7 +273,7 @@ def main(args):
                 plt.close()
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
     parser.add_argument("--verbose", action="store_true", help="Verbose mode")
@@ -274,3 +281,7 @@ if __name__ == "__main__":
                         help="Do not make plots.")
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

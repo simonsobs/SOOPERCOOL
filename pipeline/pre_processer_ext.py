@@ -468,7 +468,7 @@ def pre_processer(args):
         print("---------------------")
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(
         description="Pre-processing external data for the pipeline")
     parser.add_argument("--globals", type=str,
@@ -493,3 +493,7 @@ if __name__ == "__main__":
         print("exiting...")
     else:
         pre_processer(args)
+
+
+if __name__ == "__main__":
+    cli()

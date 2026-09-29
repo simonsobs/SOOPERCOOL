@@ -1,5 +1,4 @@
 import soopercool.map_utils as mu
-from itertools import product
 import pymaster as nmt
 import numpy as np
 import matplotlib.pyplot as plt
@@ -156,7 +155,7 @@ def get_weighted_pcls(pcls, mask, pix_type="car"):
         weights = np.mean(mask ** 2)
     elif pix_type == "car":
         shape, wcs = mask.geometry
-        pixsizemap = enmap.pixsizemap(shape, wcs)  # sterradians
+        pixsizemap = enmap.pixsizemap(shape, wcs)  # steradians
         weights = np.sum(mask ** 2 * pixsizemap) / (4*np.pi)
 
     for k in pcls_dict:
@@ -351,7 +350,7 @@ def plot_pcls_mat_transfer(pcls_mat_unfilt, pcls_mat_filt, lb, file_name,
     """
     import matplotlib.pyplot as plt
 
-    field_pairs = [f"{p}{q}" for (p, q) in product("TEB", "TEB")]
+    field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
     plt.figure(figsize=(25, 25))
     grid = plt.GridSpec(9, 9, hspace=0.3, wspace=0.3)
     msk = np.ones_like(lb).astype(bool)

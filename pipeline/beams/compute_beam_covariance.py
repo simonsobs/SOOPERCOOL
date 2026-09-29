@@ -96,8 +96,12 @@ def main(args):
             )
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

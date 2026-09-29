@@ -93,7 +93,7 @@ def main(args):
     )
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(
         description="Compute mask mode coupling matrices"
     )
@@ -106,3 +106,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

@@ -4,8 +4,8 @@ import numpy as np
 import argparse
 
 # Yuji's code
-import coordinator
-import coadder
+from . import coordinator
+from . import coadder
 
 
 def main(args):
@@ -114,7 +114,7 @@ def main(args):
         coordinator.write_hdf5_map(fname, nside, dict_maps, list_of_obsid)
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--atomic_list_fpath",
                         help="Path to npz file with path to atomic maps.")
@@ -128,3 +128,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

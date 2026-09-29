@@ -1,5 +1,5 @@
 from scipy.optimize import minimize
-import postproc_utils as pputils
+from . import postproc_utils as pputils
 import numpy as np
 import argparse
 import sacc
@@ -123,7 +123,7 @@ def main(args):
     s_out.save_fits(fname)
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(description="Fit EB angles")
     parser.add_argument(
         "--sacc-file", type=str, help="Path to the SACC fits file"
@@ -143,3 +143,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

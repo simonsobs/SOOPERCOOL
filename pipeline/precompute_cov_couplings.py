@@ -5,7 +5,6 @@ from soopercool import map_utils as mu
 import pymaster as nmt
 import os
 from soopercool import mpi_utils as mpi
-import sotodlib.preprocess.preprocess_util as pp_utils
 from itertools import product
 import time
 
@@ -18,7 +17,7 @@ def main(args):
     rank, size, comm = mpi.init(True)
 
     meta = BBmeta(args.globals)
-    logger = pp_utils.init_logger("benchmark", verbosity=1)
+    logger = meta.logger
 
     out_dir = meta.output_directory
     # Define output directory
@@ -239,7 +238,7 @@ def main(args):
         logger.info(f"[{rank}] nn cwsp computed in {time.time() - t0:.2f}s")
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(
         description="Compute and saves couplings for covariance matrices"
     )
@@ -247,3 +246,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

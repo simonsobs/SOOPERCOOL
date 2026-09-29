@@ -1,4 +1,5 @@
 import argparse
+import os
 import numpy as np
 import healpy as hp
 import pymaster as nmt
@@ -225,13 +226,23 @@ def main(args):
                         bbox_inches="tight")
             print(f"{out_dir}/mask_validation_{cl_type}_{pols}.png")
             plt.close()
+
+    print("Removing validation maps")
+    for id_sim, cl_type in mpi_shared_list:
+        os.remove(f"{out_dir}/mapQU_{cl_type}_{id_sim:04}.fits")
+        os.remove(f"{out_dir}/mapQU_{cl_type}_bonly_{id_sim:04}.fits")
+        os.remove(f"{out_dir}/clb_{cl_type}_{id_sim:04}.npz")
+    print("Removing workspace")
+    os.remove(f"{out_dir}/wsp_pure.fits")
+    os.remove(f"{out_dir}/wsp_nopure.fits")
+
     if failed_count == 0:
         print("All tests passed.")
     else:
         print(f"WARNING: {failed_count} out of 6 tests failed.")
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--out_dir", type=str, help="Output directory")
     parser.add_argument("--mask_fname",
@@ -251,3 +262,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

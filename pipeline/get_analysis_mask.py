@@ -314,13 +314,15 @@ def main(args):
         mu.plot_map(
             analysis_mask,
             title="Analysis mask after cropping borders",
-            file_name=f"{plot_dir}/{mask_label}_mask",
+            file_name=f"{plot_dir}/kspace_mask",
             pix_type=meta.pix_type,
             lims=[-analysis_mask.max(), analysis_mask.max()]
         )
 
+    # The cropped binary mask is considered suitable to multiply by before
+    # kspace filtering, as this leads to minimal harmonic-space artifacts.
     mu.write_map(
-        f"{masks_dir}/binary_galactic_cropped.fits",
+        f"{masks_dir}/kspace_mask.fits",
         analysis_mask,
         pix_type=meta.pix_type
     )
@@ -438,7 +440,7 @@ def main(args):
     print(f"    Apodization radius point source: {masks_settings['apod_radius_point_source']}")  # noqa: E501
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser(description="Get analysis mask")
     parser.add_argument("--globals", help="Path to the paramfile")
     parser.add_argument("--verbose", help="Verbose mode",
@@ -448,3 +450,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

@@ -107,16 +107,24 @@ def main(args):
             sat_parts_lower = [
                 part.lower()
                 for part in sat_parts
-                if part.startswith("SAT")
+                if part.startswith(("SAT", "sat"))
+            ]
+            # sat_parts_nochange will read in and don't modify
+            # to lower case.
+            sat_parts_nochange = [
+                part
+                for part in sat_parts
+                if part.startswith(("SAT", "sat"))
             ]
             sat = "_".join(sat_parts_lower)
+            sat = "_".join(sat_parts_nochange)
             non_sat_parts = [
-                p for p in sat_parts if not p.startswith('SAT')
+                p for p in sat_parts if not p.startswith(("SAT", "sat"))
             ]
             frq = non_sat_parts[0] if len(non_sat_parts) > 0 else None
             ssplit = (
-                "_".join(non_sat_parts[2:])
-                if len(non_sat_parts) > 2
+                "_".join(non_sat_parts[1:])
+                if len(non_sat_parts) > 1
                 else ""
             )
             map_fname = (
@@ -237,7 +245,7 @@ def main(args):
             )
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
     parser.add_argument("--no-plots", action="store_false",
@@ -248,3 +256,7 @@ if __name__ == "__main__":
                             (overrides meta.car_template).")
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

@@ -316,7 +316,7 @@ def main(args):
                              hits_hp, dtype=np.float32, pix_type='car')
 
 
-if __name__ == "__main__":
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("--globals", help="Path to the global parameter file.")
     parser.add_argument("--n_bundles", type=int, help="Number of bundles.")
@@ -327,3 +327,7 @@ if __name__ == "__main__":
                         help="Seed for the random number generator.")
     args = parser.parse_args()
     main(args)
+
+
+if __name__ == "__main__":
+    cli()

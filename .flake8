@@ -2,4 +2,4 @@
 exclude =
     build/,
     legacy/,
-    setup.py
+    .venv/
