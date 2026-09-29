@@ -355,14 +355,15 @@ def get_transfer_dict(pcls_mat_dict,
         containing the transfer function and its error.
     """
     tf_dict = {(ftag1, ftag2): {} for ftag1, ftag2 in filtering_pairs}
+    tf_func = (
+        get_transfer_with_error_TM
+        if tf_ordering == "TM"
+        else get_transfer_with_error_MT
+    )
     for ftag1, ftag2 in filtering_pairs:
 
         pcls_mat_filt = pcls_mat_dict[ftag1, ftag2]["filtered"]
-        tf_func = (
-            get_transfer_with_error_TM
-            if tf_ordering == "TM"
-            else get_transfer_with_error_MT
-        )
+
         tf, tferr = tf_func(
             pcls_mat_filt,
             cl,
