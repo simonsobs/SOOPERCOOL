@@ -92,8 +92,9 @@ def get_transfer_with_error_TM(pcls_mat_filt,
         ),
         axis=0
     )
+    Nsims = np.array(pcls_mat_filt).shape[0]
 
-    return T_mean, T_std
+    return T_mean, T_std / np.sqrt(Nsims)
 
 
 def get_transfer_with_error_MT(pcls_mat_filt,
@@ -227,7 +228,9 @@ def get_transfer_with_error_MT(pcls_mat_filt,
     ).reshape([size, n_bins, size])
     T_std = np.transpose(T_std, [0, 2, 1])
 
-    return T_mean, T_std
+    Nsims = np.array(pcls_mat_filt).shape[0]
+
+    return T_mean, T_std / np.sqrt(Nsims)
 
 
 def get_transfer_with_error(mean_pcls_mat_filt,
