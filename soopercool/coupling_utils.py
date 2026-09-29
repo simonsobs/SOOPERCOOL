@@ -322,10 +322,12 @@ def get_transfer_dict(pcls_mat_dict,
 
     Parameters
     ----------
-    pcls_mat_filt : ndarray
-        Filtered and binned pseudo-cells for different pure pairs
-        and simulations
-        Shape should be (N_sims, N_pure_pairs, N_field_pairs, N_bins)
+    pcls_mat_dict : dict
+        Dictionary containing filtered and binned pseudo-cells
+        for different pure pairs and simulations.
+        The structure is the following:
+            {(ftag1, ftag2): {"filtered": ndarray, "unfiltered": ndarray}}
+        Shape of arrays should be (N_sims, N_pure_pairs, N_field_pairs, N_bins)
     filtering_pairs : list of tuples
         List of filtering tag pairs (ftag1, ftag2) for which to compute
     cl : ndarray
