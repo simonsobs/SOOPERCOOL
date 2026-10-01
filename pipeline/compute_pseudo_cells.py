@@ -29,7 +29,7 @@ def main(args):
 
     mask_dir = "/".join(meta.masks["analysis_mask"].split("/")[:-1])
     binary = mu.read_map(
-        f"{mask_dir}/binary_galactic_cropped.fits",
+        f"{mask_dir}/kspace_mask.fits",
         pix_type=meta.pix_type,
         car_template=meta.car_template
     )
