@@ -136,104 +136,116 @@ def main(args):
                     cells_coadd["auto"][map_set1, map_set2][field_pair] - \
                     cells_coadd["cross"][map_set1, map_set2][field_pair]
 
-        # Below, we try to build a filtering correction at power spectrum level
-        # to model the increased variance induced by filtering
-        # We will build this based on a set of simulations which has
-        # already been generated for transfer function estimation
-        ftag1 = meta.filtering_tag_from_map_set(map_set1)
-        ftag2 = meta.filtering_tag_from_map_set(map_set2)
-        ktag1 = meta.kspace_tag_from_map_set(map_set1)
-        ktag2 = meta.kspace_tag_from_map_set(map_set2)
+        if meta.covariance["apply_filtering_corr"]:
+            # Below, we try to build a filtering correction at power
+            # spectrum level to model the increased variance induced by
+            # filtering We will build this based on a set of simulations
+            # which has already been generated for transfer function estimation
+            ftag1 = meta.filtering_tag_from_map_set(map_set1)
+            ftag2 = meta.filtering_tag_from_map_set(map_set2)
+            ktag1 = meta.kspace_tag_from_map_set(map_set1)
+            ktag2 = meta.kspace_tag_from_map_set(map_set2)
 
-        sim_ids = range(
-            tf_settings["sim_id_start"],
-            tf_settings["sim_id_start"] + tf_settings["tf_est_num_sims"]
-        )
-
-        ps_mat_filtered = []
-        ps_mat_unfiltered = []
-        for sim_id in sim_ids:
-            ps_mat_filtered.append(
-                np.load(
-                    f"{cells_tf_dir}/pcls_mat_tf_est_{ftag1}_{ktag1}_x_{ftag2}_{ktag2}_filtered_unbinned_{sim_id:04d}.npz" # noqa
-                )["pcls_mat"]
-            )
-            ps_mat_unfiltered.append(
-                np.load(
-                    f"{cells_tf_dir}/pcls_mat_tf_est_{ftag1}_{ktag1}_x_{ftag2}_{ktag2}_unfiltered_unbinned_{sim_id:04d}.npz" # noqa
-                )["pcls_mat"]
+            sim_ids = range(
+                tf_settings["sim_id_start"],
+                tf_settings["sim_id_start"] + tf_settings["tf_est_num_sims"]
             )
 
-        ps_mat_filtered = np.array(ps_mat_filtered)
-        ps_mat_unfiltered = np.array(ps_mat_unfiltered)
-
-        var_filtered = np.std(ps_mat_filtered, axis=0) ** 2
-        var_unfiltered = np.std(ps_mat_unfiltered, axis=0) ** 2
-
-        # Compute 4pt and 2pt diagonal
-        # transfer functions
-        T4 = np.nan_to_num(var_filtered / var_unfiltered)
-        T2 = np.nan_to_num(
-            ps_mat_filtered / ps_mat_unfiltered
-        )
-        invT2sq = np.nan_to_num(
-            np.mean(
-                1 / T2**2,
-                axis=0
-            )
-        )
-        T4_over_T2sq = np.nan_to_num(T4 * invT2sq)
-
-        ps_mat_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
-        pure_pairs = list(product(
-            ["pureT", "pureE", "pureB"],
-            ["pureT", "pureE", "pureB"]
-        ))
-        correction = {}
-        for ps_idx, fp in enumerate(ps_mat_pairs):
-            pure_idx = pure_pairs.index((f"pure{fp[0]}", f"pure{fp[1]}"))
-            y = T4_over_T2sq[pure_idx, ps_idx, :]
-            nl = y.shape[0]
-            x = np.arange(nl)
-            x, y, ystd = bin_data(
-                x,
-                y,
-                [0, 2, 6, 10, 30, 50, 70, 90, 100, 200,
-                 300, 400, 500, 600, 700, nl]  # TODO: fix this
-            )
-            msk_fit = (x >= 2) & (x <= 650)
-            corr = gp_fit(
-                np.log10(x[msk_fit]),
-                np.nan_to_num(y)[msk_fit],
-                np.nan_to_num(ystd)[msk_fit],
-                np.log10(np.arange(1, nl))
-            )
-            correction[fp] = np.concatenate(([0], corr))
-
-            if args.plots:
-                plt.figure(figsize=(8, 6))
-                plt.plot(
-                    np.arange(nl),
-                    T4_over_T2sq[pure_idx, ps_idx, :],
-                    color="k"
+            ps_mat_filtered = []
+            ps_mat_unfiltered = []
+            for sim_id in sim_ids:
+                ps_mat_filtered.append(
+                    np.load(
+                        f"{cells_tf_dir}/pcls_mat_tf_est_{ftag1}_{ktag1}_x_{ftag2}_{ktag2}_filtered_unbinned_{sim_id:04d}.npz" # noqa
+                    )["pcls_mat"]
                 )
-                plt.plot(
-                    np.arange(1, nl),
-                    corr,
-                    color="DodgerBlue"
+                ps_mat_unfiltered.append(
+                    np.load(
+                        f"{cells_tf_dir}/pcls_mat_tf_est_{ftag1}_{ktag1}_x_{ftag2}_{ktag2}_unfiltered_unbinned_{sim_id:04d}.npz" # noqa
+                    )["pcls_mat"]
                 )
-                plt.errorbar(
-                    x, y, ystd,
-                    fmt=".",
-                    color="DodgerBlue",
-                    markerfacecolor="white"
+
+            ps_mat_filtered = np.array(ps_mat_filtered)
+            ps_mat_unfiltered = np.array(ps_mat_unfiltered)
+
+            var_filtered = np.std(ps_mat_filtered, axis=0) ** 2
+            var_unfiltered = np.std(ps_mat_unfiltered, axis=0) ** 2
+
+            # Compute 4pt and 2pt diagonal
+            # transfer functions
+            T4 = np.nan_to_num(var_filtered / var_unfiltered)
+            T2 = np.nan_to_num(
+                ps_mat_filtered / ps_mat_unfiltered
+            )
+            invT2sq = np.nan_to_num(
+                np.mean(
+                    1 / T2**2,
+                    axis=0
                 )
-                plt.xlim(2, 650)
-                plt.ylim(0.8, 1.5)
-                plt.savefig(
-                    f"{plot_dir}/4pt_correction_{fp}.pdf",
-                    bbox_inches="tight"
+            )
+            T4_over_T2sq = np.nan_to_num(T4 * invT2sq)
+
+            ps_mat_pairs = [
+                "TT",
+                "TE", "TB",
+                "ET", "BT",
+                "EE", "EB", "BE", "BB"
+            ]
+            pure_pairs = list(product(
+                ["pureT", "pureE", "pureB"],
+                ["pureT", "pureE", "pureB"]
+            ))
+            correction = {}
+            for ps_idx, fp in enumerate(ps_mat_pairs):
+                pure_idx = pure_pairs.index((f"pure{fp[0]}", f"pure{fp[1]}"))
+                y = T4_over_T2sq[pure_idx, ps_idx, :]
+                nl = y.shape[0]
+                x = np.arange(nl)
+                x, y, ystd = bin_data(
+                    x,
+                    y,
+                    [0, 2, 6, 10, 30, 50, 70, 90,
+                     100, 200, 300, 400, 500,
+                     600, 700, nl]  # TODO: fix this
                 )
+                msk_fit = (x >= 2) & (x <= 650)
+                corr = gp_fit(
+                    np.log10(x[msk_fit]),
+                    np.nan_to_num(y)[msk_fit],
+                    np.nan_to_num(ystd)[msk_fit],
+                    np.log10(np.arange(1, nl))
+                )
+                correction[fp] = np.concatenate(([0], corr))
+
+                if args.plots:
+                    plt.figure(figsize=(8, 6))
+                    plt.plot(
+                        np.arange(nl),
+                        T4_over_T2sq[pure_idx, ps_idx, :],
+                        color="k"
+                    )
+                    plt.plot(
+                        np.arange(1, nl),
+                        corr,
+                        color="DodgerBlue"
+                    )
+                    plt.errorbar(
+                        x, y, ystd,
+                        fmt=".",
+                        color="DodgerBlue",
+                        markerfacecolor="white"
+                    )
+                    plt.xlim(2, 650)
+                    plt.ylim(0.8, 1.5)
+                    plt.savefig(
+                        f"{plot_dir}/4pt_correction_{fp}.pdf",
+                        bbox_inches="tight"
+                    )
+        else:
+            correction = {
+                fp: np.ones_like(cells_coadd["cross"][map_set1, map_set2][fp])
+                for fp in field_pairs
+            }
 
         # Save out coadded cells with filtering correction applied
         for type in ["cross", "noise"]:
