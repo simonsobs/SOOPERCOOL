@@ -219,9 +219,9 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None,
 
     field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
     tmp_pcls = {}
-    for field_pair in field_pairs:
-        pure_type1 = f"pure{field_pair[0]}"
-        pure_type2 = f"pure{field_pair[1]}"
+    for (pure_type1, pure_type2) in field_pairs:
+        pure_type1 = f"pure{pure_type1}"
+        pure_type2 = f"pure{pure_type2}"
         pcls = get_coupled_pseudo_cls(
             fields[pure_type1],
             fields2[pure_type2],
@@ -250,9 +250,9 @@ def get_pcls_mat_transfer(fields, nmt_binning, fields2=None,
             "BB": pcls["spin2xspin2"][3]
         }
 
-    for idx, field_pair in enumerate(field_pairs):
-        pure_type1 = f"pure{field_pair[0]}"
-        pure_type2 = f"pure{field_pair[1]}"
+    for idx, (pure_type1, pure_type2) in enumerate(field_pairs):
+        pure_type1 = f"pure{pure_type1}"
+        pure_type2 = f"pure{pure_type2}"
         pcls_mat[idx] = np.array([
             tmp_pcls[pure_type1, pure_type2]["TT"],
             tmp_pcls[pure_type1, pure_type2]["TE"],
