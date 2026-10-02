@@ -48,6 +48,8 @@ These tags are used to attach a map_set to a given filtering that has been appli
 ```yaml
 transfer_settings:
   tf_est_num_sims: X # Number of simulations for TF
+  power_law_c_cell: /path/to/cl.npz # npz file with keys l, cl, input PS for sims
+  tf_ordering: "MT"/"TM" # TM is the BBmaster paper ordering. Alternative is "MT"
   unfiltered_map_dir:
     # Path to unfiltered maps
     ftag1: /path/to/maps
