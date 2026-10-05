@@ -260,7 +260,7 @@ def bin_theory_cls(cls, bpwf):
 
     Args
     ----
-        cls: dict, items strings with field pairs "TT", "TE", etc, 
+        cls: dict, items strings with field pairs "TT", "TE", etc,
             values array-like of shape (nl,), where `nl` is the maximum
              multipole
         bpwf: ndarray
@@ -269,7 +269,7 @@ def bin_theory_cls(cls, bpwf):
             and `n_bins` is the number of bandpower bins.
     Returns
     -------
-        dict, items strings with field pairs "TT", "TE", etc, 
+        dict, items strings with field pairs "TT", "TE", etc,
         values array-like of shape (nl,), where `nl` is the maximum
         multipole
     """
