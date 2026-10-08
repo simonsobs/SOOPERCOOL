@@ -191,22 +191,27 @@ def main(args):
                 "ET", "BT",
                 "EE", "EB", "BE", "BB"
             ]
-            pure_pairs = list(product(
-                ["pureT", "pureE", "pureB"],
-                ["pureT", "pureE", "pureB"]
-            ))
+            # pure_pairs = list(product(
+            #     ["pureT", "pureE", "pureB"],
+            #     ["pureT", "pureE", "pureB"]
+            # ))
+            pure_pairs = [
+                (f"pure{fp[0]}", f"pure{fp[1]}") for fp in ps_mat_pairs
+            ]
             correction = {}
             for ps_idx, fp in enumerate(ps_mat_pairs):
                 pure_idx = pure_pairs.index((f"pure{fp[0]}", f"pure{fp[1]}"))
                 y = T4_over_T2sq[pure_idx, ps_idx, :]
                 nl = y.shape[0]
                 x = np.arange(nl)
+                # THIS IS QUITE HACKY, I WOULD ADVISE TO
+                # REPLACE THIS WITH A MORE ROBUST METHOD
+                # I WOULD ADVISE TESTING SWITCHING ON/OFF
                 x, y, ystd = bin_data(
                     x,
                     y,
                     [0, 2, 6, 10, 30, 50, 70, 90,
-                     100, 200, 300, 400, 500,
-                     600, 700, nl]  # TODO: fix this
+                     100, 200, 300, 400, 500, nl]  # TODO: fix this
                 )
                 msk_fit = (x >= 2) & (x <= 650)
                 corr = gp_fit(
