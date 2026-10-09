@@ -68,6 +68,10 @@ def main(args):
                     fname=f"{out_dir}/null_summary_{fp}_lmin{lmin}_lmax{lmax}"
                 )
 
+        null_archive.to_file(
+            f"{out_dir}/null_archive.fits"
+        )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
