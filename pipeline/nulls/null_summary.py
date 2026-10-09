@@ -1,6 +1,5 @@
 import argparse
 from pipeline.nulls import NullArchive
-import sacc
 import os
 
 
@@ -8,42 +7,10 @@ def main(args):
     """
     """
     sacc_files = args.sacc_files
-    saccs = [sacc.Sacc.load_fits(f) for f in sacc_files]
-    null_archive = NullArchive(saccs)
+    null_archive = NullArchive(sacc_files)
 
     if args.inspect:
-        unique_groups = list(set(null_archive.group))
-        diffs = [
-            (ms1, ms2)
-            for ms1, ms2 in zip(
-                null_archive.tracer1,
-                null_archive.tracer2
-            )
-        ]
-        unique_diffs = list(set(diffs))
-        field_pairs = [
-            dtype.split("_")[-1].upper().replace("0", "T")
-            for dtype in null_archive.dtype
-        ]
-        unique_field_pairs = list(set(field_pairs))
-
-        # Run some inspection of the null archive to
-        # indicate which nulls, map sets are present.
-        print("Inspecting null archive")
-        print("-----------------------")
-        print("  Provided files:")
-        for f in sacc_files:
-            print(f"    {f}")
-        print("  Available null groups:")
-        for group in unique_groups:
-            print(f"    {group}")
-        print("  Available map set differences:")
-        for ms1, ms2 in unique_diffs:
-            print(f"    {ms1} -- {ms2}")
-        print("  Available field pairs:")
-        for field_pair in unique_field_pairs:
-            print(f"    {field_pair}")
-        print(f"  Number of simulations: {null_archive.n_sims}")
+        null_archive.inspect()
 
     else:
         out_dir = args.out_dir

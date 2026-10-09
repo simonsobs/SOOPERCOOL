@@ -21,19 +21,43 @@ class NullArchive:
     residuals and compute chi, chi2 and PTE statistics.
     """
     def __init__(self, sacc_files):
-        self.sacc = sacc.concatenate_data_sets(*sacc_files)
+
+        saccs = self._read_from_fname_or_sacc(sacc_files)
+        self.sacc = sacc.concatenate_data_sets(*saccs)
 
         self.parse_sacc()
+
+    def _read_from_fname_or_sacc(self, sacc_files):
+        """
+        """
+        if isinstance(sacc_files, (str, sacc.Sacc)):
+            inputs = [sacc_files]
+        elif isinstance(sacc_files, list):
+            inputs = sacc_files
+        else:
+            raise ValueError(
+                "Expected a path, SACC object or a list of either."
+            )
+        if not inputs:
+            raise ValueError("At least one SACC input required.")
+
+        if all(isinstance(item, sacc.Sacc) for item in inputs):
+            self.sacc_files = None
+            return inputs
+        elif all(isinstance(item, str) for item in inputs):
+            self.sacc_files = inputs
+            return [sacc.Sacc.load_fits(f) for f in inputs]
+
+        raise TypeError(
+            "SACC inputs must all be all paths or all SACC objects."
+        )
 
     @classmethod
     def from_file(cls, fnames):
         """
         Instantiate a NullArchive object from saved sacc file.
         """
-        if isinstance(fnames, str):
-            fnames = [fnames]
-        saccs = [sacc.Sacc.load_fits(f) for f in fnames]
-        return cls(saccs)
+        return cls(fnames)
 
     def to_file(self, fname):
         """
@@ -80,6 +104,44 @@ class NullArchive:
 
         self.cov = np.cov(self.X.T)
         self.var = self.cov.diagonal()
+
+    def inspect(self):
+        """
+        Inspect the null archive to indicate which nulls, map sets
+        are present.
+        """
+        unique_groups = list(set(self.group))
+        diffs = [
+            (ms1, ms2)
+            for ms1, ms2 in zip(
+                self.tracer1,
+                self.tracer2
+            )
+        ]
+        unique_diffs = list(set(diffs))
+        field_pairs = [
+            dtype.split("_")[-1].upper().replace("0", "T")
+            for dtype in self.dtype
+        ]
+        unique_field_pairs = list(set(field_pairs))
+
+        # Run some inspection of the null archive to
+        # indicate which nulls, map sets are present.
+        print("Inspecting null archive")
+        print("-----------------------")
+        print("  Provided files:")
+        for f in self.sacc_files:
+            print(f"    {f}")
+        print("  Available null groups:")
+        for group in unique_groups:
+            print(f"    {group}")
+        print("  Available map set differences:")
+        for ms1, ms2 in unique_diffs:
+            print(f"    {ms1} -- {ms2}")
+        print("  Available field pairs:")
+        for field_pair in unique_field_pairs:
+            print(f"    {field_pair}")
+        print(f"  Number of simulations: {self.n_sims}")
 
     def select(self, null_groups=None,
                field_pairs=None,
