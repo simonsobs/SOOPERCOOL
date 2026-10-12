@@ -274,7 +274,10 @@ class NullArchive:
         res = self.X[:, m] if on_sims else self.data[m][None, :]
 
         chi = res / np.sqrt(self.var[m])
-        chi2 = np.einsum("si,is->s", res, np.linalg.solve(cov, res.T))
+        if diag_cov:
+            chi2 = np.sum(chi**2, axis=1)
+        else:
+            chi2 = np.einsum("si,is->s", res, np.linalg.solve(cov, res.T))
         if on_sims:
             return chi, chi2
         return chi[0], chi2[0]
@@ -469,33 +472,40 @@ class NullArchive:
                         xlabel=None,
                         fname=None,
                         display=False,
-                        is_pte=False):
+                        is_pte=False,
+                        return_fig=False):
         """
         """
         if is_pte:
             bins = np.linspace(0, 1, 2*int(np.sqrt(self.n_sims)))
         else:
             bins = 2*int(np.sqrt(self.n_sims))
-        plt.figure(figsize=(6, 4))
-        plt.hist(
+        fig = plt.figure(figsize=(6, 4))
+        ax = plt.gca()
+        ax.hist(
             chi_sims,
             bins=bins,
-            density=True,
             alpha=0.5,
-            label="Simulations"
+            color="darkorange"
         )
-        plt.axvline(chi, color="r", linestyle="--", label="Data")
-        plt.title(title)
-        plt.xlabel(xlabel)
-        plt.ylabel("Density")
-        plt.legend()
-        plt.text(0.95, 0.95, f"PTE = {pte:.3f}", transform=plt.gca().transAxes,
-                 verticalalignment='top', horizontalalignment='right')
+        ax.axvline(chi, color="DodgerBlue", linestyle="--")
+        ax.set_title(title, fontsize=14)
+        ax.set_xlabel(xlabel, fontsize=14)
+        ax.text(
+            0.95, 0.95,
+            f"${{\\rm PTE}} = {pte:.3f}$",
+            transform=plt.gca().transAxes,
+            verticalalignment='top',
+            horizontalalignment='right',
+            fontsize=13
+        )
         if fname is not None:
             plt.savefig(fname)
         if display:
             plt.show()
         else:
+            if return_fig:
+                return fig
             plt.close()
 
     def summary_stats(self, null_groups=None,
@@ -504,7 +514,8 @@ class NullArchive:
                       ellmax=None,
                       diag_cov=True,
                       fname=None,
-                      display=False):
+                      display=False,
+                      return_fig=False):
         """
         """
 
@@ -582,68 +593,78 @@ class NullArchive:
         meta_pte_min = np.sum(min_pte_sims < min_pte) / self.n_sims
 
         # PLOTS
-        self._plot_histogram(
+        figs = []
+        figs.append(self._plot_histogram(
             chi=tot_chi2,
             chi_sims=tot_chi2_sims,
             pte=tot_pte,
-            title=r"Total $\chi^2$",
+            title=r"${{\rm Total}}$ $\chi^2$",
             xlabel=r"$\chi^2$",
             display=display,
-            fname=f"{fname}_total_chi2.pdf" if fname is not None else None
-        )
-        self._plot_histogram(
+            fname=f"{fname}_total_chi2.pdf" if fname is not None else None,
+            return_fig=True
+        ))
+        figs.append(self._plot_histogram(
             chi=max_chi2_ell,
             chi_sims=max_chi2_sims_ell,
             pte=pte_max_ell,
-            title=r"Max $\chi^2$ across $\ell$ bin",
+            title=r"${{\rm Max}}$  $\chi^2$ ${{\rm across}}$ $\ell$ ${{\rm bins}}$", # noqa
             xlabel=r"$\chi^2$",
             display=display,
-            fname=f"{fname}_max_chi2_ell.pdf" if fname is not None else None
-        )
-        self._plot_histogram(
+            fname=f"{fname}_max_chi2_ell.pdf" if fname is not None else None,
+            return_fig=True
+        ))
+        figs.append(self._plot_histogram(
             chi=avg_chi_ell,
             chi_sims=avg_chi_sims_ell,
             pte=pte_avg_ell,
-            title=r"Average $\chi$ across $\ell$ bin",
+            title=r"${{\rm Average}}$ $\chi$ ${{\rm across}}$ $\ell$ ${{\rm bins}}$", # noqa
             xlabel=r"$\chi$",
             display=display,
-            fname=f"{fname}_avg_chi_ell.pdf" if fname is not None else None
-        )
-        self._plot_histogram(
+            fname=f"{fname}_avg_chi_ell.pdf" if fname is not None else None,
+            return_fig=True
+        ))
+        figs.append(self._plot_histogram(
             chi=max_chi2_fp,
             chi_sims=max_chi2_sims_fp,
             pte=pte_fp,
-            title=r"Max $\chi^2$ across field pairs",
+            title=r"${{\rm Max}}$ $\chi^2$ ${{\rm across}}$ ${{\rm field}}$ ${{\rm pairs}}$", # noqa
             xlabel=r"$\chi^2$",
             display=display,
-            fname=None if fname is None else f"{fname}_max_chi2_field_pairs.pdf" # noqa
-        )
-        self._plot_histogram(
+            fname=None if fname is None else f"{fname}_max_chi2_field_pairs.pdf", # noqa
+            return_fig=True
+        ))
+        figs.append(self._plot_histogram(
             chi=max_chi2_group,
             chi_sims=max_chi2_sims_group,
             pte=pte_group,
-            title=r"Max $\chi^2$ across null tests",
+            title=r"${{\rm Max}}$ $\chi^2$ ${{\rm across}}$ ${{\rm null}}$ ${{\rm tests}}$", # noqa
             xlabel=r"$\chi^2$",
             display=display,
-            fname=None if fname is None else f"{fname}_max_chi2_null_groups.pdf" # noqa
-        )
-        self._plot_histogram(
+            fname=None if fname is None else f"{fname}_max_chi2_null_groups.pdf", # noqa
+            return_fig=True
+        ))
+        figs.append(self._plot_histogram(
             chi=max_pte,
             chi_sims=max_pte_sims,
             pte=meta_pte_max,
-            title="Max PTE across all tests",
-            xlabel="PTE",
+            title=r"${{\rm Max}}$ ${{\rm PTE}}$ ${{\rm across}}$ ${{\rm all}}$ ${{\rm tests}}$", # noqa
+            xlabel=r"$\rm PTE$",
             display=display,
             is_pte=True,
-            fname=f"{fname}_max_pte.pdf" if fname is not None else None
-        )
-        self._plot_histogram(
+            fname=f"{fname}_max_pte.pdf" if fname is not None else None,
+            return_fig=True
+        ))
+        figs.append(self._plot_histogram(
             chi=min_pte,
             chi_sims=min_pte_sims,
             pte=meta_pte_min,
-            title="Min PTE across all tests",
-            xlabel="PTE",
+            title=r"${{\rm Min}}$ ${{\rm PTE}}$ ${{\rm across}}$ ${{\rm all}}$ ${{\rm tests}}$", # noqa
+            xlabel=r"$\rm PTE$",
             display=display,
             is_pte=True,
-            fname=f"{fname}_min_pte.pdf" if fname is not None else None
-        )
+            fname=f"{fname}_min_pte.pdf" if fname is not None else None,
+            return_fig=True
+        ))
+        if return_fig:
+            return figs
