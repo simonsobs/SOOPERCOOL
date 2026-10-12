@@ -6,16 +6,12 @@ import matplotlib.pyplot as plt
 class NullArchive:
     """
     This is a class to handle bookkeping of null tests via sacc files.
-    Instantiate an object with a list of sacc files, formatted as
+    Instantiate an object with a list of sacc files. This can be either
+    a path, list of paths, a `sacc.Sacc` object or a list of `sacc.Sacc`
+    objects.
     ```
-    sacc_files = [
-        sacc.Sacc.load_fits("null_sacc_file_1.fits"),
-        sacc.Sacc.load_fits("null_sacc_file_2.fits"),
-        ...
-    ]
-    ```
-    They will be concatenated into a single sacc object, containing
-    all residuals for data and simulations.
+    They will be concatenated into a single `sacc.Sacc` object,
+    containing all residuals for data and simulations.
 
     The class provides methods to interact with power spectrum
     residuals and compute chi, chi2 and PTE statistics.
@@ -67,6 +63,8 @@ class NullArchive:
 
     def parse_sacc(self):
         """
+        Parse the combined sacc file to extract 
+        the layout of data and sims.
         """
         self.map_diffs = self.sacc.get_tracer_combinations()
 
@@ -288,6 +286,7 @@ class NullArchive:
                                       ellmax=None,
                                       diag_cov=True):
         """
+        Summary statistics: Max chi2 across field pairs
         """
         stats = []
         if field_pairs is None:
@@ -334,6 +333,7 @@ class NullArchive:
                                 ellmax=None,
                                 diag_cov=True):
         """
+        Summary statistics: Max chi2 across null test groups
         """
         stats = []
         if null_groups is None:
@@ -379,6 +379,8 @@ class NullArchive:
                                ellmax=None,
                                diag_cov=True):
         """
+        Summary statistics: Max chi2 across ell bins
+        and average chi across ell bins
         """
         if field_pairs is None:
             field_pairs = list(set(self.dtype))
@@ -475,6 +477,8 @@ class NullArchive:
                         is_pte=False,
                         return_fig=False):
         """
+        Utility function to plot an histogram of chi2
+        or PTE values.
         """
         if is_pte:
             bins = np.linspace(0, 1, 2*int(np.sqrt(self.n_sims)))
@@ -517,6 +521,9 @@ class NullArchive:
                       display=False,
                       return_fig=False):
         """
+        Summary statistics: Compile all summary statistics
+        and plot histograms of chi2 and PTE values.
+        Eventually returns figure for the interactive web interface.
         """
 
         max_chi2_fp, max_chi2_sims_fp, pte_fp, pte_sims_fp = self._summary_stats_per_field_pair( # noqa
