@@ -5,6 +5,22 @@ import os
 
 def main(args):
     """
+    This script will create a `NullArchive` object from
+    a list of `sacc` files and compute summary statistics.
+    It will generate plots in the output directory for
+    the selected configurations.
+
+    Arguments are:
+      - sacc-files: list of sacc files to load
+      - inspect: if True, will print the layout of the sacc files
+      - out-dir: output directory to save plots and summary statistics
+      - lmins: ell_min to loop over for summary statistics
+      - lmaxs: ell_max to loop over for summary statistics
+      - field-pairs: field-pairs to consider for summary statistics.
+
+    Additionally, the script will save the combined `sacc` file in
+    the output directory. It can then be used for further analysis,
+    inspection.
     """
     sacc_files = args.sacc_files
     null_archive = NullArchive(sacc_files)
