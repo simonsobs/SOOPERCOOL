@@ -89,7 +89,7 @@ if valid_input:
     )
     mode = st.pills(
         "Mode",
-        options=["Residuals", "Summary statistics"],
+        options=["Residuals", "Summary statistics", "Table"],
         default="Residuals",
         width=300,
         label_visibility="hidden"
@@ -111,6 +111,9 @@ if valid_input:
     mapBs = [x[1] for x in map_diffs]
     #####
 
+    ###################
+    # Mode: RESIDUALS #
+    ###################
     if mode == "Residuals":
         # Activate sidebar widgets
         field_pair = st.sidebar.pills(
@@ -141,8 +144,7 @@ if valid_input:
         )
 
         fig = plt.figure(figsize=(6, 4), facecolor=stcolor)
-        import time
-        t0 = time.time()
+
         x, y, ycov = null_archive.get_ps_residual(
             mapA,
             mapB,
@@ -165,7 +167,6 @@ if valid_input:
         plt.axhline(0, color="w", lw=1, zorder=1)
         plt.axvline(range[0], color="w", lw=1, ls="--", zorder=1)
         plt.axvline(range[1], color="w", lw=1, ls="--", zorder=1)
-        t0 = time.time()
         plt.errorbar(
             x[mask], y[mask], yerr=np.sqrt(np.diag(ycov))[mask],
             marker="o",
@@ -196,7 +197,6 @@ if valid_input:
         chi2_sims = []
         sims = []
         for iii in null_archive.sim_ids:
-            t0 = time.time()
             x, y, _ = null_archive.get_ps_residual(
                 mapA,
                 mapB,
@@ -271,6 +271,9 @@ if valid_input:
         st.pyplot(fig)
         plt.close(fig)
 
+    ############################
+    # Mode: SUMMARY STATISTICS #
+    ############################
     elif mode == "Summary statistics":
         # Activate sidebar widgets
         field_pair = st.sidebar.pills(
@@ -313,3 +316,60 @@ if valid_input:
                 cols[i % ncols].pyplot(fig)
             finally:
                 plt.close(fig)
+
+    ###############
+    # Mode: TABLE #
+    ###############
+    elif mode == "Table":
+        field_pair = st.sidebar.pills(
+            "Field pair",
+            field_pairs,
+            default=["EE", "EB", "BB"],
+            selection_mode="multi"
+        )
+        range = st.sidebar.slider(
+            "Multipole range",
+            0,
+            600,
+            (100, 500),
+            step=10
+        )
+        split_by_residual = st.sidebar.checkbox(
+            "Show all map differences separately",
+            value=False
+        )
+
+        table = []
+        for group in unique_groups:
+            for fp in field_pair:
+                _, chi2 = null_archive.get_chi_chi2(
+                    null_groups=[group],
+                    field_pairs=[fp],
+                    ellmin=range[0],
+                    ellmax=range[1],
+                    on_sims=False,
+                    diag_cov=True
+                )
+
+                _, chi2_sims = null_archive.get_chi_chi2(
+                    null_groups=[group],
+                    field_pairs=[fp],
+                    ellmin=range[0],
+                    ellmax=range[1],
+                    on_sims=True,
+                    diag_cov=True
+                )
+                pte = np.sum(np.array(chi2_sims) > chi2) / len(chi2_sims)
+                table.append([group, fp, chi2, pte])
+
+        # Compile in a dataframe
+        import pandas as pd
+        df = pd.DataFrame(
+            table,
+            columns=["Null group", "Field pair", "Chi-squared", "PTE"],
+        )
+        df = df.style.format({
+            "Chi-squared": "{:.2f}",
+            "PTE": "{:.3f}",
+        })
+        st.dataframe(df)
