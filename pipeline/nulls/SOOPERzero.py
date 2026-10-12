@@ -1,6 +1,7 @@
 from pipeline.nulls import NullArchive
 import matplotlib.pyplot as plt
 import streamlit as st
+import pandas as pd
 import numpy as np
 import matplotlib
 import sys
@@ -56,6 +57,146 @@ else:
 if "data" not in st.session_state:
     st.session_state.data = None
 
+
+def plot_residual(null_archive, mapA, mapB, field_pair, range, diag_cov=True):
+    """
+    """
+    fig = plt.figure(figsize=(6, 4), facecolor=stcolor)
+
+    x, y, ycov = null_archive.get_ps_residual(
+        mapA,
+        mapB,
+        field_pair=field_pair
+    )
+    mask_ht = (x >= range[0])
+    mask_lt = (x <= range[1])
+    mask = mask_ht & mask_lt
+    compmask_ht = (x < range[0])
+    compmask_lt = (x > range[1])
+
+    idx_ht = np.flatnonzero(mask_ht)
+    idx_lt = np.flatnonzero(mask_lt)
+    compmask_ht[idx_ht[0]] = True
+    compmask_lt[idx_lt[-1]] = True
+
+    plt.xlabel(r"$\ell$", fontsize=14)
+    plt.ylabel(r"$\Delta D_\ell^{%s}$" % field_pair, fontsize=14)
+    plt.title(f"$\\rm {mapA} - {mapB}$".replace("_", "\_"), fontsize=14) # noqa
+    plt.axhline(0, color="w", lw=1, zorder=1)
+    plt.axvline(range[0], color="w", lw=1, ls="--", zorder=1)
+    plt.axvline(range[1], color="w", lw=1, ls="--", zorder=1)
+    plt.errorbar(
+        x[mask], y[mask], yerr=np.sqrt(np.diag(ycov))[mask],
+        marker="o",
+        markersize=4.7,
+        markerfacecolor="white",
+        ls="None",
+        zorder=5,
+        color="darkorange",
+        capsize=1.7
+    )
+    ylims = plt.gca().get_ylim()
+    for compmask in [compmask_ht, compmask_lt]:
+        plt.errorbar(
+            x[compmask], y[compmask],
+            yerr=np.sqrt(np.diag(ycov))[compmask],
+            marker="o",
+            markersize=4.7,
+            markerfacecolor="white",
+            ls="None",
+            zorder=5,
+            color="darkorange",
+            capsize=1.7,
+            alpha=0.4,
+        )
+
+    if diag_cov:
+        chi2 = np.sum(y[mask]**2 / np.diag(ycov)[mask])
+    else:
+        chi2 = y[mask] @ np.linalg.inv(ycov[np.ix_(mask, mask)]) @ y[mask]
+
+    chi2_sims = []
+    sims = []
+    for iii in null_archive.sim_ids:
+        x, y, _ = null_archive.get_ps_residual(
+            mapA,
+            mapB,
+            field_pair=field_pair,
+            sim_id=iii
+        )
+
+        if diag_cov:
+            chi2_sims.append(np.sum(y[mask]**2 / np.diag(ycov)[mask]))
+        else:
+            chi2_sims.append(
+                y[mask] @ np.linalg.inv(ycov[np.ix_(mask, mask)]) @ y[mask]
+            )
+
+        sims.append(y)
+
+    one_sigma_band = np.percentile(sims, [16, 84], axis=0)
+    two_sigma_band = np.percentile(sims, [2.5, 97.5], axis=0)
+
+    plt.fill_between(
+        x[mask],
+        one_sigma_band[0][mask],
+        one_sigma_band[1][mask],
+        color="gray",
+        alpha=0.5,
+        zorder=0
+    )
+    plt.fill_between(
+        x[mask],
+        two_sigma_band[0][mask],
+        two_sigma_band[1][mask],
+        color="gray",
+        alpha=0.2,
+        zorder=0
+    )
+    for compmask in [compmask_ht, compmask_lt]:
+        plt.fill_between(
+            x[compmask],
+            one_sigma_band[0][compmask],
+            one_sigma_band[1][compmask],
+            color="gray",
+            alpha=0.5*0.5,
+            zorder=0
+        )
+        plt.fill_between(
+            x[compmask],
+            two_sigma_band[0][compmask],
+            two_sigma_band[1][compmask],
+            color="gray",
+            alpha=0.2*0.5,
+            zorder=0
+        )
+
+    plt.xlim(0., 600.)
+    plt.ylim(ylims)
+
+    pte = np.sum(np.array(chi2_sims) > chi2) / len(chi2_sims)
+
+    plt.text(
+        0.05, 0.95,
+        f"$\chi^2 = {chi2:.2f}/{np.sum(mask)}$\n${{\\rm PTE}} = {pte:.3f}$", # noqa
+        transform=plt.gca().transAxes,
+        fontsize=12,
+        verticalalignment="top",
+        color="white",
+        bbox=dict(
+            facecolor=stcolor,
+            alpha=0.6,
+            edgecolor="none",
+            pad=0.5,
+            boxstyle="round"
+        ),
+    )
+
+    plt.gca().set_facecolor(stcolor)
+    return fig
+
+
+# APP STARTING BELOW
 if valid_input:
 
     # Load the data
@@ -143,131 +284,14 @@ if valid_input:
             step=10
         )
 
-        fig = plt.figure(figsize=(6, 4), facecolor=stcolor)
-
-        x, y, ycov = null_archive.get_ps_residual(
+        fig = plot_residual(
+            null_archive,
             mapA,
             mapB,
-            field_pair=field_pair
+            field_pair,
+            range,
+            diag_cov=True
         )
-        mask_ht = (x >= range[0])
-        mask_lt = (x <= range[1])
-        mask = mask_ht & mask_lt
-        compmask_ht = (x < range[0])
-        compmask_lt = (x > range[1])
-
-        idx_ht = np.flatnonzero(mask_ht)
-        idx_lt = np.flatnonzero(mask_lt)
-        compmask_ht[idx_ht[0]] = True
-        compmask_lt[idx_lt[-1]] = True
-
-        plt.xlabel(r"$\ell$", fontsize=14)
-        plt.ylabel(r"$\Delta D_\ell^{%s}$" % field_pair, fontsize=14)
-        plt.title(f"$\\rm {mapA} - {mapB}$".replace("_", "\_"), fontsize=14) # noqa
-        plt.axhline(0, color="w", lw=1, zorder=1)
-        plt.axvline(range[0], color="w", lw=1, ls="--", zorder=1)
-        plt.axvline(range[1], color="w", lw=1, ls="--", zorder=1)
-        plt.errorbar(
-            x[mask], y[mask], yerr=np.sqrt(np.diag(ycov))[mask],
-            marker="o",
-            markersize=4.7,
-            markerfacecolor="white",
-            ls="None",
-            zorder=5,
-            color="darkorange",
-            capsize=1.7
-        )
-        ylims = plt.gca().get_ylim()
-        for compmask in [compmask_ht, compmask_lt]:
-            plt.errorbar(
-                x[compmask], y[compmask],
-                yerr=np.sqrt(np.diag(ycov))[compmask],
-                marker="o",
-                markersize=4.7,
-                markerfacecolor="white",
-                ls="None",
-                zorder=5,
-                color="darkorange",
-                capsize=1.7,
-                alpha=0.4,
-            )
-
-        chi2 = y[mask] @ np.linalg.inv(ycov[np.ix_(mask, mask)]) @ y[mask]
-
-        chi2_sims = []
-        sims = []
-        for iii in null_archive.sim_ids:
-            x, y, _ = null_archive.get_ps_residual(
-                mapA,
-                mapB,
-                field_pair=field_pair,
-                sim_id=iii
-            )
-            chi2_sims.append(
-                y[mask] @ np.linalg.inv(ycov[np.ix_(mask, mask)]) @ y[mask]
-            )
-
-            sims.append(y)
-
-        one_sigma_band = np.percentile(sims, [16, 84], axis=0)
-        two_sigma_band = np.percentile(sims, [2.5, 97.5], axis=0)
-
-        plt.fill_between(
-            x[mask],
-            one_sigma_band[0][mask],
-            one_sigma_band[1][mask],
-            color="gray",
-            alpha=0.5,
-            zorder=0
-        )
-        plt.fill_between(
-            x[mask],
-            two_sigma_band[0][mask],
-            two_sigma_band[1][mask],
-            color="gray",
-            alpha=0.2,
-            zorder=0
-        )
-        for compmask in [compmask_ht, compmask_lt]:
-            plt.fill_between(
-                x[compmask],
-                one_sigma_band[0][compmask],
-                one_sigma_band[1][compmask],
-                color="gray",
-                alpha=0.5*0.5,
-                zorder=0
-            )
-            plt.fill_between(
-                x[compmask],
-                two_sigma_band[0][compmask],
-                two_sigma_band[1][compmask],
-                color="gray",
-                alpha=0.2*0.5,
-                zorder=0
-            )
-
-        plt.xlim(0., 600.)
-        plt.ylim(ylims)
-
-        pte = np.sum(np.array(chi2_sims) > chi2) / len(chi2_sims)
-
-        plt.text(
-            0.05, 0.95,
-            f"$\chi^2 = {chi2:.2f}/{np.sum(mask)}$\n${{\\rm PTE}} = {pte:.3f}$", # noqa
-            transform=plt.gca().transAxes,
-            fontsize=12,
-            verticalalignment="top",
-            color="white",
-            bbox=dict(
-                facecolor=stcolor,
-                alpha=0.6,
-                edgecolor="none",
-                pad=0.5,
-                boxstyle="round"
-            ),
-        )
-
-        plt.gca().set_facecolor(stcolor)
         st.pyplot(fig)
         plt.close(fig)
 
@@ -334,10 +358,6 @@ if valid_input:
             (100, 500),
             step=10
         )
-        split_by_residual = st.sidebar.checkbox(
-            "Show all map differences separately",
-            value=False
-        )
 
         table = []
         for group in unique_groups:
@@ -363,13 +383,61 @@ if valid_input:
                 table.append([group, fp, chi2, pte])
 
         # Compile in a dataframe
-        import pandas as pd
         df = pd.DataFrame(
             table,
             columns=["Null group", "Field pair", "Chi-squared", "PTE"],
         )
-        df = df.style.format({
+        df = df.sort_values("PTE", ascending=True)
+        dfs = df.style.format({
             "Chi-squared": "{:.2f}",
             "PTE": "{:.3f}",
         })
-        st.dataframe(df)
+        table = st.dataframe(
+            dfs,
+            hide_index=True,
+            selection_mode="single-row",
+            on_select="rerun",
+        )
+
+        if table.selection.rows:
+            group, fp, _, _ = df.iloc[table.selection.rows[0]]
+            map_diffs = null_archive.map_diff_from_null_group(group)
+
+            chi, chi2 = null_archive.get_chi_chi2(
+                null_groups=[group],
+                field_pairs=[fp],
+                ellmin=range[0],
+                ellmax=range[1],
+                on_sims=False,
+                diag_cov=True
+            )
+            chi, chi2_sims = null_archive.get_chi_chi2(
+                null_groups=[group],
+                field_pairs=[fp],
+                ellmin=range[0],
+                ellmax=range[1],
+                on_sims=True,
+                diag_cov=True
+            )
+            nplots = 1 if len(map_diffs) == 1 else 3
+            cols = st.columns(3)
+            for i, map_diff in enumerate(map_diffs):
+                mapA, mapB = map_diff
+                x, y, ycov = null_archive.get_ps_residual(
+                    mapA,
+                    mapB,
+                    field_pair=fp
+                )
+                fig = plot_residual(
+                    null_archive,
+                    mapA,
+                    mapB,
+                    field_pair=fp,
+                    range=range,
+                    diag_cov=True
+                )
+                if nplots == 1:
+                    cols[1].pyplot(fig)
+                else:
+                    cols[i].pyplot(fig)
+                plt.close(fig)

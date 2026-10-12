@@ -192,6 +192,14 @@ class NullArchive:
             m &= self.ell <= ellmax
         return m
 
+    def map_diff_from_null_group(self, null_group):
+        """
+        Return the available map differences for a given
+        null group.
+        """
+        m = self.group == null_group
+        return list(set(zip(self.tracer1[m], self.tracer2[m])))
+
     def _values(self, sim_id=None):
         """
         Return the data/sim residual data vector
