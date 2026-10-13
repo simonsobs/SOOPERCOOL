@@ -5,7 +5,6 @@ from itertools import product
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
-import soopercool.utils as su
 import soopercool.map_utils as mu
 
 
@@ -65,10 +64,6 @@ def main(args):
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
 
     # Only estimate noise from SAT data
-    map_set_list = [
-        ms for ms in meta.map_sets_list
-        if "sat" in meta.exp_tag_from_map_set(ms).lower()
-    ]
     cross_map_set_list = [
         (ms1, ms2)
         for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True)
