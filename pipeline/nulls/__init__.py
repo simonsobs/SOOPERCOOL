@@ -1,1 +1,1 @@
-from .null_archive import NullArchive
+from .null_archive import NullArchive # noqa

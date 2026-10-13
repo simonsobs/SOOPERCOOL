@@ -63,7 +63,7 @@ class NullArchive:
 
     def parse_sacc(self):
         """
-        Parse the combined sacc file to extract 
+        Parse the combined sacc file to extract
         the layout of data and sims.
         """
         self.map_diffs = self.sacc.get_tracer_combinations()
