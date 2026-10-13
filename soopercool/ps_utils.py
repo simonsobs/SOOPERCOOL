@@ -1,84 +1,8 @@
-import soopercool.map_utils as mu
 import pymaster as nmt
 import numpy as np
 import matplotlib.pyplot as plt
+
 from pixell import enmap
-
-
-def get_validation_power_spectra(meta, id_sim, mask, nmt_binning,
-                                 inv_couplings):
-    """
-    This function computes transfer validation power spectra given an
-    input simulation ID, mask and binning scheme, and stores them to disk.
-    """
-    map_set_pairs = (meta.get_ps_names_list(type="all", coadd=True)
-                     if meta.validate_beam else [(None, None)])
-    filter_flags = (["filtered"] if meta.validate_beam
-                    else ["filtered", "unfiltered"])
-
-    for cl_type in ["tf_val", "cosmo"]:
-        for filter_flag in filter_flags:
-            for map_sets in map_set_pairs:
-                map_files = [
-                    meta.get_map_filename_transfer2(
-                        id_sim, cl_type=cl_type, map_set=ms
-                    ) for ms in map_sets
-                ]
-
-                if filter_flag == "filtered":
-                    map_files = [mf.replace(".fits", "_filtered.fits")
-                                 for mf in map_files]
-
-                maps = [mu.read_map(m, field=[0, 1, 2], convert_K_to_muK=True)
-                        for m in map_files]
-
-                field = [{
-                    "spin0": nmt.NmtField(mask, map[:1]),
-                    "spin2": nmt.NmtField(mask, map[1:],
-                                          purify_b=meta.tf_est_pure_B)
-                } for map in maps]
-
-                pcls = get_coupled_pseudo_cls(field[0], field[1], nmt_binning)
-
-                if meta.validate_beam:
-                    decoupled_pcls = decouple_pseudo_cls(
-                        pcls, inv_couplings[map_sets[0], map_sets[1]]
-                    )
-                else:
-                    decoupled_pcls = decouple_pseudo_cls(
-                        pcls, inv_couplings[filter_flag]
-                    )
-                cl_prefix = f"pcls_{cl_type}_{id_sim:04d}"
-                cl_suffix = (f"_{map_sets[0]}_{map_sets[1]}"
-                             if meta.validate_beam else f"_{filter_flag}")
-                cl_name = cl_prefix + cl_suffix
-
-                np.savez(f"{meta.cell_transfer_directory}/{cl_name}.npz",
-                         **decoupled_pcls)
-
-
-def get_binned_cls(bp_win_dict, cls_dict_unbinned):
-    """
-    """
-    nl = np.shape(list(bp_win_dict.values())[0])[-1]
-    cls_dict_binned = {}
-
-    for spin_comb in ["spin0xspin0", "spin0xspin2", "spin2xspin2"]:
-        bpw_mat = bp_win_dict[f"bp_win_{spin_comb}"]
-        if spin_comb == "spin0xspin0":
-            cls_vec = np.array([cls_dict_unbinned["TT"][:nl]]).reshape(1, nl)
-        elif spin_comb == "spin0xspin2":
-            cls_vec = np.array([cls_dict_unbinned["TE"][:nl],
-                                cls_dict_unbinned["TB"][:nl]])
-        elif spin_comb == "spin2xspin2":
-            cls_vec = np.array([cls_dict_unbinned["EE"][:nl],
-                                cls_dict_unbinned["EB"][:nl],
-                                cls_dict_unbinned["EB"][:nl],
-                                cls_dict_unbinned["BB"][:nl]])
-
-        cls_dict_binned[spin_comb] = np.einsum("ijkl,kl", bpw_mat, cls_vec)
-
-    return field_pairs_from_spins(cls_dict_binned)
 
 
 def get_coupled_pseudo_cls(fields1, fields2, nmt_binning,
@@ -148,6 +72,22 @@ def decouple_pseudo_cls(coupled_pseudo_cells, coupling_inv):
 
 def get_weighted_pcls(pcls, mask, pix_type="car"):
     """
+    Returns the weighted coupled pseudo-C_ells PCL = PCL / w where
+
+    w = sum_{pixels p} Omega[p] / (4*pi) * mask[p]**2
+
+    and Omega[p] is the pixel size in steradians.
+
+    Args
+    ----
+        coupled_pseudo_cells : dict with keys f"spin{s1}xspin{s2}",
+            items array-like. Coupled pseudo-C_ell estimators.
+        mask: np.array or enmap.ndarray
+            Mask defining the mode coupling.
+    Returns
+    -------
+        dict with keys f"spin{s1}xspin{s2}", items array-like.
+        Coupled pseudo-C_ell estimators.
     """
     pcls_dict = field_pairs_from_spins(pcls)
 
@@ -316,8 +256,23 @@ def read_nmt_binning(binning_file, lmax, compute_Dl, force_cl=False):
 
 def bin_theory_cls(cls, bpwf):
     """
+    Convolve theory power spectra with bandpower window function.
+
+    Args
+    ----
+        cls: dict, items strings with field pairs "TT", "TE", etc,
+            values array-like of shape (nl,), where `nl` is the maximum
+             multipole
+        bpwf: ndarray
+            Binned power window functions of shape (size, n_bins, size, nl).
+            `size` is the number of field combinations (e.g., 9 for TEBxTEB),
+            and `n_bins` is the number of bandpower bins.
+    Returns
+    -------
+        dict, items strings with field pairs "TT", "TE", etc,
+        values array-like of shape (nl,), where `nl` is the maximum
+        multipole
     """
-    fields_theory = {"TT": 0, "EE": 1, "BB": 2, "TE": 3}
     fields_all = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
     nl_th = cls["TT"].shape[0]
 
@@ -327,8 +282,12 @@ def bin_theory_cls(cls, bpwf):
 
     cls_dict = {}
     for fp in fields_all:
-        if fp in fields_theory:
+        if fp in cls:
             cls_dict[fp] = cls[fp][:nl]
+        # E.g., if "TE" is in cls but "ET" is not, set "ET" equal to "TE".
+        elif fp[1]+fp[0] in cls:
+            cls_dict[fp] = cls[fp[1]+fp[0]][:nl]
+        # E.g., if neither "EB" nor "BE" are in cls, set them both to zero.
         else:
             cls_dict[fp] = np.zeros(nl)
     cls_vec = np.array([cls_dict[fp] for fp in fields_all])
@@ -342,14 +301,27 @@ def bin_theory_cls(cls, bpwf):
 def plot_pcls_mat_transfer(pcls_mat_unfilt, pcls_mat_filt, lb, file_name,
                            lmax=None):
     """
-    Related to the covariance PR comments, this
-    function has a bug and inconsistently loop over
-    pure pairs. We will homogeneize this in
-    all soopercool scripts in the future to avoid
-    confusion.
-    """
-    import matplotlib.pyplot as plt
+    Plot the pure-type coupled and binned power spectra which are the inputs of
+    the SOOPERCOOL transfer function if tf_ordering is set to "TM".
 
+    Args
+    ----
+        pcls_mat_unfilt: np.ndarray
+            PCL matrix of unfiltered simulations.
+            Array of shape (size, size, nl), where
+            `size` is the number of field combinations (e.g., 9 for TEBxTEB),
+            and `n_bins` is the number of bandpower bins. The first axis loops
+            over the output field pairs, the second axis loops over the
+            pure-type pairs.
+        pcls_mat_filt: np.ndarray
+            PCL matrix of filtered simulations.
+        lb: array-like, shape (n_bins,)
+            Effective bandpowers of the pcl matrices.
+        file_name: string
+            File name for the output plot.
+        lmax: int
+            Maximum multiplot to plot.
+    """
     field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
     plt.figure(figsize=(25, 25))
     grid = plt.GridSpec(9, 9, hspace=0.3, wspace=0.3)
@@ -384,6 +356,9 @@ def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
                   cb_data=None, cb_data_err=None, add_theory=False,
                   lth=None, clth=None, cbth=None, save_file=None):
     """
+    Helper function to plot power spectra.
+    TODO: This is only used in sacc_plotter.py. Generalise, if needed, and
+    extend its use to other scripts.
     """
     plt.figure(figsize=(8, 6))
     grid = plt.GridSpec(4, 1, wspace=0, hspace=0)
