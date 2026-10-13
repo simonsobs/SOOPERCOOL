@@ -34,10 +34,13 @@ def main(args):
         beam_dir = meta.beam_dir_from_map_set(map_set)
         beam_file = meta.beam_file_from_map_set(map_set)
 
-        _, bl = su.read_beam_from_file(
-            f"{beam_dir}/{beam_file}",
-            lmax=nmt_bins.lmax
-        )
+        if beam_dir is None or beam_file is None:
+            bl = np.ones(nmt_bins.lmax + 1)
+        else:
+            _, bl = su.read_beam_from_file(
+                f"{beam_dir}/{beam_file}",
+                lmax=nmt_bins.lmax
+            )
 
         nmt_bins = meta.read_nmt_binning(force_cl=True)
         bb = nmt_bins.bin_cell(bl)

@@ -155,20 +155,26 @@ def main(args):
     inv_couplings_beamed = {}
     for ms1, ms2 in meta.get_ps_names_list(type="all", coadd=True):
 
-        _, bl1 = su.read_beam_from_file(
-            "/".join([
-                meta.beam_dir_from_map_set(ms1),
-                meta.beam_file_from_map_set(ms1)
-            ]),
-            lmax=meta.lmax
-        )
-        _, bl2 = su.read_beam_from_file(
-            "/".join([
-                meta.beam_dir_from_map_set(ms2),
-                meta.beam_file_from_map_set(ms2)
-            ]),
-            lmax=meta.lmax
-        )
+        bdir1 = meta.beam_dir_from_map_set(ms1)
+        bfile1 = meta.beam_file_from_map_set(ms1)
+        bdir2 = meta.beam_dir_from_map_set(ms2)
+        bfile2 = meta.beam_file_from_map_set(ms2)
+
+        if bdir1 is None or bfile1 is None:
+            bl1 = np.ones(nmt_bins.lmax + 1)
+        else:
+            _, bl1 = su.read_beam_from_file(
+                f"{bdir1}/{bfile1}",
+                lmax=meta.lmax
+            )
+
+        if bdir2 is None or bfile2 is None:
+            bl2 = np.ones(nmt_bins.lmax + 1)
+        else:
+            _, bl2 = su.read_beam_from_file(
+                f"{bdir2}/{bfile2}",
+                lmax=meta.lmax
+            )
         beam = np.outer(bl1, bl2)
 
         transfer = cu.load_transfer_function(

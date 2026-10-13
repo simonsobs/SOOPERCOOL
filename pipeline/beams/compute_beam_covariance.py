@@ -38,6 +38,12 @@ def main(args):
         beam_dir = meta.beam_dir_from_map_set(ms)
         beam_file = meta.beam_file_from_map_set(ms)
 
+        if beam_dir is None or beam_file is None:
+            raise ValueError(
+                f"Beam info for map set {ms} not found."
+                " Please check your configuration."
+            )
+
         _, bl, bl_cov = utils.read_beam_from_file(
             f"{beam_dir}/{beam_file}",
             lmax=nmt_bins.lmax,

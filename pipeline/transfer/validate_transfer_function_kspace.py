@@ -95,10 +95,13 @@ def main(args):
         for beam_label in tf_settings["tf_est_beams_list"]:
             beam_dir = meta.beam_dir_from_map_set(beam_label)
             beam_file = meta.beam_file_from_map_set(beam_label)
-            l, bl = su.read_beam_from_file(
-                f"{beam_dir}/{beam_file}",
-                lmax=lmax_sim
-            )
+            if beam_dir is None or beam_file is None:
+                bl = np.ones(nmt_bins.lmax + 1)
+            else:
+                _, bl = su.read_beam_from_file(
+                    f"{beam_dir}/{beam_file}",
+                    lmax=lmax_sim
+                )
             beams[beam_label] = bl
     else:
         if rank == 0:
@@ -288,10 +291,13 @@ def main(args):
         for beam_label in tf_settings["tf_val_beams_list"]:
             beam_dir = meta.beam_dir_from_map_set(beam_label)
             beam_file = meta.beam_file_from_map_set(beam_label)
-            _, bl = su.read_beam_from_file(
-                f"{beam_dir}/{beam_file}",
-                lmax=lmax_sim
-            )
+            if beam_dir is None or beam_file is None:
+                bl = np.ones(nmt_bins.lmax + 1)
+            else:
+                _, bl = su.read_beam_from_file(
+                    f"{beam_dir}/{beam_file}",
+                    lmax=lmax_sim
+                )
             beams[beam_label] = bl
 
     lth = np.arange(lmax_sim+1)

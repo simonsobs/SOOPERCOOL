@@ -76,17 +76,6 @@ def main(args):
             and "sat" in meta.exp_tag_from_map_set(ms2).lower())
     ]
 
-    # Load beams to correct the mode coupling matrix
-    beams = {}
-    for map_set in map_set_list:
-        beam_dir = meta.beam_dir_from_map_set(map_set)
-        beam_file = meta.beam_file_from_map_set(map_set)
-
-        l, bl = su.read_beam_from_file(
-            f"{beam_dir}/{beam_file}",
-        )
-        beams[map_set] = bl[:nl]
-
     for map_set1, map_set2 in cross_map_set_list:
         if verbose:
             print(f"{map_set1} {map_set2}")
