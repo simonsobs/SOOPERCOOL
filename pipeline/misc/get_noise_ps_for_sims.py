@@ -5,7 +5,7 @@ from itertools import product
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
-
+import soopercool.utils as su
 import soopercool.map_utils as mu
 
 
@@ -82,7 +82,9 @@ def main(args):
         beam_dir = meta.beam_dir_from_map_set(map_set)
         beam_file = meta.beam_file_from_map_set(map_set)
 
-        l, bl = np.loadtxt(f"{beam_dir}/{beam_file}", unpack=True)
+        l, bl = su.read_beam_from_file(
+            f"{beam_dir}/{beam_file}",
+        )
         beams[map_set] = bl[:nl]
 
     for map_set1, map_set2 in cross_map_set_list:
