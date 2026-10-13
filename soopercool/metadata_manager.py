@@ -291,16 +291,6 @@ class BBmeta:
         binner = self.read_nmt_binning()
         return binner.get_effective_ells()
 
-    def read_beam(self, map_set, lmax=None):
-        """
-        """
-        beam_dir = self.beam_dir_from_map_set(map_set)
-        beam_file = self.beam_file_from_map_set(map_set)
-        l, bl = su.read_beam_from_file(f"{beam_dir}/{beam_file}", lmax=lmax)
-        if self.beam_floor is not None:
-            bl[bl < self.beam_floor] = self.beam_floor
-        return l, bl
-
     def _init_simulation_params(self):
         """
         Loop over the simulation parameters and set them as attributes.

@@ -261,10 +261,6 @@ def main(args):
                 clb_th += synch_clb
             else:
                 clb_th = synch_clb
-        beam1, beam2 = (
-            nmt_bins.bin_cell(meta.read_beam(ms)[1][:lmax+1])[mask]
-            for ms in [map_set1, map_set2]
-        )
 
         for fp in field_pairs:
             f, (main, sub) = plt.subplots(
@@ -273,7 +269,7 @@ def main(args):
             )
             if fp in field_pairs_theory and clb_th is not None:
                 ifp = field_pairs_theory[fp]
-                y = clb_th[ifp] * beam1 * beam2
+                y = clb_th[ifp]
                 res = cells_dict_mean["cross"][("coadd",
                                                 map_set1,
                                                 map_set2)][fp][mask] - y

@@ -166,13 +166,6 @@ def main(args):
                 else:
                     clb_th = synch_clb
 
-            if clb_th is not None:
-                beam1, beam2 = (
-                    nmt_bins.bin_cell(meta.read_beam(ms)[1][:lmax+1])[mask]
-                    for ms in [map_set1, map_set2]
-                )
-                clb_th *= (beam1 * beam2)[None, :lmax_bins+1]
-
             for fp in field_pairs:
 
                 ifp = None if fp not in field_pairs_theory else field_pairs_theory[fp]  # noqa

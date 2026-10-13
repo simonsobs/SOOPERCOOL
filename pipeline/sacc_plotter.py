@@ -22,11 +22,6 @@ def main(args):
     BBmeta.make_dir(plot_dir)
     lmax = meta.lmax
 
-    beams = {
-        ms: meta.read_beam(ms)[1][:lmax+1]
-        for ms in meta.map_sets_list
-    }
-
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
     ps_names = meta.get_ps_names_list(type="all", coadd=True)
 
@@ -94,7 +89,6 @@ def main(args):
                 clth[fp] += hp.read_cl(
                     fiducial_synch.format(nu1=nu1, nu2=nu2)
                 )[i, :lmax+1]
-            clth[fp] *= beams[ms1]*beams[ms2]
         clth["EB"] = np.zeros(lmax+1)
         clth["TB"] = np.zeros(lmax+1)
         clth["l"] = np.arange(lmax+1)
