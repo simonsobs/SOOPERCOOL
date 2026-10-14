@@ -377,12 +377,13 @@ def get_transfer_dict(pcls_mat_dict,
             nmt_binning,
             compute_Dl
         )
-        field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
+        pure_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
+        field_pairs = ["TT", "TE", "TB", "ET", "EE", "EB", "BT", "BE", "BB"]
 
-        for i, fp1 in enumerate(field_pairs):
+        for i, fp1 in enumerate(pure_pairs):
             for j, fp2 in enumerate(field_pairs):
-                tf_dict[ftag1, ftag2][f"{fp2}_to_{fp1}"] = tf[i, j]
-                tf_dict[ftag1, ftag2][f"{fp2}_to_{fp1}_std"] = tferr[i, j]
+                tf_dict[ftag1, ftag2][f"{fp1}_to_{fp2}"] = tf[i, j]
+                tf_dict[ftag1, ftag2][f"{fp1}_to_{fp2}_std"] = tferr[i, j]
         tf_dict[ftag1, ftag2]["full_tf"] = tf
         tf_dict[ftag1, ftag2]["full_tf_std"] = tferr
 

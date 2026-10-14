@@ -572,7 +572,8 @@ def plot_transfer_function(lb, tf_dict, lmin, lmax, field_pairs,
                     # centered below ell of 30.
                     tf_zscore = tf[f"{f1}_to_{f2}"] / tf[f"{f1}_to_{f2}_std"]
                     good = tf_zscore > 2.
-                    if np.any(~good):
+                    valid = len(lb[good]) > 0 and len(lb[~good]) > 0
+                    if np.any(~good) and valid:
                         lmin = max((lb[~good][-1] + lb[good][0])/2., 30)
                     else:
                         lmin = max((lb[0])/2., 30)
