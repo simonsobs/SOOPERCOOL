@@ -127,7 +127,15 @@ def main(args):
         s = sacc.Sacc()
 
         for ms in map_sets:
-            f = float(meta.freq_tag_from_map_set(ms))
+
+            if meta.bandpass_from_map_set(ms) is not None:
+                nu, bp = np.loadtxt(
+                    meta.bandpass_from_map_set(ms),
+                    unpack=True
+                )
+            else:
+                f = float(meta.freq_tag_from_map_set(ms))
+                nu, bp = np.array([f-1., f, f+1]), np.array([0., 1., 0.])
             if verbose:
                 print(f"# {id_sim} | {ms}")
 
@@ -142,12 +150,11 @@ def main(args):
                     **{
                         "quantity": qty,
                         "spin": spin,
-                        "nu": [f-1., f, f+1],
-                        # Delta bandpasses. TODO: generalize
+                        "nu": nu,
                         "ell": lb,
                         "beam": np.ones_like(lb),
                         # Unit beam. TODO: generalize
-                        "bandpass": [0., 1., 0.]  # Deltas. TODO: generalize
+                        "bandpass": bp
                     }
                 )
 
