@@ -450,9 +450,9 @@ class NullArchive:
 
         avg_chi = np.mean(stats["avg_chi"])
         avg_chi_sims = np.mean(stats_sims["avg_chi"], axis=0)
-        pte_avg = np.sum(avg_chi_sims > avg_chi) / self.n_sims
+        pte_avg = np.sum(np.abs(avg_chi_sims) > np.abs(avg_chi)) / self.n_sims
         pte_avg_sims = [
-            np.sum(avg_chi_sims > avg_chi_sims[i]) / self.n_sims
+            np.sum(np.abs(avg_chi_sims) > np.abs(avg_chi_sims[i])) / self.n_sims # noqa
             for i in range(self.n_sims)
         ]
 
@@ -501,16 +501,50 @@ class NullArchive:
             color="darkorange"
         )
         ax.axvline(chi, color="DodgerBlue", linestyle="--")
+
+        ax_center = (ax.get_xlim()[0] + ax.get_xlim()[1]) / 2
+        ax_width = ax.get_xlim()[1] - ax.get_xlim()[0]
+
+        ylim_top = ax.get_ylim()[1]
+        ax.set_ylim(top=ylim_top * 1.1)
+        if chi >= ax_center:
+            va = "center"
+            ha = "right"
+            offset = -0.01 * ax_width
+        else:
+            va = "center"
+            ha = "left"
+            offset = 0.01 * ax_width
+        ax.text(
+            chi + offset,
+            0.920 * ax.get_ylim()[1],
+            f"${chi:.3f}$",
+            verticalalignment=va,
+            horizontalalignment=ha,
+            color="DodgerBlue",
+            fontsize=13
+        )
         ax.set_title(title, fontsize=14)
         ax.set_xlabel(xlabel, fontsize=14)
         ax.text(
-            0.95, 0.95,
+            0.975,
+            0.890 if not is_pte else 0.965,
             f"${{\\rm PTE}} = {pte:.3f}$",
-            transform=plt.gca().transAxes,
+            transform=ax.transAxes,
             verticalalignment='top',
             horizontalalignment='right',
             fontsize=13
         )
+        if not is_pte:
+            ax.text(
+                0.975, 0.965,
+                f"${{\\rm MC}}:$ ${np.mean(chi_sims):.3f} \\pm {np.std(chi_sims):.3f}$", # noqa
+                transform=ax.transAxes,
+                verticalalignment='top',
+                horizontalalignment='right',
+                fontsize=13,
+                color="darkorange"
+            )
         if fname is not None:
             plt.savefig(fname)
         if display:
