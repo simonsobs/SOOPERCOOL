@@ -306,6 +306,23 @@ if valid_input:
             default=["EE", "EB", "BB"],
             selection_mode="multi"
         )
+
+        null_groups = null_archive.group
+        freq = null_archive.freq
+        freqs = sorted(list(set(freq)))
+        freq_band = st.sidebar.multiselect(
+            "Frequency band",
+            freqs,
+            default=freqs
+        )
+        # Filter null groups
+        group_filter = [
+            null_groups[i]
+            for i in range(len(null_groups))
+            if freq[i] in freq_band
+        ]
+        unique_groups = sorted(list(set(group_filter)))
+
         sel_groups = st.sidebar.multiselect(
             "Null groups",
             unique_groups,
