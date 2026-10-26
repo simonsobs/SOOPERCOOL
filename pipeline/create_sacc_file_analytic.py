@@ -1,6 +1,7 @@
 import argparse
 from soopercool import BBmeta
 from soopercool import mpi_utils as mpi
+from soopercool import utils as su
 import sacc
 from itertools import product
 import numpy as np
@@ -82,7 +83,8 @@ def main(args):
             pair34 = f"{ms3}_x_{ms4}"
             suffix = f"cov_{pair12}_{pair34}.npz"
             cov_dict = np.load(
-                f"{cov_dir}/analytic_{suffix}"
+                f"{cov_dir}/"
+                + su.cov_filename("analytic_cov", ms1, ms2, ms3, ms4)
             )
             cov = cov_dict["cov"]
 

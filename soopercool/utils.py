@@ -1,3 +1,4 @@
+import hashlib
 import os
 
 import camb
@@ -653,3 +654,17 @@ def multipole_min_from_tf(tf_file, field_pairs, snr_cut=3.):
         idx_bad_tf[fp] = idx.max() if idx.size > 0 else 0
 
     return idx_bad_tf
+
+
+def cov_filename(prefix, ms1, ms2, ms3, ms4, max_bytes=255):
+    """
+    Covariance file name `{prefix}_{ms1}_x_{ms2}_{ms3}_x_{ms4}.npz`. If it
+    exceeds the file system limit, the name is truncated and a hash of the
+    full name is appended (unchanged for names that fit).
+    """
+    name = f"{prefix}_{ms1}_x_{ms2}_{ms3}_x_{ms4}"
+    if len(f"{name}.npz".encode()) <= max_bytes:
+        return f"{name}.npz"
+    digest = hashlib.sha1(name.encode()).hexdigest()[:16]
+    keep = max_bytes - len(".npz") - len(digest) - 1
+    return f"{name[:keep]}_{digest}.npz"
