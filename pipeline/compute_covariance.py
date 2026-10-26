@@ -158,7 +158,8 @@ def main(args):
 
         # Save block covariance matrix
         np.savez(
-            f"{cov_dir}/analytic_cov_{ms1}_x_{ms2}_{ms3}_x_{ms4}.npz",
+            f"{cov_dir}/"
+            + su.cov_filename("analytic_cov", ms1, ms2, ms3, ms4),
             cov=full_cov,
             lb=nmt_bins.get_effective_ells()
         )
