@@ -71,7 +71,7 @@ def get_transfer_with_error_TM(pcls_mat_filt,
         ), axes=[1, 2, 0]
     )
     T_mean = np.einsum(
-        "ijl,jkl->ikl",
+        "ijl,jkl->kil",
         cct_inv,
         np.einsum(
             "jil,jkl->ikl",
