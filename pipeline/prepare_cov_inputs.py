@@ -207,12 +207,12 @@ def main(args):
                 # THIS IS QUITE HACKY, I WOULD ADVISE TO
                 # REPLACE THIS WITH A MORE ROBUST METHOD
                 # I WOULD ADVISE TESTING SWITCHING ON/OFF
-                x, y, ystd = bin_data(
-                    x,
-                    y,
-                    [0, 2, 6, 10, 30, 50, 70, 90,
-                     100, 200, 300, 400, 500, nl]  # TODO: fix this
-                )
+                edges = [0, 2, 6, 10, 30, 50, 70, 90,
+                         100, 200, 300, 400, 500]  # TODO: fix this
+                if not args.new_corr_edges:
+                    # Edges used before #96 (extra points at 600, 700)
+                    edges += [600, 700]
+                x, y, ystd = bin_data(x, y, edges + [nl])
                 msk_fit = (x >= 2) & (x <= 650)
                 corr = gp_fit(
                     np.log10(x[msk_fit]),
@@ -286,6 +286,12 @@ def cli():
         "--plots",
         action="store_true",
         help="Save plots"
+    )
+    parser.add_argument(
+        "--new-corr-edges",
+        action="store_true",
+        help="Bin the filtering correction with the edges of #96 (no edges "
+             "at ell = 600 and 700, which are used by default)"
     )
     args = parser.parse_args()
     main(args)

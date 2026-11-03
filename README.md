@@ -185,6 +185,7 @@ python pipeline/prepare_cov_inputs.py --globals config_file.yaml
 srun -n 12 -c 8 --cpu_bind=cores python pipeline/precompute_cov_couplings.py --globals config_file.yaml
 ```
 There is a switch in the configuration file to turn on/off the empirical filtering correction to the covariance. Set the boolean entry in the yaml `apply_filtering_corr`.
+By default the filtering correction is binned with edges up to ell = 700 (as before #96); add `--new-corr-edges` to `prepare_cov_inputs.py` to use the edges of #96, which stop at ell = 500.
 The second script will save a large amount of covariance couplings (for signal and noise cross terms) and therefore we advice to restrict the analysis lmax and to make sure you have enough disk space. These files can be deleted after computing covariances.
 
 Running covariance is then straightforward

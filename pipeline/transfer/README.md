@@ -29,6 +29,7 @@ transfer_settings:
     ## Optional beams applied on TF validation sims
     tf_val_beams_list: []
 ```
+By default `compute_transfer_function.py` assumes band-limited TF-estimation simulations (as the SAT ISO v4 TF sims): the input C_l is the power law times a sine^2 band limit (`--bandlim-ell 650 --bandlim-width 50`), and the TF is solved only on bins with ell_max <= `--lmax-valid` (700; higher bins take the last valid value), since the MT design matrix is singular above the band limit. For sims without a band limit, add `--no-bandlim` to read the input C_l from `power_law_c_ell` and solve on all bins.
 ___
 ## IF RUNNING WITH FOURIER SPACE FILTERING
 If you want to apply a Fourier-space filter on the maps, you'll also need to compute the associated transfer function. In this case, you'll first need to apply this $k$-space filter on simulations. This can be done running
