@@ -125,117 +125,61 @@ def main(args):
             if not (h0, h1, h2, h3) in hit_maps_for_cov:
                 hit_maps_for_cov.append((h0, h1, h2, h3))
 
-    spin_and_hit_maps = list(product(spin_combos, hit_maps_for_cov))
+    # Build the list of output files, one entry per unique file name.
+    # Several (spin, hits) combinations map to the same file (e.g. the
+    # signal-signal cwsp does not depend on hits), so we deduplicate before
+    # distributing. This guarantees each file is computed and written by
+    # exactly one rank, avoiding concurrent writes to the same file.
+    # Each entry is (file name, kind, field keys).
+    jobs = {}
 
-    task_ids = mpi.distribute_tasks(
-        size,
-        rank,
-        len(spin_and_hit_maps)
-    )
-    local_spin_and_hit_maps = [spin_and_hit_maps[i] for i in task_ids]
-
-    t0 = time.time()
-    wsp = {}
+    # Mode-coupling workspaces (only read by later pipeline steps).
     for s0, s1 in spin_pairs:
-        fname_wsp = f"{cov_dir}/wsp_{s0}_{s1}"
-        if not os.path.exists(fname_wsp):
-            wsp[s0, s1] = nmt.NmtWorkspace(
-                fields[s0],
-                fields[s1],
-                nmt_bins
-            )
-            if rank == 0:
-                wsp[s0, s1].write_to(fname_wsp)
+        jobs[f"{cov_dir}/wsp_{s0}_{s1}"] = ("wsp", (s0, s1))
+
+    for (s0, s1, s2, s3), (h0, h1, h2, h3) in product(spin_combos,
+                                                       hit_maps_for_cov):
+        n0, n1 = (s0, "noise", h0), (s1, "noise", h1)
+        n2, n3 = (s2, "noise", h2), (s3, "noise", h3)
+        candidates = [
+            (f"cwsp_{s0}_{s1}_{s2}_{s3}",
+             "signal-signal", (s0, s1, s2, s3)),
+            (f"cwsp_snsn_{s0}_{h1}_{s1}_{s2}_{h3}_{s3}",
+             "snsn", (s0, n1, s2, n3)),
+            (f"cwsp_snns_{s0}_{h1}_{s1}_{h2}_{s2}_{s3}",
+             "snns", (s0, n1, n2, s3)),
+            (f"cwsp_nssn_{h0}_{s0}_{s1}_{s2}_{h3}_{s3}",
+             "nssn", (n0, s1, s2, n3)),
+            (f"cwsp_nsns_{h0}_{s0}_{s1}_{h2}_{s2}_{s3}",
+             "nsns", (n0, s1, n2, s3)),
+            (f"cwsp_nnnn_{h0}_{s0}_{h1}_{s1}_{h2}_{s2}_{h3}_{s3}",
+             "nn", (n0, n1, n2, n3)),
+        ]
+        for fname, kind, keys in candidates:
+            jobs.setdefault(f"{cov_dir}/{fname}", (kind, keys))
+
+    # Make sure every rank sees the same ordered job list.
+    jobs = comm.bcast(list(jobs.items()), root=0)
+
+    task_ids = mpi.distribute_tasks(size, rank, len(jobs))
+
+    for i in task_ids:
+        fname, (kind, keys) = jobs[i]
+        t0 = time.time()
+        if os.path.exists(fname):
+            logger.info(f"[{rank}] {kind} already exists, skipping: {fname}")
+            continue
+        if kind == "wsp":
+            w = nmt.NmtWorkspace(fields[keys[0]], fields[keys[1]], nmt_bins)
         else:
-            wsp[s0, s1] = nmt.NmtWorkspace.from_file(fname_wsp)
-    logger.info(
-        f"[{rank}] Time to compute workspaces: {time.time() - t0:.2f}s"
-    )
-
-    for (s0, s1, s2, s3), (h0, h1, h2, h3) in local_spin_and_hit_maps:
-
-        # signal-signal
-        t0 = time.time()
-        fname_cwsp = f"{cov_dir}/cwsp_{s0}_{s1}_{s2}_{s3}"
-        if not os.path.exists(fname_cwsp):
-            cwsp = nmt.NmtCovarianceWorkspace(
-                fields[s0],
-                fields[s1],
-                fields[s2],
-                fields[s3]
-            )
-            cwsp.write_to(fname_cwsp)
+            w = nmt.NmtCovarianceWorkspace(*[fields[k] for k in keys])
+        w.write_to(fname)
         logger.info(
-            f"[{rank}] signal-signal cwsp computed in {time.time() - t0:.2f}s"
+            f"[{rank}] {kind} computed in {time.time() - t0:.2f}s: {fname}"
         )
 
-        # signal-noise
-        t0 = time.time()
-
-        fname_cwsp = f"{cov_dir}/cwsp_snsn_{s0}_{h1}_{s1}_{s2}_{h3}_{s3}"
-        if not os.path.exists(fname_cwsp):
-            cwsp = nmt.NmtCovarianceWorkspace(
-                fields[s0],
-                fields[s1, "noise", h1],
-                fields[s2],
-                fields[s3, "noise", h3]
-            )
-            cwsp.write_to(fname_cwsp)
-        logger.info(
-            f"[{rank}] snsn cwsp computed in {time.time() - t0:.2f}s"
-        )
-
-        t0 = time.time()
-
-        fname_cwsp = f"{cov_dir}/cwsp_snns_{s0}_{h1}_{s1}_{h2}_{s2}_{s3}"
-        if not os.path.exists(fname_cwsp):
-            cwsp = nmt.NmtCovarianceWorkspace(
-                fields[s0],
-                fields[s1, "noise", h1],
-                fields[s2, "noise", h2],
-                fields[s3]
-            )
-            cwsp.write_to(fname_cwsp)
-        logger.info(f"[{rank}] snns cwsp computed in {time.time() - t0:.2f} s")
-
-        t0 = time.time()
-
-        fname_cwsp = f"{cov_dir}/cwsp_nssn_{h0}_{s0}_{s1}_{s2}_{h3}_{s3}"
-        if not os.path.exists(fname_cwsp):
-            cwsp = nmt.NmtCovarianceWorkspace(
-                fields[s0, "noise", h0],
-                fields[s1],
-                fields[s2],
-                fields[s3, "noise", h3]
-            )
-            cwsp.write_to(fname_cwsp)
-        logger.info(f"[{rank}] nssn cwsp computed in {time.time() - t0:.2f} s")
-
-        t0 = time.time()
-
-        fname_cwsp = f"{cov_dir}/cwsp_nsns_{h0}_{s0}_{s1}_{h2}_{s2}_{s3}"
-        if not os.path.exists(fname_cwsp):
-            cwsp = nmt.NmtCovarianceWorkspace(
-                fields[s0, "noise", h0],
-                fields[s1],
-                fields[s2, "noise", h2],
-                fields[s3]
-            )
-            cwsp.write_to(fname_cwsp)
-        logger.info(f"[{rank}] nsns cwsp computed in {time.time() - t0:.2f} s")
-
-        # noise-noise
-        t0 = time.time()
-        fname_cwsp = f"{cov_dir}/cwsp_nnnn_{h0}_{s0}_{h1}_{s1}_{h2}_{s2}_{h3}_{s3}" # noqa
-        if not os.path.exists(fname_cwsp):
-            cwsp = nmt.NmtCovarianceWorkspace(
-                fields[s0, "noise", h0],
-                fields[s1, "noise", h1],
-                fields[s2, "noise", h2],
-                fields[s3, "noise", h3]
-            )
-            cwsp.write_to(fname_cwsp)
-        logger.info(f"[{rank}] nn cwsp computed in {time.time() - t0:.2f}s")
+    # Do not exit until every rank has written its files.
+    comm.Barrier()
 
 
 def cli():
