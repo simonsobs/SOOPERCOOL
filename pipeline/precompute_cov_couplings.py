@@ -137,8 +137,8 @@ def main(args):
     for s0, s1 in spin_pairs:
         jobs[f"{cov_dir}/wsp_{s0}_{s1}"] = ("wsp", (s0, s1))
 
-    for (s0, s1, s2, s3), (h0, h1, h2, h3) in product(spin_combos,
-                                                       hit_maps_for_cov):
+    spin_and_hit_maps = product(spin_combos, hit_maps_for_cov)
+    for (s0, s1, s2, s3), (h0, h1, h2, h3) in spin_and_hit_maps:
         n0, n1 = (s0, "noise", h0), (s1, "noise", h1)
         n2, n3 = (s2, "noise", h2), (s3, "noise", h3)
         candidates = [
