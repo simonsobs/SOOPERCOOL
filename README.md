@@ -50,6 +50,7 @@ transfer_settings:
   tf_est_num_sims: X # Number of simulations for TF
   power_law_c_cell: /path/to/cl.npz # npz file with keys l, cl, input PS for sims
   tf_ordering: "MT"/"TM" # TM is the BBmaster paper ordering. Alternative is "MT"
+  tf_reference: "theory"/"unfiltered_sims" # (optional, default "theory") compare the filtered sims with the input C_ell or with the unfiltered sims of the same realizations (removes most of the sims' sample variance from the TF)
   unfiltered_map_dir:
     # Path to unfiltered maps
     ftag1: /path/to/maps

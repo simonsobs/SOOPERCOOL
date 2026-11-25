@@ -54,7 +54,8 @@ def main(args):
         mcm,
         nmt_bins,
         compute_Dl=meta.compute_Dl,
-        tf_ordering=tf_settings["tf_ordering"]
+        tf_ordering=tf_settings["tf_ordering"],
+        tf_reference=tf_settings.get("tf_reference", "theory")
     )
     full_tf = {}
     for ftag1, ftag2 in filtering_pairs:
