@@ -6,7 +6,8 @@ def get_transfer_with_error_TM(pcls_mat_filt,
                                cl,
                                mcm,
                                nmt_binning,
-                               compute_Dl=False):
+                               compute_Dl=False,
+                               return_sims=False):
     """
     Compute the transfer function and its associated error
     assuming that the binned filtered pseudo-Cl is given by
@@ -33,6 +34,9 @@ def get_transfer_with_error_TM(pcls_mat_filt,
     compute_Dl : bool, optional
         This is a dummy argument to be consistent with
         the MT version of this function.
+    return_sims : bool, optional
+        If True, also return the transfer function estimated from each
+        simulation separately (used by `tf_reference="unfiltered_sims"`).
 
     Returns
     -------
@@ -80,20 +84,20 @@ def get_transfer_with_error_TM(pcls_mat_filt,
         )
     )
 
-    T_std = np.std(
+    T_sims = np.einsum(
+        "ijl,njkl->nkil",
+        cct_inv,
         np.einsum(
-            "ijl,njkl->nkil",
-            cct_inv,
-            np.einsum(
-                "jil,njkl->nikl",
-                cb_coupled_matrix,
-                pcls_mat_filt
-            )
-        ),
-        axis=0
+            "jil,njkl->nikl",
+            cb_coupled_matrix,
+            pcls_mat_filt
+        )
     )
+    T_std = np.std(T_sims, axis=0)
     Nsims = np.array(pcls_mat_filt).shape[0]
 
+    if return_sims:
+        return T_mean, T_std / np.sqrt(Nsims), T_sims
     return T_mean, T_std / np.sqrt(Nsims)
 
 
@@ -101,7 +105,8 @@ def get_transfer_with_error_MT(pcls_mat_filt,
                                cl,
                                mcm,
                                nmt_binning,
-                               compute_Dl=False):
+                               compute_Dl=False,
+                               return_sims=False):
     """
     Compute the transfer function and its associated error
     assuming that the binned filtered pseudo-Cl is given by
@@ -135,6 +140,9 @@ def get_transfer_with_error_MT(pcls_mat_filt,
         Whether to compute Cl or Dl. This should already be accounted
         for in the nmt_binning object but is needed here when
         we apply the right binning operator on mode coupling matrices.
+    return_sims : bool, optional
+        If True, also return the transfer function estimated from each
+        simulation separately (used by `tf_reference="unfiltered_sims"`).
 
     Returns
     -------
@@ -148,6 +156,9 @@ def get_transfer_with_error_MT(pcls_mat_filt,
     T_std : ndarray
         Standard deviation of the transfer function
         Shape should be (N_field_pairs, N_field_pairs, N_bins)
+    T_sims : ndarray, only if return_sims
+        Per-simulation transfer functions,
+        shape (N_sims, N_field_pairs, N_field_pairs, N_bins)
     """
     nl = nmt_binning.lmax + 1
     n_bins = nmt_binning.get_n_bands()
@@ -218,19 +229,64 @@ def get_transfer_with_error_MT(pcls_mat_filt,
     T_mean = np.transpose(T_mean, [0, 2, 1])
 
     # now let's try to compute the error on the TF
-    T_std = np.std(
-        np.einsum(
-            "ab,Nbc->Nac",
-            D_inv,
-            cls.reshape([-1, size*n_bins, size])
-        ),
-        axis=0
-    ).reshape([size, n_bins, size])
-    T_std = np.transpose(T_std, [0, 2, 1])
+    T_sims = np.einsum(
+        "ab,Nbc->Nac",
+        D_inv,
+        cls.reshape([-1, size*n_bins, size])
+    ).reshape([-1, size, n_bins, size])
+    T_sims = np.transpose(T_sims, [0, 1, 3, 2])
+    T_std = np.std(T_sims, axis=0)
 
     Nsims = np.array(pcls_mat_filt).shape[0]
 
+    if return_sims:
+        return T_mean, T_std / np.sqrt(Nsims), T_sims
     return T_mean, T_std / np.sqrt(Nsims)
+
+
+def correct_transfer_with_unfiltered(T_filt, T_unfilt,
+                                     T_filt_sims, T_unfilt_sims):
+    """
+    Refer a transfer function to the unfiltered simulations instead of the
+    input (theory) power spectrum.
+
+    The TM/MT estimators compare the filtered simulations with the input
+    C_ell, so the sample variance of the finite set of simulations enters
+    the transfer function. Applying the same estimator to the unfiltered
+    simulations gives, bin by bin, the matrix U that maps the input C_ell
+    to the spectra actually realized (identity up to sample variance).
+    Since T_filt = T U for the same realizations, the transfer function
+    relative to the realized skies is T = T_filt U^{-1} (per bin), where
+    the sample variance largely cancels.
+
+    Parameters
+    ----------
+    T_filt, T_unfilt : ndarray
+        Mean transfer functions from the filtered and the unfiltered
+        simulations, shape (N_field_pairs, N_field_pairs, N_bins).
+    T_filt_sims, T_unfilt_sims : ndarray
+        Per-simulation transfer functions (same realizations, same order),
+        shape (N_sims, N_field_pairs, N_field_pairs, N_bins).
+
+    Returns
+    -------
+    T_mean : ndarray
+        Corrected transfer function, shape (N_field_pairs, N_field_pairs,
+        N_bins).
+    T_std : ndarray
+        Standard deviation of the corrected mean, from the scatter of the
+        per-simulation corrected transfer functions divided by sqrt(N_sims).
+    """
+    def right_divide(A, B):
+        # per bin A @ pinv(B); bins on the last axis
+        A_ = np.moveaxis(A, -1, -3)
+        B_ = np.moveaxis(B, -1, -3)
+        return np.moveaxis(A_ @ np.linalg.pinv(B_), -3, -1)
+
+    T_mean = right_divide(T_filt, T_unfilt)
+    T_sims = right_divide(T_filt_sims, T_unfilt_sims)
+    Nsims = T_sims.shape[0]
+    return T_mean, np.std(T_sims, axis=0) / np.sqrt(Nsims)
 
 
 def get_transfer_with_error(mean_pcls_mat_filt,
@@ -318,7 +374,8 @@ def get_transfer_dict(pcls_mat_dict,
                       mcm,
                       nmt_binning,
                       compute_Dl=False,
-                      tf_ordering="TM"):
+                      tf_ordering="TM",
+                      tf_reference="theory"):
     """
     This is just a wrapper to loop over the filtering_pairs
     provided and compute the transfer function for each pair
@@ -354,12 +411,22 @@ def get_transfer_dict(pcls_mat_dict,
         of the transfer function.
         Default is "TM" and corresponds to the the approach
         described in https://arxiv.org/abs/2502.00946.
+    tf_reference : str, optional
+        What the filtered simulations are compared with.
+        "theory" (default): the input power spectrum `cl`.
+        "unfiltered_sims": the unfiltered simulations of the same
+        realizations (see `correct_transfer_with_unfiltered`), which removes
+        most of the sample variance of the simulations from the transfer
+        function. Requires pcls_mat_dict[...]["unfiltered"].
     Returns
     -------
     tf_dict : dict
         Dictionary with keys as (ftag1, ftag2) and values as another dict
         containing the transfer function and its error.
     """
+    if tf_reference not in ("theory", "unfiltered_sims"):
+        raise ValueError(f"Unknown tf_reference {tf_reference!r}: "
+                         "use 'theory' or 'unfiltered_sims'")
     tf_dict = {(ftag1, ftag2): {} for ftag1, ftag2 in filtering_pairs}
     tf_func = (
         get_transfer_with_error_TM
@@ -370,13 +437,34 @@ def get_transfer_dict(pcls_mat_dict,
 
         pcls_mat_filt = pcls_mat_dict[ftag1, ftag2]["filtered"]
 
-        tf, tferr = tf_func(
-            pcls_mat_filt,
-            cl,
-            mcm,
-            nmt_binning,
-            compute_Dl
-        )
+        if tf_reference == "theory":
+            tf, tferr = tf_func(
+                pcls_mat_filt,
+                cl,
+                mcm,
+                nmt_binning,
+                compute_Dl
+            )
+        else:
+            pcls_mat_unfilt = pcls_mat_dict[ftag1, ftag2]["unfiltered"]
+            if np.shape(pcls_mat_unfilt) != np.shape(pcls_mat_filt):
+                raise ValueError(
+                    "tf_reference='unfiltered_sims' needs the unfiltered "
+                    "pseudo-Cl matrices of the same simulations, got shapes "
+                    f"{np.shape(pcls_mat_unfilt)} and "
+                    f"{np.shape(pcls_mat_filt)}"
+                )
+            tf_f, _, tf_f_sims = tf_func(
+                pcls_mat_filt, cl, mcm, nmt_binning, compute_Dl,
+                return_sims=True
+            )
+            tf_u, _, tf_u_sims = tf_func(
+                pcls_mat_unfilt, cl, mcm, nmt_binning, compute_Dl,
+                return_sims=True
+            )
+            tf, tferr = correct_transfer_with_unfiltered(
+                tf_f, tf_u, tf_f_sims, tf_u_sims
+            )
         field_pairs = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"]
 
         for i, fp1 in enumerate(field_pairs):
